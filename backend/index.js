@@ -1,4 +1,5 @@
 require('colors');
+require('dotenv').config();
 
 console.log(`${'Honeyside'.yellow} © ${'2022'.yellow}`);
 console.log(`Welcome to ${'Clover'.cyan}`);

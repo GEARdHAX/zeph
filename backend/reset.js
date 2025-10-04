@@ -1,4 +1,5 @@
 require('colors');
+require('dotenv').config();
 
 console.log(`${'Honeyside'.yellow} © ${'2019'.yellow}`);
 console.log(`Welcome to ${'Clover'.cyan}`);
@@ -20,7 +21,13 @@ const mongooseConnect = () => {
   mongoose.set('useCreateIndex', true);
   let connecting = setTimeout(() => console.log('Connecting to DB...'.yellow), 1000);
   mongoose
-    .connect(Config.db, { useNewUrlParser: true, useFindAndModify: false, useUnifiedTopology: true })
+    .connect(Config.mongo.uri, {
+      useNewUrlParser: true,
+      useFindAndModify: false,
+      useUnifiedTopology: true,
+      dbName: Config.mongo.database,
+    })
+
     .then(() => {
       clearTimeout(connecting);
       Room.deleteMany({}).then(done);

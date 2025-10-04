@@ -119,8 +119,7 @@ module.exports = () => {
     const { mongo } = store.config;
     const uri =
       mongo.uri ||
-      `mongodb${mongo.srv ? '+srv' : ''}://${mongo.username}:${encodeURIComponent(mongo.password)}@${mongo.hostname}:${
-        mongo.port
+      `mongodb${mongo.srv ? '+srv' : ''}://${mongo.username}:${encodeURIComponent(mongo.password)}@${mongo.hostname}:${mongo.port
       }/${mongo.database}?authSource=${mongo.authenticationDatabase}`;
 
     mongoose.set('strictQuery', false);
@@ -129,7 +128,6 @@ module.exports = () => {
       .connect(uri, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
-        ssl: false,
         family: 4,
       })
       .then(() => {
