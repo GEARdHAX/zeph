@@ -13,25 +13,17 @@ function Info() {
           <img src={logo} alt="Picture" />
         </div>
         <div className="text">
-          Welcome to
-          {' '}
-          {Config.appName || 'Clover'}
+          Welcome to {Config.appName || 'Chattr'}
           !
           <br />
           <br />
-          {Config.appName || 'Clover'}
-          {' '}
-          is a messaging app that enables real-time messaging, audio and video calls,
+          {Config.appName || 'Chattr'} is a messaging app that enables real-time messaging, audio and video calls,
           groups and conferencing.
         </div>
       </div>
       <div className="text">
-        Copyright &copy;
-        {' '}
-        {Config.brand || 'Honeyside'}
-        <br />
-        v
-        {version}
+        Copyright &copy; {Config.brand || 'Adarsh Arya'}
+        <br />v{version}
       </div>
     </div>
   );
