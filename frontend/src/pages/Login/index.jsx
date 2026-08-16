@@ -4,12 +4,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import jwtDecode from 'jwt-decode';
 import { useDispatch } from 'react-redux';
 import Div100vh from 'react-div-100vh';
-import { toast } from 'react-toastify';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import {
+  Tabs, TabsList, TabsTrigger, TabsContent,
+} from '@/components/ui/tabs';
 import Credits from './components/Credits';
 import Logo from './components/Logo';
 import Input from './components/Input';
-import './Login.sass';
-import Config from '../../config';
 import login from '../../actions/login';
 import register from '../../actions/register';
 import setAuthToken from '../../actions/setAuthToken';
@@ -20,6 +24,8 @@ import backgroundImage from '../../assets/background.jpg';
 function Login() {
   const dispatch = useDispatch();
   const [info, setInfo] = useState({});
+  const [tab, setTab] = useState('login');
+  const [showCredits, setShowCredits] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,23 +47,6 @@ function Login() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (window.self !== window.top) {
-      toast.warn(
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            window.top.location.href = Config.url;
-          }}
-        >
-          <b>Click here to remove the Envato frame or meetings will not work properly.</b>
-        </a>,
-        {
-          autoClose: false,
-        },
-      );
-    }
-
     getInfo().then((res) => {
       setInfo(res.data);
     });
@@ -76,10 +65,10 @@ function Login() {
       dispatch(initIO(res.data.token));
       navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath, { replace: true });
       await setEntryPath(null);
-    } catch (e) {
+    } catch (err) {
       let errors = {};
-      if (!e.response || typeof e.response.data !== 'object') errors.generic = 'Could not connect to server.';
-      else errors = e.response.data;
+      if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Could not connect to server.';
+      else errors = err.response.data;
       setLoginErrors(errors);
     }
   };
@@ -102,23 +91,23 @@ function Login() {
       setUser(jwtDecode(res.data.token));
       setToken(res.data.token);
       dispatch(initIO(res.data.token));
-    } catch (e) {
+    } catch (err) {
       let errors = {};
-      if (!e.response || typeof e.response.data !== 'object') errors.generic = 'Could not connect to server.';
-      else errors = e.response.data;
+      if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Could not connect to server.';
+      else errors = err.response.data;
       setRegisterErrors(errors);
     }
   };
 
   const loginInfo = Object.keys(loginErrors).map((key) => (
-    <div className="uk-text-center" key={key}>
-      <span className="uk-text-danger">{loginErrors[key]}</span>
+    <div className="text-center text-sm text-destructive" key={key}>
+      {loginErrors[key]}
     </div>
   ));
 
   const registerInfo = Object.keys(registerErrors).map((key) => (
-    <div className="uk-text-center" key={key}>
-      <span className="uk-text-danger">{registerErrors[key]}</span>
+    <div className="text-center text-sm text-destructive" key={key}>
+      {registerErrors[key]}
     </div>
   ));
 
@@ -129,160 +118,133 @@ function Login() {
   return (
     <Div100vh>
       <div
-        className="login uk-cover-container uk-background-secondary uk-flex uk-flex-center uk-flex-middle uk-overflow-hidden uk-light"
+        className="relative flex h-full w-screen items-center justify-center overflow-hidden bg-cover bg-center text-white"
         style={loginStyle}
       >
-        <div className="uk-position-cover uk-overlay-primary" />
-        <div className="login-scrollable uk-flex uk-flex-center uk-flex-middle uk-position-z-index">
-          <Credits />
+        <div className="absolute inset-0 bg-[rgba(0,71,171,0.54)]" />
+        <div className="relative z-10 flex h-full w-full items-center justify-center overflow-y-auto">
+          <Credits onShowCredits={() => setShowCredits(true)} />
 
-          <div className="login-inner uk-width-medium uk-padding-small" data-uk-scrollspy="cls: uk-animation-fade">
+          <div className="flex min-h-[420px] w-[400px] max-w-full flex-col items-center justify-center p-2">
             <Logo />
 
-            <div className="toggle-credits">
-              <form className="toggle-class" onSubmit={onLogin}>
-                <fieldset className="uk-fieldset">
-                  {loginInfo}
-                  <Input
-                    icon="user"
-                    placeholder="Username (or email)"
-                    type="text"
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <Input
-                    icon="lock"
-                    placeholder="Password"
-                    type="password"
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <div className="uk-margin-small">
-                    <label>
-                      <input
-                        className="uk-checkbox"
-                        type="checkbox"
-                        onChange={(e) => setKeep(e.target.checked)}
-                        checked={keep}
-                      />{' '}
-                      Keep me logged in
-                    </label>
-                  </div>
-                  <div className="uk-margin-bottom">
-                    <button type="submit" className="uk-button uk-button-primary uk-border-pill uk-width-1-1">
-                      LOG IN
-                    </button>
-                  </div>
-                </fieldset>
-              </form>
+            {!showCredits && (
+              <div className="w-full text-foreground">
+                <Tabs value={tab} onValueChange={setTab}>
+                  <TabsList className="mb-2 w-full">
+                    <TabsTrigger value="login" className="flex-1">
+                      Log In
+                    </TabsTrigger>
+                    <TabsTrigger value="register" className="flex-1">
+                      Register
+                    </TabsTrigger>
+                  </TabsList>
 
-              <form className="toggle-class" onSubmit={onRegister} hidden>
-                {registerInfo}
-                <Input
-                  icon="user"
-                  placeholder="Username"
-                  type="text"
-                  onChange={(e) => setRegisterUsername(e.target.value)}
-                />
-                <Input
-                  icon="mail"
-                  placeholder="Email"
-                  type="email"
-                  onChange={(e) => setRegisterEmail(e.target.value)}
-                />
-                <Input
-                  icon="pencil"
-                  placeholder="First Name"
-                  type="text"
-                  onChange={(e) => setRegisterFirstName(e.target.value)}
-                />
-                <Input
-                  icon="pencil"
-                  placeholder="Last Name"
-                  type="text"
-                  onChange={(e) => setRegisterLastName(e.target.value)}
-                />
-                <Input
-                  icon="lock"
-                  placeholder="Password"
-                  type="password"
-                  onChange={(e) => setRegisterPassword(e.target.value)}
-                />
-                <Input
-                  icon="lock"
-                  placeholder="Repeat Password"
-                  type="password"
-                  onChange={(e) => setRegisterRepeatPassword(e.target.value)}
-                />
-                <div className="uk-margin-bottom">
-                  <button type="submit" className="uk-button uk-button-primary uk-border-pill uk-width-1-1">
-                    REGISTER
-                  </button>
-                </div>
-              </form>
+                  <TabsContent value="login">
+                    <form onSubmit={onLogin} className="flex flex-col gap-2">
+                      {loginInfo}
+                      <Input
+                        icon="user"
+                        placeholder="Username (or email)"
+                        type="text"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                      <Input
+                        icon="lock"
+                        placeholder="Password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <Label className="my-1 gap-2 text-white">
+                        <Checkbox checked={keep} onCheckedChange={(checked) => setKeep(checked === true)} />
+                        Keep me logged in
+                      </Label>
+                      <Button type="submit" className="w-full rounded-full">
+                        LOG IN
+                      </Button>
+                      {info.nodemailerEnabled && (
+                        <div className="mt-2 text-center text-sm">
+                          <Link to="/forgot-password" className="underline">
+                            Forgot your password?
+                          </Link>
+                        </div>
+                      )}
+                    </form>
+                  </TabsContent>
 
-              <form className="toggle-password" hidden>
-                <Input icon="mail" placeholder="Email" type="email" />
-                <div className="uk-margin-bottom">
-                  <button type="submit" className="uk-button uk-button-primary uk-border-pill uk-width-1-1">
-                    SEND CODE
-                  </button>
-                </div>
-              </form>
-
-              <div>
-                <div className="uk-text-center">
-                  <a
-                    className="uk-link-reset uk-text-small toggle-class"
-                    data-uk-toggle="target: .toggle-class ;animation: uk-animation-fade"
-                  >
-                    Need an account? Register now!
-                  </a>
-                  <a
-                    className="uk-link-reset uk-text-small toggle-class"
-                    data-uk-toggle="target: .toggle-class ;animation: uk-animation-fade"
-                    hidden
-                  >
-                    <span data-uk-icon="arrow-left" /> Back to Login
-                  </a>
-                </div>
-
-                {info.nodemailerEnabled && (
-                  <div className="uk-text-center" style={{ marginTop: 12 }}>
-                    <a className="uk-link-reset uk-text-small" href="#">
-                      <Link to="/forgot-password">Forgot your password?</Link>
-                    </a>
-                  </div>
-                )}
+                  <TabsContent value="register">
+                    <form onSubmit={onRegister} className="flex flex-col gap-2">
+                      {registerInfo}
+                      <Input
+                        icon="user"
+                        placeholder="Username"
+                        type="text"
+                        value={registerUsername}
+                        onChange={(e) => setRegisterUsername(e.target.value)}
+                      />
+                      <Input
+                        icon="mail"
+                        placeholder="Email"
+                        type="email"
+                        value={registerEmail}
+                        onChange={(e) => setRegisterEmail(e.target.value)}
+                      />
+                      <Input
+                        icon="pencil"
+                        placeholder="First Name"
+                        type="text"
+                        value={registerFirstName}
+                        onChange={(e) => setRegisterFirstName(e.target.value)}
+                      />
+                      <Input
+                        icon="pencil"
+                        placeholder="Last Name"
+                        type="text"
+                        value={registerLastName}
+                        onChange={(e) => setRegisterLastName(e.target.value)}
+                      />
+                      <Input
+                        icon="lock"
+                        placeholder="Password"
+                        type="password"
+                        value={registerPassword}
+                        onChange={(e) => setRegisterPassword(e.target.value)}
+                      />
+                      <Input
+                        icon="lock"
+                        placeholder="Repeat Password"
+                        type="password"
+                        value={registerRepeatPassword}
+                        onChange={(e) => setRegisterRepeatPassword(e.target.value)}
+                      />
+                      <Button type="submit" className="w-full rounded-full">
+                        REGISTER
+                      </Button>
+                    </form>
+                  </TabsContent>
+                </Tabs>
               </div>
-            </div>
+            )}
 
-            <form className="toggle-credits uk-text-center" hidden>
-              <span>
-                Everyone has a sweet side
-                <br />
-                Everything can taste like honey
-                <br />
-              </span>
-              <br />
-              <br />
-              The default background image is from{' '}
-              <a href="https://picsum.photos/" target="_blank" rel="noopener noreferrer">
-                Picsum Photos
-              </a>
-              <br />
-              <br />A big thank you to all contributors to React, Redux, Socket.IO, Emoji Mart, Axios, SASS and Moment
-            </form>
-
-            <div>
-              <div className="uk-margin-top uk-text-center">
-                <a
-                  className="uk-link-reset uk-text-small toggle-credits"
-                  data-uk-toggle="target: .toggle-credits ;animation: uk-animation-fade"
-                  hidden
-                >
-                  <span data-uk-icon="arrow-left" /> Close Credits
+            {showCredits && (
+              <div className="w-full text-center text-sm text-foreground">
+                {'The default background image is from '}
+                <a href="https://picsum.photos/" target="_blank" rel="noopener noreferrer" className="underline">
+                  Picsum Photos
                 </a>
+                <br />
+                <br />
+                A big thank you to all contributors to React, Redux, Socket.IO, Emoji Mart, Axios, SASS and Moment
+                <div className="mt-4">
+                  <Button variant="ghost" size="sm" onClick={() => setShowCredits(false)}>
+                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    Close Credits
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

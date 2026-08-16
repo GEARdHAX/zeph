@@ -1,5 +1,6 @@
 const File = require('../models/File');
 const fs = require('fs');
+const logger = require('../logger');
 
 module.exports = (req, res, next) => {
   const { id } = req.params;
@@ -12,7 +13,7 @@ module.exports = (req, res, next) => {
 
       fs.access(location, fs.constants.F_OK, (err) => {
         if (err) {
-          console.log(err);
+          logger.warn({ err, fileId: id }, 'File missing on disk');
           // TODO handle missing file
         }
 
@@ -22,7 +23,7 @@ module.exports = (req, res, next) => {
       });
     })
     .catch((err) => {
-      console.log(err);
+      logger.error({ err, fileId: id }, 'Failed to look up file descriptor');
       // TODO handle missing database entry
     });
 };

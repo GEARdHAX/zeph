@@ -1,5 +1,6 @@
 const Message = require('../models/Message');
 const Room = require('../models/Room');
+const logger = require('../logger');
 
 module.exports = (req, res, next) => {
   let { id } = req.fields;
@@ -75,7 +76,7 @@ module.exports = (req, res, next) => {
     })
     .exec((err, room) => {
       if (err || !room) {
-        console.log(err);
+        if (err) logger.error({ err, roomId: id }, 'Failed to look up room for join-room');
         return res.status(404).json({ error: true });
       }
       if (room.people.filter((person) => req.user.id.toString() === person._id.toString()).length === 0) {

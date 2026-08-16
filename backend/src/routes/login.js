@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Session = require('../models/Session');
 const argon2 = require('argon2');
 const store = require('../store');
 const jwt = require('jsonwebtoken');
@@ -15,7 +16,9 @@ module.exports = (req, res, next) => {
 
   email = email.toLowerCase();
 
-  const sendResponse = (user) => {
+  const sendResponse = async (user) => {
+    const session = await new Session({ user: user._id, userAgent: req.headers['user-agent'] || '' }).save();
+
     const payload = {
       id: user._id,
       email: user.email,
@@ -24,6 +27,7 @@ module.exports = (req, res, next) => {
       lastName: user.lastName,
       picture: user.picture,
       username: user.username,
+      deviceId: session._id,
     };
     jwt.sign(payload, store.config.secret, { expiresIn: 60 * 60 * 24 * 60 }, (err, token) => {
       if (err) return res.status(500).json({ token: 'Error signing token.' });

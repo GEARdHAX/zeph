@@ -1,44 +1,13 @@
-import './TopBar.sass';
-import { FiArrowLeft, FiMoreHorizontal, FiExternalLink } from 'react-icons/fi';
-import Config from '../../../config';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 function TopBar({ back }) {
-  const honeyside = () => window.open('https://www.honeyside.it', '_blank');
-  const codeCanyon = () => window.open(
-    'https://codecanyon.net/item/clover-realtime-messaging-audio-video-conferencing-web-app-nodejs-react-webrtc-socketio/25737452',
-    '_blank',
-  );
-
   return (
-    <div className="top-bar uk-flex uk-flex-between uk-flex-middle">
-      <div className="nav">
-        <div className="button" onClick={back}>
-          <FiArrowLeft />
-        </div>
-      </div>
-      <div className="nav">
-        {Config.demo && (
-          <div className="uk-inline">
-            <div className="button" type="button">
-              <FiMoreHorizontal />
-            </div>
-            <div data-uk-dropdown="mode: click; offset: 5; boundary: .top-bar; pos: bottom-right">
-              <div className="link" onClick={honeyside}>
-                Honeyside
-                <div className="icon">
-                  <FiExternalLink />
-                </div>
-              </div>
-              <div className="link" onClick={codeCanyon}>
-                CodeCanyon
-                <div className="icon">
-                  <FiExternalLink />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+    <div className="flex h-[54px] w-full items-center justify-between border-b bg-card px-2">
+      <Button variant="ghost" size="icon" onClick={back}>
+        <ArrowLeft />
+      </Button>
+      <div />
     </div>
   );
 }

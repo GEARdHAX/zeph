@@ -1,10 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import './Room.sass';
-import { FiCircle } from 'react-icons/fi';
 import { useSelector } from 'react-redux';
 import { useGlobal } from 'reactn';
 import { Lightbox } from 'react-modal-image';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import Config from '../../../config';
+
+const STATUS_COLOR = {
+  online: 'bg-emerald-500',
+  away: 'bg-orange-500',
+  busy: 'bg-destructive',
+  offline: 'bg-gray-400',
+};
 
 function Room() {
   const room = useSelector((state) => state.io.room);
@@ -33,58 +40,65 @@ function Room() {
     });
   }
 
-  function Picture({ picture, user, group }) {
-    if (picture) return <img src={`${Config.url || ''}/api/images/${picture.shieldedID}/256`} alt="Picture" />;
+  function Picture({ picture, user: pictureUser, group }) {
+    if (picture) {
+      return (
+        <img
+          src={`${Config.url || ''}/api/images/${picture.shieldedID}/256`}
+          alt="Picture"
+          className="h-full w-full object-cover"
+        />
+      );
+    }
     return (
-      <div className="img">
-        {group ? room.title.substr(0, 1) : `${user.firstName.substr(0, 1)}${user.lastName.substr(0, 1)}`}
+      <div className="flex h-full w-full items-center justify-center bg-secondary text-secondary-foreground">
+        {group ? room.title.substr(0, 1) : `${pictureUser.firstName.substr(0, 1)}${pictureUser.lastName.substr(0, 1)}`}
       </div>
     );
   }
 
   const rows = [];
-  // eslint-disable-next-line no-unused-vars
-  let rowIndex = 0;
   let row = [];
 
   room.images.forEach((message) => {
     row.push(message);
     if (row.length === 2) {
       rows.push(row);
-      rowIndex++;
       row = [];
     }
   });
   if (row.length > 0) rows.push(row);
 
-  const images = rows.map((row, key) => {
-    const images = row.map((message) => {
-      return (
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-        <img
-          src={`${Config.url || ''}/api/images/${message.content}/256`}
-          alt={`Sent by @${message.author.username}`}
-          onClick={() => setOpen(message)}
-          key={message.content}
-        />
-      );
-    });
-    return <div className="row" key={key}>{images}</div>;
+  const images = rows.map((imageRow, key) => {
+    const rowImages = imageRow.map((message) => (
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+      <img
+        src={`${Config.url || ''}/api/images/${message.content}/256`}
+        alt={`Sent by @${message.author.username}`}
+        onClick={() => setOpen(message)}
+        key={message.content}
+        className="mb-0.5 h-[147px] w-[147px] flex-1 cursor-pointer object-cover first:ml-0.5 last:mr-0.5"
+      />
+    ));
+    // eslint-disable-next-line react/no-array-index-key
+    return (
+      <div className="flex min-h-[149px] flex-row" key={key}>
+        {rowImages}
+      </div>
+    );
   });
 
   const onScroll = () => {
     setScrollHeight(scrollContainer.current.scrollHeight);
-    if (
-      scrollContainer.current.scrollTop
-      >= scrollContainer.current.scrollHeight - scrollContainer.current.offsetHeight
-    ) {
-      // Request more images
-    }
   };
 
   function Notice() {
     if (images.length === 0) {
-      return <div className="notice-text">There are no images in this conversation yet.</div>;
+      return (
+        <div className="p-5 text-center text-sm text-muted-foreground">
+          There are no images in this conversation yet.
+        </div>
+      );
     }
     return null;
   }
@@ -101,51 +115,38 @@ function Room() {
 
   people.sort(compare);
 
-  const getColor = (id) => {
+  const getStatus = (id) => {
     if (onlineUsers.filter((u) => u.id === id && u.status === 'busy').length > 0) return 'busy';
     if (onlineUsers.filter((u) => u.id === id && u.status === 'online').length > 0) return 'online';
     if (onlineUsers.filter((u) => u.id === id && u.status === 'away').length > 0) return 'away';
     return 'offline';
   };
 
-  const members = people.map((person, key) => (
-    <div className="member" key={key}>
-      <Picture picture={person.picture} user={person} />
-      <div className="text">
-        {person.firstName}
-        {' '}
-        {person.lastName}
+  const members = people.map((person) => (
+    <div key={person._id} className="flex h-[54px] items-center border-b text-sm last:border-b-0">
+      <div className="mx-4 h-10 w-10 shrink-0 overflow-hidden rounded-full">
+        <Picture picture={person.picture} user={person} />
       </div>
-      <div className={getColor(person._id)}>
-        <FiCircle />
-      </div>
+      <div className="flex-1">{`${person.firstName} ${person.lastName}`}</div>
+      <span className={cn('mr-4 h-2.5 w-2.5 shrink-0 rounded-full', STATUS_COLOR[getStatus(person._id)])} />
     </div>
   ));
 
-  function Members() {
-    return <div className="members">{members}</div>;
-  }
-
   return (
-    <div className="details-room">
-      <div className="profile">
+    <div className="flex h-full min-w-[280px] flex-col items-center overflow-hidden bg-background">
+      <div className="m-10 h-[200px] w-[200px] shrink-0 overflow-hidden rounded-full text-5xl">
         <Picture group={room.isGroup} picture={room.isGroup ? room.picture : other.picture} user={other} />
       </div>
-      <div className="name" hidden>
-        {room.isGroup ? room.title : `${other.firstName} ${other.lastName}`}
-      </div>
-      <div className="title" hidden>
-        {other.tagLine || 'No Tag Line'}
-      </div>
-      <button
-        className="details-button uk-margin-remove-bottom uk-button uk-button-secondary"
-        onClick={() => setViewMembers(!viewMembers)}
+      <Button variant="secondary" className="w-full" onClick={() => setViewMembers(!viewMembers)}>
+        {`View ${viewMembers ? 'Images' : 'Members'}`}
+      </Button>
+      {viewMembers && <div className="h-full w-full overflow-y-auto py-0 pr-5">{members}</div>}
+      <div
+        className="flex w-full flex-1 flex-col overflow-y-auto overflow-x-hidden py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        ref={scrollContainer}
+        onScroll={onScroll}
+        hidden={viewMembers}
       >
-        View
-        {viewMembers ? 'Images' : 'Members'}
-      </button>
-      {viewMembers && <Members />}
-      <div className="images" ref={scrollContainer} onScroll={onScroll} hidden={viewMembers}>
         {open && (
           <Lightbox
             medium={`${Config.url || ''}/api/images/${open.content}/1024`}

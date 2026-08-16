@@ -1,9 +1,13 @@
 const Room = require('../models/Room');
 
+const MAX_LIMIT = 100;
+const DEFAULT_LIMIT = 30;
+
 module.exports = (req, res, next) => {
   let { limit } = req.fields;
 
-  !limit && (limit = 30);
+  limit = Number(limit) || DEFAULT_LIMIT;
+  limit = Math.min(Math.max(limit, 1), MAX_LIMIT);
 
   Room.find({
     people: { $in: [req.user.id] },

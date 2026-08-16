@@ -1,6 +1,6 @@
 {
-  "name": "adarsh-arya",
-  "author": "Adarsh Arya",
+  "name": "chitcx",
+  "author": "",
   "version": "2.9.1",
   "private": true,
   "type": "module",
@@ -11,7 +11,9 @@
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
     "lint:check": "eslint .",
-    "lint:fix": "eslint --fix ."
+    "lint:fix": "eslint --fix .",
+    "test": "vitest run",
+    "bench:bundle": "node scripts/bench-bundle.js"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -30,12 +32,19 @@
   },
   "dependencies": {
     "@emoji-mart/data": "1.1.2",
+    "@emoji-mart/react": "^1.1.1",
+    "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react-swc": "3.6.0",
     "axios": "1.6.7",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "emoji-mart": "^5.6.0",
     "emoji-regex": "10.3.0",
     "jwt-decode": "3.1.2",
+    "lucide-react": "^1.31.0",
     "mediasoup-client": "3.7.2",
     "moment": "2.30.1",
+    "radix-ui": "^1.6.7",
     "react": "18.2.0",
     "react-data-table-component": "7.6.2",
     "react-div-100vh": "0.7.0",
@@ -50,30 +59,36 @@
     "reactn": "2.2.7",
     "redux": "4.2.1",
     "redux-thunk": "2.4.2",
-    "sass": "1.70.0",
-    "socket.io-client": "2.5.0",
+    "socket.io-client": "^4.8.3",
     "striptags": "3.2.0",
-    "styled-components": "5.3.11",
-    "uikit": "3.18.3",
-    "vite": "5.1.1",
-    "xss": "1.0.14",
-    "@emoji-mart/react": "^1.1.1"
+    "styled-components": "^6.5.3",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^5.4.19",
+    "xss": "1.0.14"
   },
   "devDependencies": {
     "@babel/core": "7.23.9",
     "@babel/eslint-parser": "7.23.10",
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",
     "@babel/preset-react": "7.23.3",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.4",
     "eslint": "8.56.0",
     "eslint-config-airbnb": "19.0.4",
     "eslint-config-prettier": "9.1.0",
     "eslint-config-react": "1.1.7",
+    "eslint-import-resolver-alias": "^1.1.2",
     "eslint-plugin-import": "2.29.1",
     "eslint-plugin-jsx-a11y": "6.8.0",
     "eslint-plugin-prettier": "5.1.3",
     "eslint-plugin-react": "7.33.2",
     "eslint-plugin-react-hooks": "4.6.0",
-    "prettier": "3.2.5"
+    "jsdom": "^29.1.1",
+    "prettier": "3.2.5",
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "eslint-plugin-jsx-a11y": "6.8.0"

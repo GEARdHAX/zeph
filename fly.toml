@@ -1,0 +1,8 @@
+# fly.toml — REMOVED
+#
+# Fly.io is no longer part of this stack.
+# Decision: D-008 in DECISIONS.md
+#
+# The backend API + Socket.IO + Mediasoup all run on the Oracle Always-Free ARM instance.
+# See infra/mediasoup-host.md for the full provisioning guide.
+# See docker-compose.prod.yml for the production deployment configuration.

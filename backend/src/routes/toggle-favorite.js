@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const logger = require('../logger');
 
 module.exports = (req, res, next) => {
   let { roomID } = req.fields;
@@ -31,12 +32,12 @@ module.exports = (req, res, next) => {
           res.status(200).json({ favorites: user.favorites, roomID });
         })
         .catch((err) => {
-          console.log(err);
+          logger.error({ err, userId: req.user.id }, 'Failed to populate favorites after toggle');
           res.status(500).json({ error: true });
         });
     })
     .catch((err) => {
-      console.log(err);
+      logger.error({ err, userId: req.user.id }, 'Failed to toggle favorite');
       res.status(500).json({ error: true });
     });
 };

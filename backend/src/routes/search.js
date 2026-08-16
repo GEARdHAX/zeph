@@ -1,10 +1,20 @@
 const User = require('../models/User');
 Config = require('../../config');
 
-module.exports = (req, res, next) => {
-  let { search, limit, more } = req.fields;
+const MAX_LIMIT = 50;
+const DEFAULT_LIMIT = 25;
 
-  !limit && (limit = 25);
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+module.exports = (req, res, next) => {
+  let { search, limit } = req.fields;
+
+  search = typeof search === 'string' ? search.slice(0, 100) : '';
+
+  limit = Number(limit) || DEFAULT_LIMIT;
+  limit = Math.min(Math.max(limit, 1), MAX_LIMIT);
+
+  const safeSearch = escapeRegex(search);
 
   User.aggregate()
     .project({
@@ -20,11 +30,11 @@ module.exports = (req, res, next) => {
       $and: [
         {
           $or: [
-            { fullName: { $regex: `.*${search}.*`, $options: 'i' } },
-            { email: { $regex: `.*${search}.*`, $options: 'i' } },
-            { username: { $regex: `.*${search}.*`, $options: 'i' } },
-            { firstName: { $regex: `.*${search}.*`, $options: 'i' } },
-            { lastName: { $regex: `.*${search}.*`, $options: 'i' } },
+            { fullName: { $regex: safeSearch, $options: 'i' } },
+            { email: { $regex: safeSearch, $options: 'i' } },
+            { username: { $regex: safeSearch, $options: 'i' } },
+            { firstName: { $regex: safeSearch, $options: 'i' } },
+            { lastName: { $regex: safeSearch, $options: 'i' } },
           ],
         },
         {
@@ -35,6 +45,7 @@ module.exports = (req, res, next) => {
     .sort({ _id: -1 })
     .limit(limit)
     .exec((err, users) => {
+      if (err) return res.status(500).json({ error: true });
       User.populate(users, { path: 'picture' }, (err, users) => {
         if (err) return res.status(500).json({ error: true });
         res.status(200).json({ limit, search, users });

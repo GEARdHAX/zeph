@@ -1,0 +1,149 @@
+version: '3.9'
+
+# ============================================================
+# Chitcx — Local Development Stack
+# ============================================================
+# Usage:
+#   docker compose up           — start all services
+#   docker compose up --build   — rebuild images first
+#   docker compose down -v      — stop and remove volumes
+#
+# Prerequisites:
+#   - backend/.env (copy from backend/.env.example, set MONGO_URI and REDIS_URL)
+#   - frontend/.env (copy from frontend/.env.example)
+# ============================================================
+
+services:
+
+  # ── MongoDB ─────────────────────────────────────────────
+  mongo:
+    image: mongo:6.0
+    container_name: chitcx_mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: chitcx
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - chitcx_net
+
+  # ── Redis ────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: chitcx_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - chitcx_net
+
+  # ── Ollama (optional local AI — summarize/translate/draft-reply) ──
+  # Not a backend dependency: the app runs fully without this container.
+  # Set AI_PROVIDER=ollama in backend/.env to enable AI features against it.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: chitcx_ollama
+    restart: unless-stopped
+    profiles: [ai]
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - '11434:11434'
+    networks:
+      - chitcx_net
+
+  # ── Backend (Express / Socket.IO / Mediasoup) ───────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chitcx_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override specific vars for Docker networking
+      MONGO_URI: mongodb://mongo:27017/chitcx
+      REDIS_URL: redis://redis:6379
+      # Mediasoup must know the host's actual public IP for WebRTC
+      # Set PUBLIC_IP_ADDRESS in backend/.env to your machine/server IP
+      PUBLIC_IP_ADDRESS: ${PUBLIC_IP_ADDRESS:-127.0.0.1}
+      MAPPED_IP: ${MAPPED_IP:-false}
+    ports:
+      - "${PORT:-4002}:${PORT:-4002}"
+      # Mediasoup RTC UDP/TCP port range — must match config.rtcMinPort/rtcMaxPort
+      - "10000-12000:10000-12000/udp"
+      - "10000-12000:10000-12000/tcp"
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:${PORT:-4002}/healthz | grep -q 'ok'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - chitcx_net
+
+  # ── Frontend (Vite dev server — HMR enabled) ────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: chitcx_frontend
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env
+    environment:
+      VITE_BACKEND_URL: http://localhost:${PORT:-4002}
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5173 > /dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - chitcx_net
+
+# ── Volumes ──────────────────────────────────────────────
+volumes:
+  mongo_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+# ── Networks ─────────────────────────────────────────────
+networks:
+  chitcx_net:
+    driver: bridge

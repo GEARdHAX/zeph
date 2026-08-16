@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useGlobal } from 'reactn';
-import './Create.sass';
-import TopBar from './components/TopBar';
-import SearchBar from './components/SearchBar';
-import User from './components/User';
+import { Button } from '@/components/ui/button';
+import TopBar from '../components/TopBar';
+import SearchBar from '../components/SearchBar';
+import User from '../components/User';
 import search from '../../../actions/search';
 
-function Panel() {
+function CreateGroupStepOne() {
   const setPanel = useGlobal('panel')[1];
   const user = useGlobal('user')[0];
   const searchText = useGlobal('search')[0];
@@ -33,13 +33,14 @@ function Panel() {
     }
   };
 
-  const searchResultsList = searchResults.map((user) => (
-    <User key={user._id} user={user} selected={newGroupUsers.includes(user._id)} onSelect={() => onSelect(user._id)} />
+  const searchResultsList = searchResults.map((resultUser) => (
+    <User
+      key={resultUser._id}
+      user={resultUser}
+      selected={newGroupUsers.includes(resultUser._id)}
+      onSelect={() => onSelect(resultUser._id)}
+    />
   ));
-
-  function Notice({ text }) {
-    return <div className="notice">{text}</div>;
-  }
 
   const createGroup = (e) => {
     e.preventDefault();
@@ -47,31 +48,37 @@ function Panel() {
     else setError(true);
   };
 
+  const selectedCount = newGroupUsers.length - 1;
+  const hasSelection = newGroupUsers.length > 1;
+
   return (
-    <div className="group-create">
-      <TopBar />
+    <div className="flex h-full flex-1 flex-col border-r sm:w-full md:max-w-[300px] md:min-w-[300px] lg:max-w-[360px] lg:min-w-[360px]">
+      <TopBar back={() => setPanel('standard')} />
       <SearchBar />
-      <button
-        className="uk-margin-remove uk-button uk-button-large uk-button-primary create-button"
-        onClick={createGroup}
-      >
+      <Button className="w-full rounded-none" onClick={createGroup}>
         Select Users
-      </button>
-      <div className="selection-text error" hidden={newGroupUsers.length <= 1 || !error}>
-        You must select some people!
-      </div>
-      <div className="selection-text" hidden={newGroupUsers.length <= 1}>
-        {newGroupUsers.length - 1}
-        {' '}
-        selected -
-        <a onClick={() => setNewGroupUsers([user.id])}>Clear</a>
-      </div>
-      <div className="rooms">
+      </Button>
+      {hasSelection && error && (
+        <div className="bg-muted px-3 py-3 text-center text-sm text-blue-700">You must select some people!</div>
+      )}
+      {hasSelection && (
+        <div className="flex items-center justify-center gap-1 bg-muted px-3 py-3 text-center text-sm text-muted-foreground">
+          {`${selectedCount} selected -`}
+          <button type="button" className="underline" onClick={() => setNewGroupUsers([user.id])}>
+            Clear
+          </button>
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto">
         {searchResultsList}
-        {searchResults.length === 0 && <Notice text={`There are no users available for "${searchText}"`} />}
+        {searchResults.length === 0 && (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            {`There are no users available for "${searchText}"`}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export default Panel;
+export default CreateGroupStepOne;

@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import './Room.sass';
-import { FiMessageSquare } from 'react-icons/fi';
+import { MessageSquare } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useGlobal } from 'reactn';
@@ -8,7 +7,7 @@ import Picture from '../../../components/Picture';
 import createRoom from '../../../actions/createRoom';
 import Actions from '../../../constants/Actions';
 
-function Room({ user }) {
+function User({ user }) {
   const [hover, setHover] = useState(false);
   const setNav = useGlobal('nav')[1];
 
@@ -28,29 +27,37 @@ function Room({ user }) {
   };
 
   return (
-    <div className="room uk-flex" onMouseOver={() => setHover(true)} onMouseOut={() => setHover(false)} onClick={chat}>
-      <div className="profile">
+    <div
+      className="flex h-[54px] cursor-pointer items-center border-b hover:bg-muted"
+      onMouseOver={() => setHover(true)}
+      onFocus={() => setHover(true)}
+      onMouseOut={() => setHover(false)}
+      onBlur={() => setHover(false)}
+      onClick={chat}
+    >
+      <div className="mx-3 h-10 w-10 shrink-0 overflow-hidden rounded-full [&_.img]:flex [&_.img]:h-10 [&_.img]:w-10 [&_.img]:items-center [&_.img]:justify-center [&_.img]:bg-secondary [&_.img]:text-lg [&_.img]:text-secondary-foreground">
         <Picture user={user} />
       </div>
-      <div className="text">
-        <div className="title">
+      <div className="flex flex-1 flex-col justify-center">
+        <div className="text-[13px] font-bold">
           {title}
           {title.length > 22 && '...'}
         </div>
       </div>
-      <div className="controls" hidden={hover}>
-        <div className="date">
-          @
-          {user.username}
+      {!hover && (
+        <div className="flex items-center pr-2">
+          <div className="text-[10px] text-muted-foreground">{`@${user.username}`}</div>
         </div>
-      </div>
-      <div className="controls" hidden={!hover}>
-        <div className="button">
-          <FiMessageSquare />
+      )}
+      {hover && (
+        <div className="flex items-center pr-2">
+          <div className="flex items-center p-1 text-muted-foreground">
+            <MessageSquare className="h-4 w-4" />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-export default Room;
+export default User;

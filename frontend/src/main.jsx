@@ -1,8 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import UIkit from 'uikit';
-import Icons from 'uikit/dist/js/uikit-icons';
 import { Provider } from 'react-redux';
 import App from './App';
 import * as serviceWorker from './serviceWorker';
@@ -10,9 +8,6 @@ import init from './init';
 import store from './store';
 
 init().then(() => {
-  // Loading UIkit Icons plugin.
-  UIkit.use(Icons);
-
   const root = ReactDOM.createRoot(document.getElementById('root'));
   root.render(
     <React.StrictMode>

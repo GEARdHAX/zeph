@@ -11,6 +11,11 @@ const MessageSchema = new Schema({
     type: Date,
     default: Date.now,
   },
+  readBy: [{ type: Schema.ObjectId, ref: 'users' }],
 });
+
+// Every message list/pagination/sync query filters by room first, then ranges on _id
+// (already indexed as the primary key) — a single index on room covers all of them.
+MessageSchema.index({ room: 1 });
 
 module.exports = User = mongoose.model('messages', MessageSchema);

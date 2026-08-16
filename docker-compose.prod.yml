@@ -1,0 +1,70 @@
+# docker-compose.prod.yml — Oracle Always-Free production stack
+#
+# Usage on the Oracle instance:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This file OVERRIDES docker-compose.yml with production-specific settings:
+#   - Frontend container removed (static build deployed to Cloudflare Pages instead)
+#   - Nginx added as reverse proxy + TLS termination (for media subdomain)
+#   - Backend restarts always, no volume bind-mounts
+#   - Redis and Mongo don't expose ports to the host (internal network only)
+#   - Mediasoup RTC ports remain exposed on host (UDP/TCP 10000-12000)
+
+version: '3.9'
+
+services:
+
+  # ── MongoDB — internal only in prod ──────────────────────
+  mongo:
+    ports: !reset []          # remove host port binding — not exposed externally
+    restart: always
+
+  # ── Redis — internal only in prod ────────────────────────
+  redis:
+    ports: !reset []          # remove host port binding — not exposed externally
+    restart: always
+
+  # ── Backend — production settings ────────────────────────
+  backend:
+    restart: always
+    environment:
+      NODE_ENV: production
+      # PUBLIC_IP_ADDRESS and other secrets come from backend/.env on the Oracle host
+    # Remove the dev healthcheck curl (curl may not be in the image)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT:-4002}/healthz | grep -q ok || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Frontend — DISABLED in production ────────────────────
+  # The frontend is deployed to Cloudflare Pages as a static build.
+  # Run `npm run build` locally or in CI, then push to Cloudflare Pages.
+  frontend:
+    profiles:
+      - dev-only     # this service only starts when --profile dev-only is passed
+                     # i.e. it never starts in production with the standard command
+
+  # ── Nginx — production reverse proxy ─────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: chitcx_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/conf.d/chitcx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro          # Let's Encrypt certs (mounted from host)
+      - /var/www/certbot:/var/www/certbot:ro          # certbot webroot
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chitcx_net
+
+volumes:
+  nginx_logs:
+    driver: local

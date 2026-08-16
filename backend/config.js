@@ -1,11 +1,24 @@
 require('dotenv').config();
 const info = require('./version.json');
 
+if (!process.env.AUTH_SECRET) {
+  console.error(
+    'FATAL: AUTH_SECRET environment variable is not set. Refusing to start with an insecure default JWT secret.',
+  );
+  process.exit(1);
+}
+
 module.exports = {
   appVersion: info.version,
   appBuild: info.build,
   port: process.env.PORT || 4000,
-  secret: process.env.AUTH_SECRET || 'jwt-default-secret',
+  secret: process.env.AUTH_SECRET,
+  corsOrigin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
+    : ['http://localhost:5173'],
+  aiProvider: process.env.AI_PROVIDER || 'none',
+  ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
+  ollamaModel: process.env.OLLAMA_MODEL || 'llama3.2:1b',
   mongo: {
     uri: process.env.MONGO_URI,
     srv: (process.env.MONGO_SRV || '').toString() === 'true',
@@ -14,7 +27,7 @@ module.exports = {
     authenticationDatabase: process.env.MONGO_AUTHENTICATION_DATABASE,
     hostname: process.env.MONGO_HOSTNAME,
     port: process.env.MONGO_PORT,
-    database: process.env.MONGO_DATABASE_NAME || 'crumble',
+    database: process.env.MONGO_DATABASE_NAME || 'chitcx',
   },
   dataFolder: './data',
   rootUser: {

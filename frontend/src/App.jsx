@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { getGlobal, useGlobal, setGlobal } from 'reactn';
-import './App.sass';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ToastContainer, toast } from 'react-toastify';
@@ -86,7 +85,7 @@ function App() {
   }
 
   return (
-    <div className={`theme ${Config.theme}`}>
+    <div className="fixed h-full w-full overflow-hidden bg-blue-800" data-theme={Config.theme}>
       <ToastContainer
         position="bottom-right"
         autoClose={5000}

@@ -1,10 +1,7 @@
 import { useEffect, useRef } from 'react';
-import './LittleInterface.sass';
 import Picture from '../../../components/Picture';
 
-function Interface({
-  audio, video, peer, isMaximized,
-}) {
+function LittleInterface({ audio, video, peer, isMaximized }) {
   const audioRef = useRef(null);
   const videoRef = useRef(null);
 
@@ -19,12 +16,12 @@ function Interface({
   }, [video]);
 
   return (
-    <div className="little-interface uk-flex uk-flex-middle uk-flex-center uk-flex-column uk-height-1-1">
+    <div className="flex h-full flex-col items-center justify-center overflow-hidden">
       {audio && (
         <audio
           ref={audioRef}
           onLoadedMetadata={() => audioRef.current.play()}
-          className="remote-audio"
+          className="hidden"
           controls={false}
           hidden
           data-user={peer}
@@ -34,27 +31,28 @@ function Interface({
         <video
           ref={videoRef}
           onLoadedMetadata={() => videoRef.current.play()}
-          className="remote-video"
+          className="h-full w-full"
           playsInline
           controls={false}
-          hidden={false}
           data-user={peer}
           style={{ objectFit: isMaximized ? 'cover' : 'contain' }}
         />
       )}
       {!video && (
-        <div className="remote-peer">
-          <div className="name">
-            {peer.firstName}
-            {' '}
-            {peer.lastName}
+        <div className="flex h-full w-full flex-1 flex-col items-center justify-center bg-muted">
+          <div className="flex h-[16px] items-end py-px text-[11px] font-bold text-muted-foreground">
+            {`${peer.firstName} ${peer.lastName}`}
           </div>
-          <Picture user={peer} />
-          <div className="status">{!video && !audio ? 'Spectator' : 'Audio Only'}</div>
+          <div className="h-10 w-10 min-w-10 [&_.img]:flex [&_.img]:h-10 [&_.img]:w-10 [&_.img]:items-center [&_.img]:justify-center [&_.img]:rounded-full [&_.img]:bg-muted-foreground [&_.img]:text-base [&_.img]:text-background [&_img]:h-10 [&_img]:w-10 [&_img]:rounded-full">
+            <Picture user={peer} />
+          </div>
+          <div className="flex h-[16px] items-start py-px text-[11px] font-bold text-muted-foreground">
+            {!video && !audio ? 'Spectator' : 'Audio Only'}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export default Interface;
+export default LittleInterface;

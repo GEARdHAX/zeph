@@ -4,12 +4,12 @@ const jwt = require('jsonwebtoken');
 const validator = require('validator');
 const isEmpty = require('../utils/isEmpty');
 const xss = require('xss');
+const logger = require('../logger');
 
 module.exports = (req, res, next) => {
-  console.log(req.fields);
   let email = xss(req.fields.email);
 
-  if (!req.user.level === 'root') return res.status(401).send('401 Unauthorized User');
+  if (req.user.level !== 'root') return res.status(401).send('401 Unauthorized User');
 
   let errors = {};
   isEmpty(email) && (errors.email = 'Email required.');
@@ -20,6 +20,7 @@ module.exports = (req, res, next) => {
 
   User.findOneAndDelete({ email }).then((result) => {
     if (!result) return res.status(404).json({ email: 'User not found.' });
+    logger.info({ deletedUserId: result._id, byUserId: req.user.id }, 'User deleted by admin');
     store.io.to(result._id).emit('user-deleted', { id: result._id });
     res.status(200).json({ result });
   });

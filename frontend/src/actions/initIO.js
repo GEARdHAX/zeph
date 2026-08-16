@@ -4,12 +4,16 @@ import Config from '../config';
 import Actions from '../constants/Actions';
 import store from '../store';
 import getRooms from './getRooms';
+import syncMessages from './syncMessages';
+import markMessageRead from './markMessageRead';
 import messageSound from '../assets/message.mp3';
 import socketPromise from '../lib/socket.io-promise';
 
 const initIO = (token) => (dispatch) => {
   const io = IO(`${Config.url || ''}/`);
   io.request = socketPromise(io);
+
+  let wasConnected = false;
 
   io.on('connect', () => {
     io.emit('authenticate', { token });
@@ -19,6 +23,24 @@ const initIO = (token) => (dispatch) => {
   io.on('authenticated', () => {
     console.log('IO authenticated');
     dispatch({ type: Actions.IO_INIT, io });
+
+    // Only resync on a *re*-authenticate (i.e. after a drop) — the first authenticate
+    // on initial load has nothing to fill a gap for, and the room's initial message
+    // list already comes from getRoom()'s own fetch.
+    if (wasConnected) {
+      const currentRoom = store.getState().io.room;
+      if (currentRoom) {
+        const roomMessages = store.getState().io.messages;
+        const lastMessageID = roomMessages.length ? roomMessages[roomMessages.length - 1]._id : undefined;
+        syncMessages({ roomID: currentRoom._id, lastMessageID })
+          .then((res) => store.dispatch({ type: Actions.SYNC_MESSAGES, messages: res.data.messages }))
+          .catch((err) => console.log(err));
+      }
+      getRooms()
+        .then((res) => store.dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
+        .catch((err) => console.log(err));
+    }
+    wasConnected = true;
   });
 
   io.on('message-in', (data) => {
@@ -38,7 +60,10 @@ const initIO = (token) => (dispatch) => {
     }
 
     if (!currentRoom) return;
-    if (currentRoom._id === room._id) store.dispatch({ type: Actions.MESSAGE, message });
+    if (currentRoom._id === room._id) {
+      store.dispatch({ type: Actions.MESSAGE, message });
+      markMessageRead({ roomID: room._id, messageID: message._id }).catch((err) => console.log(err));
+    }
 
     getRooms()
       .then((res) => store.dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
@@ -128,7 +153,9 @@ const initIO = (token) => (dispatch) => {
     }
   });
 
-  io.on('disconnected', () => {});
+  io.on('disconnect', (reason) => {
+    console.log('IO disconnected:', reason);
+  });
 
   window.onbeforeunload = () => {
     io.emit('leave', { socketID: io.id, roomID: store.getState().rtc.roomID });

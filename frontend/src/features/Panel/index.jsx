@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useGlobal } from 'reactn';
-import './Panel.sass';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 import TopBar from './components/TopBar';
@@ -58,16 +57,16 @@ function Panel() {
   const meetingsList = meetings.map((meeting) => <Meeting key={meeting._id} meeting={meeting} />);
 
   function Notice({ text }) {
-    return <div className="notice">{text}</div>;
+    return <div className="p-5 text-center text-sm text-muted-foreground">{text}</div>;
   }
 
   return (
-    <div className="panel">
+    <div className="flex h-full flex-1 flex-col border-r sm:w-full md:max-w-[300px] md:min-w-[300px] lg:max-w-[360px] lg:min-w-[360px]">
       <TopBar />
       <SearchBar />
       <NavBar />
       {callStatus === 'in-call' && (!location.pathname.startsWith('/meeting') || over === false) && <MeetingBar />}
-      <div className="rooms">
+      <div className="flex-1 overflow-y-auto">
         {nav === 'rooms' && roomsList}
         {nav === 'rooms' && rooms.length === 0 && (
           <Notice text="There are no rooms yet. Contact someone or create a group to begin!" />

@@ -1,0 +1,24 @@
+# .gitleaks.toml — Custom allowlist rules for the Chattr repo
+# https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+
+title = "Chattr gitleaks config"
+
+[allowlist]
+  description = "Allowlisted patterns that are known-safe in this repo"
+
+  # Example .env files intentionally contain placeholder values, not real secrets
+  paths = [
+    '''backend/\.env\.example''',
+    '''frontend/\.env\.example''',
+    '''infra/.*''',
+  ]
+
+  # Placeholder strings that look like secrets but aren't
+  regexes = [
+    '''change-me''',
+    '''your_smtp_password''',
+    '''your_smtp_user''',
+    '''jwt-default-secret''',
+    '''admin@example\.com''',
+    '''no-reply@yourdomain\.tld''',
+  ]

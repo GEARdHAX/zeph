@@ -1,7 +1,8 @@
 const Room = require('../models/Room');
+const logger = require('../logger');
 
 module.exports = (socket, data) => {
-  console.log('Received join room event', JSON.stringify(data));
+  logger.debug({ data }, 'more-rooms event received');
 
   let { roomID } = data;
 

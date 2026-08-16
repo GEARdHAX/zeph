@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import './Ringing.sass';
-import { FiVideo, FiPhone, FiPhoneOff } from 'react-icons/fi';
+import { Video, Phone, PhoneOff } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -68,14 +67,12 @@ function Ringing({ incoming, meetingID }) {
     };
   }, []);
 
-  const close = (closingState) => {
+  const close = (shouldNotify) => {
     if (isVideo && videoStream) videoStream.getVideoTracks()[0].stop();
     if (isAudio && audioStream) audioStream.getAudioTracks()[0].stop();
     dispatch({ type: Actions.RTC_LEAVE });
-    if (closingState) postClose({ meetingID, userID: counterpart._id });
+    if (shouldNotify) postClose({ meetingID, userID: counterpart._id });
     navigate('/', { replace: true });
-
-    console.log('close action ringing');
   };
 
   useEffect(() => {
@@ -110,16 +107,14 @@ function Ringing({ incoming, meetingID }) {
         <img
           src={`${Config.url || ''}/api/images/${counterpart.picture.shieldedID}/256`}
           alt="Picture"
-          className="picture"
+          className="h-full w-full rounded-full object-cover"
         />
       );
     }
     return (
-      <div className="img-wrapper">
-        <div className="img">
-          {counterpart.firstName.substr(0, 1)}
-          {counterpart.lastName.substr(0, 1)}
-        </div>
+      <div className="flex h-full w-full items-center justify-center rounded-full bg-muted-foreground text-5xl text-background">
+        {counterpart.firstName.substr(0, 1)}
+        {counterpart.lastName.substr(0, 1)}
       </div>
     );
   }
@@ -134,29 +129,51 @@ function Ringing({ incoming, meetingID }) {
   };
 
   return (
-    <div className="join uk-flex uk-flex-middle uk-flex-center uk-flex-column">
-      <img className="logo-little" src={logo} alt="Logo" />
-      <p className="title">{getTitle()}</p>
-      <p className="name">Delta Honey</p>
-      <div className="picture uk-margin-small">
+    <div className="flex w-[360px] max-w-[calc(100%-80px)] flex-col items-center border bg-card p-5">
+      <img className="-mb-8 h-[50px] object-contain" src={logo} alt="Logo" />
+      <p className="mb-0 text-lg font-bold uppercase">{getTitle()}</p>
+      <p className="mb-0 mt-2 text-sm font-bold uppercase">
+        {`${counterpart.firstName || 'Anonymous'} ${counterpart.lastName || 'User'}`}
+      </p>
+      <div className="my-3 h-[150px] w-[150px] animate-ring-pulse rounded-full">
         <Picture />
       </div>
-      <div className="uk-flex" hidden={!incoming}>
-        <div className="rounded-button close" onClick={close}>
-          <FiPhoneOff className="button-icon" />
+      {incoming && (
+        <div className="flex">
+          <button
+            type="button"
+            className="m-2 flex h-[60px] w-[60px] items-center justify-center rounded-full bg-primary/30 text-primary-foreground hover:opacity-90"
+            onClick={() => close()}
+          >
+            <PhoneOff className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            className="m-2 flex h-[60px] w-[60px] items-center justify-center rounded-full bg-primary text-primary-foreground hover:opacity-90"
+            onClick={join}
+          >
+            <Phone className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            className="m-2 flex h-[60px] w-[60px] items-center justify-center rounded-full bg-primary text-primary-foreground hover:opacity-90"
+            onClick={joinWithVideo}
+          >
+            <Video className="h-6 w-6" />
+          </button>
         </div>
-        <div className="rounded-button" onClick={join}>
-          <FiPhone className="button-icon" />
+      )}
+      {!incoming && (
+        <div className="flex">
+          <button
+            type="button"
+            className="m-2 flex h-[60px] w-[60px] items-center justify-center rounded-full bg-primary/30 text-primary-foreground hover:opacity-90"
+            onClick={() => close()}
+          >
+            <PhoneOff className="h-6 w-6" />
+          </button>
         </div>
-        <div className="rounded-button" onClick={joinWithVideo}>
-          <FiVideo className="button-icon" />
-        </div>
-      </div>
-      <div className="uk-flex" hidden={incoming}>
-        <div className="rounded-button close" onClick={close}>
-          <FiPhoneOff className="button-icon" />
-        </div>
-      </div>
+      )}
     </div>
   );
 }

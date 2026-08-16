@@ -1,18 +1,22 @@
 import { useRef, useState, useEffect } from 'react';
-import './BottomBar.sass';
-import { FiSend, FiImage, FiSmile, FiPaperclip } from 'react-icons/fi';
+import {
+  Send, Image, Smile, Paperclip, Sparkles,
+} from 'lucide-react';
 import { useGlobal } from 'reactn';
 import moment from 'moment';
 import { useDispatch, useSelector } from 'react-redux';
 import Picker from '@emoji-mart/react';
+import { Button } from '@/components/ui/button';
 import message from '../../../actions/message';
 import uploadImage from '../../../actions/uploadImage';
 import uploadFile from '../../../actions/uploadFile';
 import Actions from '../../../constants/Actions';
 import getRooms from '../../../actions/getRooms';
 import typing from '../../../actions/typing';
+import retryWithBackoff from '../../../lib/retryWithBackoff';
+import draftReply from '../../../actions/draftReply';
 
-function BottomBar() {
+function BottomBar({ aiEnabled }) {
   const imageInput = useRef(null);
   const fileInput = useRef(null);
 
@@ -23,36 +27,57 @@ function BottomBar() {
   const [text, setText] = useState('');
   const [isPicker, showPicker] = useGlobal('isPicker');
   const [pictureRefs, addPictureRef] = useState([]);
+  const [drafting, setDrafting] = useState(false);
 
   const dispatch = useDispatch();
+  const typingTimeout = useRef(null);
 
+  // Debounced: a "typing" POST per keystroke wastes data on slow/metered connections.
+  // Only the "stopped typing" signal (text cleared) needs to fire immediately.
   useEffect(() => {
-    if (text === '') dispatch(typing(room, false));
-    else dispatch(typing(room, true));
+    if (text === '') {
+      clearTimeout(typingTimeout.current);
+      dispatch(typing(room, false));
+      return undefined;
+    }
+    clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(() => dispatch(typing(room, true)), 1500);
+    return () => clearTimeout(typingTimeout.current);
   }, [text]);
 
   const sendMessage = () => {
     if (text.length === 0) return;
-    message({
-      roomID: room._id,
-      authorID: user.id,
-      content: text,
-      contentType: 'text',
-    }).then(() => {
-      getRooms()
-        .then((res) => dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
-        .catch((err) => console.log(err));
-    });
+
+    const clientID = crypto.randomUUID();
     const newMessage = {
-      _id: Math.random(),
+      clientID,
       author: { ...user, _id: user.id },
       content: text,
       type: 'text',
       date: moment(),
+      status: 'sending',
     };
     dispatch({ type: Actions.MESSAGE, message: newMessage });
     setText('');
     showPicker(false);
+
+    const sendRequest = () => message({ roomID: room._id, content: text, contentType: 'text' });
+
+    retryWithBackoff(sendRequest)
+      .then((res) => {
+        dispatch({
+          type: Actions.MESSAGE_UPDATE,
+          clientID,
+          patch: { _id: res.data.message._id, status: 'sent' },
+        });
+        getRooms()
+          .then((res2) => dispatch({ type: Actions.SET_ROOMS, rooms: res2.data.rooms }))
+          .catch((err) => console.log(err));
+      })
+      .catch((err) => {
+        console.log(err);
+        dispatch({ type: Actions.MESSAGE_UPDATE, clientID, patch: { status: 'failed' } });
+      });
   };
 
   const handleKeyPress = (event) => {
@@ -60,6 +85,22 @@ function BottomBar() {
     if (event.key === 'Enter') sendMessage();
   };
 
+  const draft = async () => {
+    setDrafting(true);
+    try {
+      const res = await draftReply(room._id);
+      setText(res.data.draft);
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setDrafting(false);
+    }
+  };
+
+  // ponytail: image/file sends still use the old fire-and-forget fake-_id pattern with no
+  // retry/failure UI — upload retry needs re-sendable FormData, a bigger change than the
+  // text-message retry above. Apply the same clientID+retryWithBackoff treatment here if
+  // upload reliability on flaky networks becomes a reported problem.
   const sendImages = async (images) => {
     const tmpRefs = [];
     for (let i = 0; i < images.length; i++) {
@@ -90,7 +131,10 @@ function BottomBar() {
 
   const sendFiles = async (files) => {
     for (let i = 0; i < files.length; i++) {
-      if (files[i].size / (1024 * 1024) > 10) return alert('File exceeds 10MB limit!');
+      if (files[i].size / (1024 * 1024) > 10) {
+        alert('File exceeds 10MB limit!');
+        return;
+      }
     }
     const tmpRefs = [];
     for (let i = 0; i < files.length; i++) {
@@ -122,44 +166,70 @@ function BottomBar() {
   };
 
   return (
-    <div className="bottom-bar-conversation uk-flex uk-flex-middle">
-      <div className="picker" hidden={!isPicker}>
-        <Picker onSelect={(emoji) => setText(text + emoji.native)} theme="light" title="Emoji" native />
-      </div>
-      <div className="button smile" onClick={() => showPicker(!isPicker)}>
-        <FiSmile />
-      </div>
+    <div className="relative flex min-h-[54px] max-h-[54px] w-full items-center border-t bg-card">
+      {isPicker && (
+        <div className="absolute bottom-[451px] left-0">
+          <Picker onSelect={(emoji) => setText(text + emoji.native)} theme="light" title="Emoji" native />
+        </div>
+      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="mx-2"
+        aria-label="Toggle emoji picker"
+        onClick={() => showPicker(!isPicker)}
+      >
+        <Smile />
+      </Button>
       <input
-        className="file-input"
+        className="hidden"
         type="file"
         ref={imageInput}
         accept="image/*"
         multiple
         onChange={(e) => sendImages(e.target.files)}
       />
-      <div
-        className="button image-attach"
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Attach image"
         onClick={() => imageInput && imageInput.current && imageInput.current.click()}
       >
-        <FiImage />
-      </div>
-      <input className="file-input" type="file" ref={fileInput} multiple onChange={(e) => sendFiles(e.target.files)} />
-      <div className="button attach" onClick={() => fileInput && fileInput.current && fileInput.current.click()}>
-        <FiPaperclip />
-      </div>
+        <Image />
+      </Button>
+      <input className="hidden" type="file" ref={fileInput} multiple onChange={(e) => sendFiles(e.target.files)} />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="mx-2"
+        aria-label="Attach file"
+        onClick={() => fileInput && fileInput.current && fileInput.current.click()}
+      >
+        <Paperclip />
+      </Button>
       <input
-        className="search-input"
+        className="h-10 w-full flex-1 bg-transparent px-2 text-sm outline-none"
         type="text"
         placeholder="Type something to send..."
         value={text}
         onChange={(e) => setText(e.target.value)}
-        data-emoji-input="unicode"
         onKeyPress={handleKeyPress}
         onFocus={() => showPicker(false)}
       />
-      <div className="button" onClick={sendMessage}>
-        <FiSend />
-      </div>
+      {aiEnabled && (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Draft reply with AI"
+          disabled={drafting}
+          onClick={draft}
+        >
+          <Sparkles />
+        </Button>
+      )}
+      <Button variant="ghost" size="icon" className="mr-2" aria-label="Send message" onClick={sendMessage}>
+        <Send />
+      </Button>
     </div>
   );
 }

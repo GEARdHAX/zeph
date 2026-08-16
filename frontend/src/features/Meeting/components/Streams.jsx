@@ -1,11 +1,8 @@
-import './Streams.sass';
 import { useSelector } from 'react-redux';
 import { useGlobal } from 'reactn';
 import Interface from './Interface';
 
-function Streams({
-  streams, children, isMaximized, isGrid,
-}) {
+function Streams({ streams, children, isMaximized, isGrid }) {
   const consumers = useSelector((state) => state.rtc.consumers);
   const producers = useSelector((state) => state.rtc.producers);
   const peers = useSelector((state) => state.rtc.peers);
@@ -27,8 +24,9 @@ function Streams({
       if (stream.isVideo) return (actualPeer.video = stream);
       actualPeer.audio = stream;
     });
-    const isScreen = (actualPeer.video || actualPeer.screen)
-      && producers.filter((p) => p.producerID === actualPeer.video.producerID && p.isScreen).length > 0;
+    const isScreen =
+      (actualPeer.video || actualPeer.screen) &&
+      producers.filter((p) => p.producerID === actualPeer.video.producerID && p.isScreen).length > 0;
     actualPeers.push({ ...actualPeer, isScreen });
   });
 
@@ -40,10 +38,10 @@ function Streams({
     let mainPeer = mainStream;
     actualPeers.forEach((peer) => peer.socketID === mainPeer && (mainPeer = peer));
     return (
-      <div className="streams uk-flex uk-flex-middle uk-flex-center uk-flex-column">
-        <div className="video-container">
-          <div className="video-row">
-            <div className="video-wrapper">
+      <div className="flex h-full w-full flex-1 flex-col items-center justify-center bg-black">
+        <div className="flex h-full w-full flex-1 flex-col">
+          <div className="relative flex flex-1 flex-row">
+            <div className="relative flex-1">
               <Interface
                 isMaximized={isMaximized}
                 video={mainPeer.video}
@@ -67,18 +65,16 @@ function Streams({
   actualPeers.forEach((peer, key) => {
     if (row.length === side) {
       rows.push(
-        <div className="video-row" key={key}>
+        // eslint-disable-next-line react/no-array-index-key
+        <div className="flex flex-1 flex-row" key={key}>
           {row}
         </div>,
       );
       row = [];
     }
-    console.log('peer', peer);
-    if (peer.video) {
-      console.log('video', peer.video.getVideoTracks()[0]);
-    }
     row.push(
-      <div className="video-wrapper" key={key}>
+      // eslint-disable-next-line react/no-array-index-key
+      <div className="relative flex-1" key={key}>
         <Interface
           isMaximized={isMaximized}
           video={peer.video}
@@ -92,16 +88,16 @@ function Streams({
 
   if (row.length > 0) {
     rows.push(
-      <div className="video-row" key="last">
+      <div className="flex flex-1 flex-row" key="last">
         {row}
       </div>,
     );
   }
 
   return (
-    <div className="streams uk-flex uk-flex-middle uk-flex-center uk-flex-column">
-      {actualPeers.length === 0 && <p className="waiting">Waiting for others to join...</p>}
-      {actualPeers.length > 0 && <div className="video-container">{rows}</div>}
+    <div className="flex h-full w-full flex-1 flex-col items-center justify-center bg-black">
+      {actualPeers.length === 0 && <p className="text-2xl font-bold text-white">Waiting for others to join...</p>}
+      {actualPeers.length > 0 && <div className="flex h-full w-full flex-col">{rows}</div>}
       {children}
     </div>
   );

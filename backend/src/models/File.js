@@ -11,4 +11,7 @@ const MessageSchema = new Schema({
   type: String,
 });
 
+// Every file request (files.js) looks up by shieldedID.
+MessageSchema.index({ shieldedID: 1 });
+
 module.exports = Image = mongoose.model('files', MessageSchema);

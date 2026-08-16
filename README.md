@@ -1,6 +1,13 @@
-# 🍀 Clover (Chattr) - Real-time Conferencing & Collaboration Platform
+# Chitcx — Real-time Conferencing & Collaboration Platform
 
-Clover is a production-grade, secure, real-time messaging, audio, and video conferencing platform. It is engineered with a modern full-stack JavaScript architecture using Express, React, Socket.IO, and Mediasoup (WebRTC SFU).
+Chitcx is a real-time messaging, audio, and video conferencing platform, engineered with a full-stack JavaScript architecture using Express, React, Socket.IO, and Mediasoup (WebRTC SFU).
+
+> **Attribution:** The original application layer (chat, calling, and WebRTC functionality)
+> is built on a commercial template ("Clover" by Honeyside, via CodeCanyon). All security
+> hardening, real-time architecture work, low-network optimization, testing, CI/CD,
+> observability, the AI assistant, and this rebrand are original engineering work on top of
+> that foundation — see [`DECISIONS.md`](DECISIONS.md) for the full record of what changed
+> and why.
 
 ---
 
@@ -78,7 +85,7 @@ Clover is a production-grade, secure, real-time messaging, audio, and video conf
 ├── scripts/                  # Multi-node automation installers and configuration scripts
 ├── launcher                  # Root bash shell entry-point script for Ubuntu deployment setup
 ├── package.json              # Root workspace metadata
-├── documentation.pdf         # Offline manual for Chattr platform configuration
+├── documentation.pdf         # Original template manual (Honeyside/Clover, kept for reference)
 ├── README.md                 # Project documentation
 ├── .gitignore                # Global git ignore filters
 └── .honeyignore              # Target exclusion rules for specific build/package processes
@@ -150,7 +157,7 @@ Home Page (Main Dashboard Context)
 
 ## 6. Messaging Architecture
 
-Clover employs a hybrid transport system: Express REST for structural transactions (registering user accounts, creating group objects) and Socket.IO for reactive events (instant messaging, typing notifications, statuses).
+Chitcx employs a hybrid transport system: Express REST for structural transactions (registering user accounts, creating group objects) and Socket.IO for reactive events (instant messaging, typing notifications, statuses).
 
 ```
 Client (Sender)
@@ -337,7 +344,7 @@ Meeting (Video Call)
 ## 15. Documentation Summaries
 
 *   **`documentation/README.md`**: Summarizes resource links where updates, changelogs, and official deployment announcements are posted.
-*   **`documentation/online.url`**: URL redirect asset targeting the official Clover publishing channel.
+*   **`documentation/online.url`**: URL redirect asset from the original template, pointing to the Honeyside/Clover publishing channel (kept for attribution).
 *   **`documentation.pdf`**: User handbook covering administrative features and setup tips.
 
 ---
@@ -360,7 +367,7 @@ Meeting (Video Call)
     ```
 
 ### Production Setup (Ubuntu Server Setup via Launcher)
-For Ubuntu VPS deployments, Clover includes a automated launcher script:
+For Ubuntu VPS deployments, Chitcx includes a automated launcher script:
 1.  Run the launcher command to trigger the build flow:
     ```bash
     ./launcher setup

@@ -1,14 +1,32 @@
 import { useRef, useState } from 'react';
 import { useGlobal } from 'reactn';
-import './Create.sass';
-import { FiEdit2 } from 'react-icons/fi';
+import { Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import TopBar from './components/TopBar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import TopBar from '../components/TopBar';
 import Config from '../../../config';
 import upload from '../../../actions/uploadImage';
 import createGroup from '../../../actions/createGroup';
 
-function Panel() {
+function GroupPicture({ picture, title }) {
+  if (picture) {
+    return (
+      <img
+        src={`${Config.url || ''}/api/images/${picture.shieldedID}/256`}
+        alt="Picture"
+        className="h-[150px] w-[150px] rounded-full object-cover"
+      />
+    );
+  }
+  return (
+    <div className="flex h-[150px] w-[150px] items-center justify-center rounded-full bg-secondary text-5xl text-secondary-foreground">
+      {title && title.length > 0 ? title.substr(0, 1) : 'G'}
+    </div>
+  );
+}
+
+function CreateGroupStepTwo() {
   const setPanel = useGlobal('panel')[1];
   const [newGroupUsers] = useGlobal('newGroupUsers');
   const fileInput = useRef(null);
@@ -18,11 +36,6 @@ function Panel() {
 
   const navigate = useNavigate();
 
-  function GroupPicture({ picture }) {
-    if (picture) return <img src={`${Config.url || ''}/api/images/${picture.shieldedID}/256`} alt="Picture" className="picture" />;
-    return <div className="img">{title && title.length > 0 ? title.substr(0, 1) : 'G'}</div>;
-  }
-
   const changePicture = async (image) => {
     const picture = await upload(image, null, () => {}, 'square');
     setGroupPicture(picture.data.image);
@@ -30,45 +43,42 @@ function Panel() {
 
   const create = async (e) => {
     e.preventDefault();
-    if (!title || title.length === 0) return setError(true);
-    setError(null);
+    if (!title || title.length === 0) {
+      setError(true);
+      return;
+    }
+    setError(false);
     const res = await createGroup({ people: newGroupUsers, picture: groupPicture, title });
     const room = res.data;
     setPanel('standard');
-    const target = `/room/${room._id}`;
-    navigate(target, { replace: true });
+    navigate(`/room/${room._id}`, { replace: true });
   };
 
   return (
-    <div className="group-create">
-      <TopBar />
-      <button className="uk-button uk-button-large uk-button-primary create-button" onClick={create}>
+    <div className="flex h-full flex-1 flex-col border-r sm:w-full md:max-w-[300px] md:min-w-[300px] lg:max-w-[360px] lg:min-w-[360px]">
+      <TopBar back={() => setPanel('createGroup')} />
+      <Button className="w-full rounded-none" onClick={create}>
         Create Group
-      </button>
-      <div className="selection-text error" hidden={!error}>
-        Group name required!
-      </div>
+      </Button>
+      {error && <div className="bg-muted px-3 py-3 text-center text-sm text-blue-700">Group name required!</div>}
       <input
-        className="file-input"
+        className="hidden"
         type="file"
         ref={fileInput}
         accept="image/*"
         onChange={(e) => changePicture(e.target.files[0])}
       />
       <div
-        style={{ marginTop: 15 }}
-        className="picture"
+        className="group relative left-1/2 mt-4 w-[150px] -translate-x-1/2 cursor-pointer"
         onClick={() => fileInput && fileInput.current && fileInput.current.click()}
       >
-        <GroupPicture picture={groupPicture} />
-        <div className="overlay">
-          <div className="text">
-            <FiEdit2 />
-          </div>
+        <GroupPicture picture={groupPicture} title={title} />
+        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 text-white opacity-0 transition-opacity group-hover:bg-black/70 group-hover:opacity-100">
+          <Pencil className="h-8 w-8" />
         </div>
       </div>
-      <input
-        className="group-name"
+      <Input
+        className="mx-2.5 mb-1.5 mt-4 rounded-full"
         type="text"
         placeholder="Group name..."
         value={title}
@@ -78,4 +88,4 @@ function Panel() {
   );
 }
 
-export default Panel;
+export default CreateGroupStepTwo;

@@ -1,19 +1,38 @@
 require('colors');
 require('dotenv').config();
 
-console.log(`${'Honeyside'.yellow} © ${'2022'.yellow}`);
-console.log(`Welcome to ${'Clover'.cyan}`);
+const logger = require('./src/logger');
+const pinoHttp = require('pino-http');
+
+logger.info('Chitcx server starting');
 
 const express = require('express');
+const compression = require('compression');
 const app = express();
+// Request-ID + structured access logging. skip() keeps the 5s health-check
+// poll (Docker/load-balancer) out of the logs — it's not signal.
+app.use(pinoHttp({
+  logger,
+  autoLogging: { ignore: (req) => req.url === '/healthz' },
+}));
+// gzip/br response compression — meaningful payload savings on slow/metered mobile connections.
+app.use(compression());
 const http = require('http');
 const io = require('socket.io');
 const store = require('./src/store');
 const init = require('./src/init');
-const mediasoup = require('./src/mediasoup');
+// MEDIASOUP_ENABLED controls whether the WebRTC SFU is loaded.
+// Set to 'true' only on servers that have native build tools (gcc, python3, make).
+// Glitch / shared hosts: leave unset or 'false' — API + Socket.IO still fully functional.
+// Local Docker / VPS with Dockerfile: set to 'true'.
+const mediasoupEnabled = process.env.MEDIASOUP_ENABLED === 'true';
+const mediasoup = mediasoupEnabled ? require('./src/mediasoup') : null;
 
 Config = require('./config');
-if (Config.ip) Config.mediasoup.webRtcTransport.listenIps[0].ip = Config.ip;
+
+// Health check — registered BEFORE the DB-availability gate so it always responds.
+// Used by Docker Compose healthchecks and load balancers.
+app.use('/healthz', require('./src/routes/health'));
 
 app.use((req, res, next) => (store.connected ? next() : res.status(500).send('Database not available.')));
 
@@ -28,14 +47,19 @@ const server = http.createServer(app);
 store.app = app;
 store.config = Config;
 store.io = io(server);
-init();
-mediasoup.init();
+init(mediasoupEnabled);
+if (mediasoupEnabled && mediasoup) {
+  mediasoup.init();
+  logger.info('Mediasoup SFU enabled');
+} else {
+  logger.info('Mediasoup SFU disabled (MEDIASOUP_ENABLED != true) — API-only mode');
+}
 
-const listen = () => server.listen(Config.port, () => console.log(`Server listening on port ${Config.port}`.green));
+const listen = () => server.listen(Config.port, () => logger.info(`Server listening on port ${Config.port}`));
 
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {
-    console.log('Specified port unavailable, retrying in 10 seconds...'.red);
+    logger.warn('Specified port unavailable, retrying in 10 seconds...');
     setTimeout(() => {
       server.close();
       server.listen(Config.port);
@@ -81,7 +105,7 @@ if (Config.nodemailerEnabled) {
           entry.dateSent = Date.now();
           await entry.save();
         } catch (e) {
-          console.log(e);
+          logger.error({ err: e }, 'Failed to send scheduled email');
         }
       }
 

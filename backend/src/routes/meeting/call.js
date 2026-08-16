@@ -2,6 +2,7 @@ const User = require('../../models/User');
 const Room = require('../../models/Room');
 const xss = require('xss');
 const store = require('../../store');
+const logger = require('../../logger');
 
 module.exports = async (req, res, next) => {
   let { roomID, meetingID } = req.fields;
@@ -35,7 +36,7 @@ module.exports = async (req, res, next) => {
       res.status(200).json({ ok: true });
     })
     .catch((err) => {
-      console.log(err);
+      logger.error({ err, roomId: roomID }, 'Failed to initiate call');
       return res.status(500).json({ error: true });
     });
 };

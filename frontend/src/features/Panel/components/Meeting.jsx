@@ -1,7 +1,7 @@
 import { useGlobal } from 'reactn';
-import './Meeting.sass';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
+import { cn } from '@/lib/utils';
 
 function Meetings({ meeting }) {
   const setMeeting = useGlobal('meetingID')[1];
@@ -17,11 +17,25 @@ function Meetings({ meeting }) {
   else if (meeting.lastLeave) text = `Meeting ended ${moment(meeting.lastLeave).fromNow()}`;
 
   const incoming = meeting.callee && user.id === meeting.callee._id;
-  console.log(meeting);
+
+  let title = 'Untitled Meeting';
+  if (meeting.startedAsCall) {
+    if (meeting.callToGroup) {
+      title = `Group call in ${meeting.group.title}`;
+    } else if (incoming) {
+      title = `Call from ${meeting.caller ? meeting.caller.firstName : 'Deleted'} ${
+        meeting.caller ? meeting.caller.lastName : 'User'
+      }`;
+    } else {
+      title = `Call to ${meeting.callee ? meeting.callee.firstName : 'Deleted'} ${
+        meeting.callee ? meeting.callee.lastName : 'User'
+      }`;
+    }
+  }
 
   return (
     <div
-      className="meeting-entry uk-flex uk-flex-center uk-flex-middle"
+      className="flex h-20 cursor-pointer items-center border-b"
       onClick={() => {
         setMeeting(meeting._id);
         setShowPanel(false);
@@ -29,28 +43,20 @@ function Meetings({ meeting }) {
         navigate(`/meeting/${meeting._id}`, { replace: true });
       }}
     >
-      <div className="img-wrapper">
-        <div className={`img-content${meeting.peers.length ? ' active-meeting' : ''}`}>{meeting.peers.length}</div>
+      <div className="mx-3 h-10 w-10 shrink-0 overflow-hidden rounded-full">
+        <div
+          className={cn(
+            'flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-lg text-secondary-foreground',
+            meeting.peers.length && 'bg-emerald-500 text-white',
+          )}
+        >
+          {meeting.peers.length}
+        </div>
       </div>
-      <div className="text">
-        <div className="title">
-          {meeting.startedAsCall
-            ? meeting.callToGroup
-              ? `Group call in ${meeting.group.title}`
-              : incoming
-                ? `Call from ${meeting.caller ? meeting.caller.firstName : 'Deleted'} ${
-                    meeting.caller ? meeting.caller.lastName : 'User'
-                  }`
-                : `Call to ${meeting.callee ? meeting.callee.firstName : 'Deleted'} ${
-                    meeting.callee ? meeting.callee.lastName : 'User'
-                  }`
-            : 'Untitled Meeting'}
-        </div>
-        <div className="message">{text}</div>
-        <div className="message">
-          ID:
-          {meeting._id}
-        </div>
+      <div className="flex flex-1 flex-col justify-center">
+        <div className="text-[13px] font-bold">{title}</div>
+        <div className="text-[11px] text-muted-foreground">{text}</div>
+        <div className="text-[11px] text-muted-foreground">{`ID: ${meeting._id}`}</div>
       </div>
     </div>
   );

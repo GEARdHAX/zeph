@@ -1,23 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import './Meeting.sass';
 import {
-  FiMaximize,
-  FiMic,
-  FiMicOff,
-  FiMinimize,
-  FiPhoneOff,
-  FiVideo,
-  FiVideoOff,
-  FiUserPlus,
-  FiMonitor,
-  FiXOctagon,
-  FiGrid,
-  FiColumns,
-  FiMenu,
-  FiChevronLeft,
-  FiChevronUp,
-  FiChevronDown,
-} from 'react-icons/fi';
+  Maximize,
+  Mic,
+  MicOff,
+  Minimize,
+  PhoneOff,
+  Video,
+  VideoOff,
+  UserPlus,
+  Monitor,
+  XOctagon,
+  Grid3x3,
+  Columns2,
+  Menu,
+  ChevronLeft,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import * as mediasoup from 'mediasoup-client';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -318,9 +317,7 @@ function Meeting() {
       roomID,
       producerID: producer.producerID,
     });
-    const {
-      producerId, id, kind, rtpParameters,
-    } = data;
+    const { producerId, id, kind, rtpParameters } = data;
 
     const codecOptions = {};
     const consumer = await transport.consume({
@@ -406,7 +403,6 @@ function Meeting() {
     await setShowPanel(true);
     await setCallStatus(null);
     dispatch({ type: Actions.RTC_LEAVE });
-    console.log('close action meeting');
   };
 
   useEffect(() => {
@@ -415,7 +411,7 @@ function Meeting() {
 
   if (callDirection === 'incoming' && !joined) {
     return (
-      <div className="content uk-flex uk-flex-column uk-flex-center uk-flex-middle" style={{ background: 'black' }}>
+      <div className="flex h-full flex-col items-center justify-center bg-black">
         <Ringing
           incoming
           meetingID={roomID}
@@ -430,7 +426,7 @@ function Meeting() {
 
   if (callDirection === 'outgoing' && !joined) {
     return (
-      <div className="content uk-flex uk-flex-column uk-flex-center uk-flex-middle" style={{ background: 'black' }}>
+      <div className="flex h-full flex-col items-center justify-center bg-black">
         <Ringing incoming={false} meetingID={roomID} />
       </div>
     );
@@ -438,7 +434,7 @@ function Meeting() {
 
   if (!joined) {
     return (
-      <div className="content uk-flex uk-flex-column uk-flex-center uk-flex-middle" style={{ background: 'black' }}>
+      <div className="flex h-full flex-col items-center justify-center bg-black">
         <Join
           onJoin={() => {
             setJoined(true);
@@ -458,30 +454,35 @@ function Meeting() {
     }, [localStream]);
 
     return (
-      <div className="meeting-top-controls">
-        <div
-          className="panel-control"
+      <div className="z-[1] flex h-[95px] min-h-[95px] w-full max-w-full flex-grow items-center bg-secondary max-sm:h-[85px] max-sm:min-h-[85px]">
+        <button
+          type="button"
+          className="flex h-full w-[60px] min-w-[60px] items-center justify-center text-neutral-100 hover:bg-muted-foreground/20 max-sm:w-[50px] max-sm:min-w-[50px]"
           onClick={() => {
             setShowPanel(!showPanel);
             setOver(showPanel);
           }}
         >
-          {showPanel ? <FiChevronLeft /> : <FiMenu />}
-        </div>
+          {showPanel ? <ChevronLeft /> : <Menu />}
+        </button>
         <LittleStreams streams={streams} />
-        <div className="videos" style={{ flexGrow: 0 }}>
+        <div className="flex-none">
           <video
             hidden={!video && !isScreen}
-            className="video"
+            className="mx-px h-[95px] w-[135px] cursor-pointer bg-black object-cover max-sm:h-[85px] max-sm:w-[110px]"
             onLoadedMetadata={() => localVideoRef.current.play()}
             ref={localVideoRef}
-            style={{ objectFit: 'cover', background: 'black', zIndex: 1000 }}
+            style={{ zIndex: 1000 }}
             playsInline
           />
         </div>
-        <div className="panel-control" onClick={() => setTopBar(!topBar)}>
-          {topBar ? <FiChevronDown /> : <FiChevronUp />}
-        </div>
+        <button
+          type="button"
+          className="flex h-full w-[60px] min-w-[60px] items-center justify-center text-neutral-100 hover:bg-muted-foreground/20 max-sm:w-[50px] max-sm:min-w-[50px]"
+          onClick={() => setTopBar(!topBar)}
+        >
+          {topBar ? <ChevronDown /> : <ChevronUp />}
+        </button>
       </div>
     );
   }
@@ -495,23 +496,24 @@ function Meeting() {
     }, [localVideoRef]);
 
     return (
-      <div className="meeting-top-controls-transparent">
-        <div
-          className="panel-control"
+      <div className="z-[1000] flex h-0 w-full justify-between">
+        <button
+          type="button"
+          className="relative flex h-[95px] w-[60px] min-w-[60px] items-center justify-center text-neutral-100"
           onClick={() => {
             setShowPanel(!showPanel);
             setOver(showPanel);
           }}
         >
-          {showPanel ? <FiChevronLeft /> : <FiMenu />}
-        </div>
-        <div className="videos" style={{ flexGrow: 0, minWidth: video || isScreen ? 137 : 0 }}>
+          {showPanel ? <ChevronLeft /> : <Menu />}
+        </button>
+        <div className="relative flex-none" style={{ minWidth: video || isScreen ? 137 : 0 }}>
           <video
             hidden={!video && !isScreen}
-            className="video"
+            className="mx-px h-[105px] w-[140px] cursor-pointer bg-black object-cover"
             onLoadedMetadata={() => localVideoRef.current.play()}
             ref={localVideoRef}
-            style={{ objectFit: 'cover', background: 'black', zIndex: 1000 }}
+            style={{ zIndex: 1000 }}
             playsInline
           />
         </div>
@@ -520,7 +522,7 @@ function Meeting() {
   }
 
   return (
-    <div className="meeting-main uk-flex uk-flex-column">
+    <div className="flex h-full w-full flex-col">
       {isGrid && <TopBarTransparent localStream={localStream} />}
       {!isGrid && topBar && <TopBar localStream={localStream} />}
       <Streams
@@ -531,37 +533,59 @@ function Meeting() {
         isScreen={isScreen}
         isMaximized={isMaximized}
       >
-        <div className="meeting-controls" style={{ bottom: topBar || isGrid ? 0 : 95 }}>
-          <div
-            className="control"
+        <div
+          className="absolute z-[1] flex w-full items-center justify-center pb-[18px] max-sm:pb-3"
+          style={{ bottom: topBar || isGrid ? 0 : 95 }}
+        >
+          <button
+            type="button"
+            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
             onClick={() => (video ? stopVideo() : getVideo().then((stream) => produceVideo(stream)))}
           >
-            {video ? <FiVideo /> : <FiVideoOff />}
-          </div>
-          <div
-            className="control"
+            {video ? <Video /> : <VideoOff />}
+          </button>
+          <button
+            type="button"
+            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
             onClick={() => (audio ? stopAudio() : getAudio().then((stream) => produceAudio(stream)))}
           >
-            {audio ? <FiMic /> : <FiMicOff />}
-          </div>
-          <div
-            className="control"
+            {audio ? <Mic /> : <MicOff />}
+          </button>
+          <button
+            type="button"
+            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
             onClick={() => (isScreen ? stopScreen() : getScreen().then((stream) => produceScreen(stream)))}
           >
-            {isScreen ? <FiXOctagon /> : <FiMonitor />}
-          </div>
-          <div className="close" onClick={close}>
-            <FiPhoneOff />
-          </div>
-          <div className="control" onClick={() => setAddPeers(true)}>
-            <FiUserPlus />
-          </div>
-          <div className="control" onClick={() => setMaximized(!isMaximized)}>
-            {isMaximized ? <FiMaximize /> : <FiMinimize />}
-          </div>
-          <div className="control" onClick={() => setGrid(!isGrid)}>
-            {isGrid ? <FiGrid /> : <FiColumns />}
-          </div>
+            {isScreen ? <XOctagon /> : <Monitor />}
+          </button>
+          <button
+            type="button"
+            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center border border-destructive bg-destructive text-white hover:border-red-700 hover:bg-red-700 max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
+            onClick={close}
+          >
+            <PhoneOff />
+          </button>
+          <button
+            type="button"
+            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
+            onClick={() => setAddPeers(true)}
+          >
+            <UserPlus />
+          </button>
+          <button
+            type="button"
+            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
+            onClick={() => setMaximized(!isMaximized)}
+          >
+            {isMaximized ? <Maximize /> : <Minimize />}
+          </button>
+          <button
+            type="button"
+            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
+            onClick={() => setGrid(!isGrid)}
+          >
+            {isGrid ? <Grid3x3 /> : <Columns2 />}
+          </button>
         </div>
       </Streams>
       {!isGrid && !topBar && <TopBar localStream={localStream} />}

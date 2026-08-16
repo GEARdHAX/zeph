@@ -1,22 +1,42 @@
 import { useEffect, useState, useRef } from 'react';
-import './TopBar.sass';
-import { FiPhone, FiVideo, FiArrowLeft, FiMoreHorizontal, FiExternalLink, FiStar, FiInfo } from 'react-icons/fi';
+import {
+  Phone, Video, ArrowLeft, MoreHorizontal, Star, Info, Sparkles,
+} from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import moment from 'moment';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import Picture from '../../../components/Picture';
 import toggleFavorite from '../../../actions/toggleFavorite';
 import getMeetingRoom from '../../../actions/getMeetingRoom';
 import postCall from '../../../actions/postCall';
+import summarizeConversation from '../../../actions/summarizeConversation';
 import Actions from '../../../constants/Actions';
-import Config from '../../../config';
 
-function TopBar({ back, loading }) {
+const STATUS_COLOR = {
+  online: 'bg-emerald-500',
+  away: 'bg-orange-500',
+  busy: 'bg-destructive',
+};
+
+function TopBar({ back, loading, aiEnabled }) {
   const onlineUsers = useSelector((state) => state.io.onlineUsers);
   const room = useSelector((state) => state.io.room) || {};
   const user = useGlobal('user')[0];
+  const [summary, setSummary] = useState(null);
+  const [summarizing, setSummarizing] = useState(false);
   const [favorites, setFavorites] = useGlobal('favorites');
   const setNav = useGlobal('nav')[1];
   const setAudio = useGlobal('audio')[1];
@@ -26,13 +46,6 @@ function TopBar({ back, loading }) {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
-  const honeyside = () => window.open('https://www.honeyside.it', '_blank');
-  const codeCanyon = () =>
-    window.open(
-      'https://codecanyon.net/item/clover-realtime-messaging-audio-video-conferencing-web-app-nodejs-react-webrtc-socketio/25737452',
-      '_blank',
-    );
 
   let other = {};
 
@@ -52,8 +65,10 @@ function TopBar({ back, loading }) {
   const errorToast = (content) => toast.error(content);
 
   const call = async (isVideo) => {
-    if (onlineUsers.filter((u) => u.id === other._id).length === 0 && !room.isGroup)
-      return warningToast("Can't call user because user is offline");
+    if (onlineUsers.filter((u) => u.id === other._id).length === 0 && !room.isGroup) {
+      warningToast("Can't call user because user is offline");
+      return;
+    }
     await setAudio(true);
     await setVideo(isVideo);
     await setCallDirection('outgoing');
@@ -80,34 +95,42 @@ function TopBar({ back, loading }) {
     setFavorites(res.data.favorites);
   };
 
-  const isFavorite = () => {
-    for (const favorite of favorites) {
-      if (favorite._id === room._id) return true;
-    }
-    return false;
-  };
+  const isFavorite = () => favorites.some((fav) => fav._id === room._id);
 
   const roomInfo = () => {
     navigate(`/room/${room._id}/info`, { replace: true });
   };
 
-  const Online = ({ other }) => {
-    const onlineUsers = useSelector((state) => state.io.onlineUsers);
+  const summarize = async () => {
+    setSummarizing(true);
+    try {
+      const res = await summarizeConversation(room._id);
+      setSummary(res.data.summary);
+    } catch (e) {
+      errorToast('Could not summarize this conversation.');
+    } finally {
+      setSummarizing(false);
+    }
+  };
+
+  function Online({ other: peer }) {
+    const statusUsers = useSelector((state) => state.io.onlineUsers);
     const prevStatusRef = useRef(false);
     const [lastOnline, setLastOnline] = useState(null);
 
     useEffect(() => {
-      if (prevStatusRef.current && onlineUsers.filter((u) => u.id === other._id).length === 0)
+      if (prevStatusRef.current && statusUsers.filter((u) => u.id === peer._id).length === 0) {
         setLastOnline(moment().valueOf());
-      prevStatusRef.current = onlineUsers.filter((u) => u.id === other._id).length > 0;
-    }, [onlineUsers, other]);
+      }
+      prevStatusRef.current = statusUsers.filter((u) => u.id === peer._id).length > 0;
+    }, [statusUsers, peer]);
 
-    if (onlineUsers.filter((u) => u.id === other._id && u.status === 'busy').length > 0) return 'busy';
-    if (onlineUsers.filter((u) => u.id === other._id && u.status === 'online').length > 0) return 'online';
-    if (onlineUsers.filter((u) => u.id === other._id && u.status === 'away').length > 0) return 'away';
+    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'busy').length > 0) return 'busy';
+    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'online').length > 0) return 'online';
+    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'away').length > 0) return 'away';
     if (lastOnline) return `Last online: ${moment(lastOnline).fromNow()}`;
-    return `Last online: ${other.lastOnline ? moment(other.lastOnline).fromNow() : 'Never'}`;
-  };
+    return `Last online: ${peer.lastOnline ? moment(peer.lastOnline).fromNow() : 'Never'}`;
+  }
 
   const getStatus = () => {
     if (room.isGroup) return null;
@@ -118,72 +141,76 @@ function TopBar({ back, loading }) {
   };
 
   return (
-    <div className="top-bar uk-flex uk-flex-between uk-flex-middle">
-      <div className="nav uk-flex uk-flex-middle">
-        <div className="button mobile" onClick={back}>
-          <FiArrowLeft />
-        </div>
+    <div className="flex min-h-[54px] max-h-[54px] w-full items-center justify-between border-b bg-card">
+      <div className="flex items-center">
+        <Button variant="ghost" size="icon" className="sm:hidden" onClick={back}>
+          <ArrowLeft />
+        </Button>
         {!loading && (
-          <div className="uk-flex uk-flex-middle">
-            <div className="profile conversation">
+          <div className="flex items-center">
+            <div className="relative ml-1 mr-3 h-10 w-10 shrink-0 overflow-hidden rounded-full [&_.img]:flex [&_.img]:h-10 [&_.img]:w-10 [&_.img]:items-center [&_.img]:justify-center [&_.img]:bg-secondary [&_.img]:text-lg [&_.img]:text-secondary-foreground">
               <Picture user={other} group={room.isGroup} picture={room.picture} title={room.title} />
             </div>
-            {getStatus() && <div className={`dot ${getStatus()}`} />}
+            {getStatus() && (
+              <span
+                className={cn(
+                  '-ml-8 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-card',
+                  STATUS_COLOR[getStatus()],
+                )}
+              />
+            )}
           </div>
         )}
         {!loading && (
-          <div className="text">
-            <div className="title">
+          <div className="flex flex-col justify-center">
+            <div className="text-[13px] font-bold">
               {title}
               {title.length > 22 && '...'}
             </div>
-            <div className="message">
+            <div className="text-[11px] text-muted-foreground">
               {room.isGroup ? `Group: ${room.people.length} members` : <Online other={other} />}
             </div>
           </div>
         )}
       </div>
-      <div className="nav">
-        <div className="button" onClick={() => call(true)}>
-          <FiVideo />
-        </div>
-        <div className="button" onClick={() => call(false)}>
-          <FiPhone />
-        </div>
-        <div className={`button${isFavorite() ? ' active' : ''}`} onClick={favorite}>
-          <FiStar />
-        </div>
-        <div className="uk-inline">
-          <div className="button" type="button">
-            <FiMoreHorizontal />
-          </div>
-          <div data-uk-dropdown="mode: click; offset: 5; boundary: .top-bar; pos: bottom-right">
-            <div className="link" onClick={roomInfo}>
+      <div className="flex items-center px-2">
+        <Button variant="ghost" size="icon" onClick={() => call(true)}>
+          <Video />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => call(false)}>
+          <Phone />
+        </Button>
+        <Button variant="ghost" size="icon" className={isFavorite() ? 'text-blue-700' : ''} onClick={favorite}>
+          <Star />
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {aiEnabled && (
+              <DropdownMenuItem onClick={summarize} disabled={summarizing}>
+                {summarizing ? 'Summarizing…' : 'Summarize conversation'}
+                <Sparkles className="ml-auto h-4 w-4" />
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={roomInfo}>
               Room Info
-              <div className="icon">
-                <FiInfo />
-              </div>
-            </div>
-            {Config.demo && <div className="divider" />}
-            {Config.demo && (
-              <div className="link" onClick={honeyside}>
-                Honeyside
-                <div className="icon">
-                  <FiExternalLink />
-                </div>
-              </div>
-            )}
-            {Config.demo && (
-              <div className="link" onClick={codeCanyon}>
-                CodeCanyon
-                <div className="icon">
-                  <FiExternalLink />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+              <Info className="ml-auto h-4 w-4" />
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+      <Dialog open={!!summary} onOpenChange={(next) => !next && setSummary(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conversation summary</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{summary}</p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

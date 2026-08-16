@@ -1,7 +1,8 @@
 const Message = require('../models/Message');
+const logger = require('../logger');
 
 module.exports = (socket, data) => {
-  console.log('Received join room event', JSON.stringify(data));
+  logger.debug({ data }, 'more-messages event received');
 
   let { roomID, messageID } = data;
 

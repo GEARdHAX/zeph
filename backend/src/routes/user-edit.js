@@ -10,7 +10,7 @@ module.exports = async (req, res, next) => {
   let lastName = xss(req.fields.lastName);
   let { password, repeatPassword, user } = req.fields;
 
-  if (!req.user.level === 'root') return res.status(401).send('401 Unauthorized User');
+  if (req.user.level !== 'root') return res.status(401).send('401 Unauthorized User');
 
   let errors = {};
 

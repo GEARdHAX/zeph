@@ -1,5 +1,6 @@
 const Images = require('../models/Image');
 const fs = require('fs');
+const logger = require('../logger');
 
 module.exports = (req, res, next) => {
   const { id, size } = req.params;
@@ -12,12 +13,11 @@ module.exports = (req, res, next) => {
 
       if (size) {
         location = `${location.substr(0, location.length - 4)}-${size}.jpg`;
-        console.log(location);
       }
 
       fs.access(location, fs.constants.F_OK, (err) => {
         if (err) {
-          console.log(err);
+          logger.warn({ err, imageId: id, location }, 'Image missing on disk');
           return res.status(404).send('Not Found');
         }
 
@@ -27,7 +27,7 @@ module.exports = (req, res, next) => {
       });
     })
     .catch((err) => {
-      console.log(err);
+      logger.error({ err, imageId: id }, 'Failed to look up image descriptor');
       return res.status(404).send('Not Found');
     });
 };

@@ -1,12 +1,33 @@
+import {
+  User, Lock, Mail, Pencil,
+} from 'lucide-react';
+import { Input as ShadInput } from '@/components/ui/input';
+
+const ICONS = {
+  user: User,
+  lock: Lock,
+  mail: Mail,
+  pencil: Pencil,
+};
+
 function Input({
-  icon, placeholder, type, onChange,
+  icon, placeholder, type, onChange, value,
 }) {
+  const Icon = ICONS[icon];
+
   return (
-    <div className="uk-margin-small">
-      <div className="uk-inline uk-width-1-1">
-        <span className="uk-form-icon uk-form-icon-flip" data-uk-icon={`icon: ${icon}`} onChange={onChange} />
-        <input className="uk-input uk-border-pill" required placeholder={placeholder} type={type} onChange={onChange} />
-      </div>
+    <div className="relative mb-2 w-full">
+      {Icon && (
+        <Icon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      )}
+      <ShadInput
+        className="rounded-full pr-9"
+        required
+        placeholder={placeholder}
+        type={type}
+        value={value}
+        onChange={onChange}
+      />
     </div>
   );
 }

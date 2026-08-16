@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import './LittleStreams.sass';
 import { useSelector } from 'react-redux';
 import { useGlobal } from 'reactn';
+import { cn } from '@/lib/utils';
 import Interface from './LittleInterface';
 
 function LittleStreams({ streams }) {
@@ -12,12 +12,12 @@ function LittleStreams({ streams }) {
   const el = useRef(null);
 
   useEffect(() => {
-    if (!el) return;
+    if (!el) return undefined;
     const scrollHorizontally = (e) => {
-      e = window.event || e;
-      const delta = Math.max(-1, Math.min(1, e.wheelDelta || -e.detail));
+      const event = window.event || e;
+      const delta = Math.max(-1, Math.min(1, event.wheelDelta || -event.detail));
       el.current.scrollLeft -= delta * 40; // Multiplied by 40
-      e.preventDefault();
+      event.preventDefault();
     };
     if (el.current.addEventListener) {
       // IE9, Chrome, Safari, Opera
@@ -53,22 +53,25 @@ function LittleStreams({ streams }) {
     actualPeers.push(actualPeer);
   });
 
-  const videos = [];
-
-  actualPeers.forEach((peer, key) => {
-    videos.push(
-      <div
-        className={`video${mainStream && mainStream.socketID === peer.socketID ? ' main-peer' : ''}`}
-        key={key}
-        onClick={() => setMainStream(peer)}
-      >
-        <Interface isMaximized video={peer.video} audio={peer.audio} peer={peer.user} />
-      </div>,
-    );
-  });
+  const videos = actualPeers.map((peer, key) => (
+    <div
+      // eslint-disable-next-line react/no-array-index-key
+      key={key}
+      className={cn(
+        'mx-px h-[95px] w-[135px] max-sm:h-[85px] max-sm:w-[110px]',
+        mainStream && mainStream.socketID === peer.socketID && 'box-border border-2 border-primary',
+      )}
+      onClick={() => setMainStream(peer)}
+    >
+      <Interface isMaximized video={peer.video} audio={peer.audio} peer={peer.user} />
+    </div>
+  ));
 
   return (
-    <div className="videos" ref={el}>
+    <div
+      className="flex min-w-[137px] flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      ref={el}
+    >
       {actualPeers.length > 0 && videos}
     </div>
   );

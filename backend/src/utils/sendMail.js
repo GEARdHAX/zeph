@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const store = require('../store');
+const logger = require('../logger');
 
 const sendMail = (data) => {
   return new Promise((resolve, reject) => {
@@ -7,15 +8,15 @@ const sendMail = (data) => {
 
     transport.verify((error) => {
       if (error) {
-        console.log('error while connecting to smtp server'.red);
+        logger.error({ err: error }, 'Error while connecting to SMTP server');
         reject(error);
       } else {
         transport.sendMail(data, (err) => {
           if (err) {
-            console.log(`error while sending email to ${data.to} with subject ${data.subject}`.red);
+            logger.error({ err, to: data.to, subject: data.subject }, 'Error while sending email');
             reject(err);
           } else {
-            console.log(`email sent to ${data.to} with subject ${data.subject}`.green);
+            logger.info({ to: data.to, subject: data.subject }, 'Email sent');
             resolve();
           }
         });

@@ -2,7 +2,7 @@ const mongoose = require('./mongoose');
 const Schema = mongoose.Schema;
 
 const UserSchema = new Schema({
-  email: String,
+  email: { type: String, unique: true, sparse: true },
   firstName: String,
   level: {
     type: String,
@@ -11,12 +11,12 @@ const UserSchema = new Schema({
   password: String,
   phone: String,
   lastName: String,
-  username: String,
+  username: { type: String, unique: true, sparse: true },
   fullName: String,
   favorites: [{ type: Schema.ObjectId, ref: 'rooms' }],
   tagLine: {
     type: String,
-    default: 'New Clover User',
+    default: 'New Chitcx User',
   },
   picture: { type: Schema.ObjectId, ref: 'images' },
   lastOnline: {

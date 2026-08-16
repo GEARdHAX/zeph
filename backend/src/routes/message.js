@@ -3,8 +3,25 @@ const Room = require('../models/Room');
 const store = require('../store');
 const xss = require('xss');
 
-module.exports = (req, res, next) => {
-  const { roomID, authorID, content, type, fileID } = req.fields;
+module.exports = async (req, res, next) => {
+  const { roomID, content, type, fileID } = req.fields;
+  const authorID = req.user.id;
+
+  let room;
+  try {
+    room = await Room.findOne({ _id: roomID });
+  } catch (e) {
+    return res.status(404).json({ error: true });
+  }
+
+  if (!room) {
+    return res.status(404).json({ error: true });
+  }
+
+  const isMember = room.people.some((person) => person.toString() === authorID.toString());
+  if (!isMember) {
+    return res.status(403).json({ error: true });
+  }
 
   Message({
     room: roomID,

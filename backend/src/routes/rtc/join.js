@@ -1,4 +1,5 @@
 const store = require('../../store');
+const logger = require('../../logger');
 
 module.exports = async (req, res, next) => {
   const { id } = req.fields;
@@ -12,7 +13,7 @@ module.exports = async (req, res, next) => {
       room = await store.rooms.asyncFindOne({ _id: id });
     }
   } catch (e) {
-    console.log(e);
+    logger.error({ err: e, roomId: id }, 'Failed to join RTC room');
   }
 
   res.status(200).json(room);

@@ -1,6 +1,5 @@
 const router = require('express').Router();
 const passport = require('passport');
-const jwt = require('express-jwt');
 const Config = require('../../config');
 
 router.get('/images/:id', require('./images'));
@@ -27,14 +26,16 @@ router.post('/room/join', passport.authenticate('jwt', { session: false }, null)
 router.post('/room/remove', passport.authenticate('jwt', { session: false }, null), require('./remove-room'));
 router.post('/search', passport.authenticate('jwt', { session: false }, null), require('./search'));
 router.post('/message', passport.authenticate('jwt', { session: false }, null), require('./message'));
+router.post('/message/read', passport.authenticate('jwt', { session: false }, null), require('./message-read'));
 router.post('/messages/more', passport.authenticate('jwt', { session: false }, null), require('./more-messages'));
+router.post('/messages/sync', passport.authenticate('jwt', { session: false }, null), require('./sync-messages'));
 router.post('/group/create', passport.authenticate('jwt', { session: false }, null), require('./create-group'));
 
 router.post('/rtc/create', passport.authenticate('jwt', { session: false }, null), require('./rtc/create'));
 router.post('/rtc/join', passport.authenticate('jwt', { session: false }, null), require('./rtc/join'));
-router.post('/rtc/peers', require('./rtc/peers'));
+router.post('/rtc/peers', passport.authenticate('jwt', { session: false }, null), require('./rtc/peers'));
 
-router.post('/meeting/get', require('./meeting/get'));
+router.post('/meeting/get', passport.authenticate('jwt', { session: false }, null), require('./meeting/get'));
 router.post('/meeting/call', passport.authenticate('jwt', { session: false }, null), require('./meeting/call'));
 router.post('/meeting/add', passport.authenticate('jwt', { session: false }, null), require('./meeting/add'));
 router.post('/meeting/answer', passport.authenticate('jwt', { session: false }, null), require('./meeting/answer'));
@@ -50,6 +51,14 @@ router.post(
   passport.authenticate('jwt', { session: false }, null),
   require('./users/change-password'),
 );
+
+router.post('/ai/summarize', passport.authenticate('jwt', { session: false }, null), require('./ai/summarize'));
+router.post('/ai/translate', passport.authenticate('jwt', { session: false }, null), require('./ai/translate'));
+router.post('/ai/draft-reply', passport.authenticate('jwt', { session: false }, null), require('./ai/draft-reply'));
+
+router.post('/logout', passport.authenticate('jwt', { session: false }, null), require('./logout'));
+router.get('/sessions', passport.authenticate('jwt', { session: false }, null), require('./sessions/list'));
+router.post('/sessions/revoke', passport.authenticate('jwt', { session: false }, null), require('./sessions/revoke'));
 
 router.use('/info', require('./info'));
 

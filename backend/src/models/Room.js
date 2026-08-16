@@ -11,4 +11,8 @@ const RoomSchema = new Schema({
   lastMessage: { type: Schema.ObjectId, ref: 'messages' },
 });
 
+// list-rooms.js filters by people membership and sorts by lastUpdate — compound index
+// covers both the filter and the sort in a single index scan.
+RoomSchema.index({ people: 1, lastUpdate: -1 });
+
 module.exports = User = mongoose.model('rooms', RoomSchema);

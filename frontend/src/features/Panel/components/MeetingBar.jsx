@@ -1,5 +1,4 @@
 import { useGlobal } from 'reactn';
-import './MeetingBar.sass';
 import { useNavigate } from 'react-router-dom';
 
 function MeetingBar() {
@@ -11,7 +10,7 @@ function MeetingBar() {
 
   return (
     <div
-      className="meeting-bar uk-flex uk-flex-center uk-flex-middle"
+      className="flex h-[50px] cursor-pointer animate-pulse items-center justify-center bg-blue-800 text-white"
       onClick={() => {
         setShowPanel(false);
         setOver(true);

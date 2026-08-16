@@ -1,38 +1,26 @@
+import moment from 'moment';
 import { useGlobal } from 'reactn';
 import Config from '../../../config';
-import moment from 'moment';
 
-function Credits() {
-  return (
-    <span>
-      {' '}
-      -
-      {' '}
-      <a
-        data-uk-tooltip="Special thanks and open source resources in use"
-        data-uk-toggle="target: .toggle-credits ;animation: uk-animation-fade"
-      >
-        Credits
-      </a>
-    </span>
-  );
-}
-
-function Copyright() {
+function Copyright({ onShowCredits }) {
   const version = useGlobal('version')[0];
   return (
-    <div id="copyright" className="uk-position-bottom-center uk-position-small uk-visible@m uk-position-z-index">
-      <span className="uk-text-small uk-text-muted">
-        ©
-        {' '}
-        {moment().year()}
-        {' '}
-        {Config.brand || 'Honeyside'}
-        {Config.showCredits && <Credits />}
-        {' '}
-        - v
-        {version}
-      </span>
+    <div className="absolute bottom-2 left-1/2 z-10 hidden -translate-x-1/2 text-xs text-white/70 md:block">
+      {`© ${moment().year()} ${Config.brand || 'Chitcx'}`}
+      {Config.showCredits && (
+        <>
+          {' - '}
+          <button
+            type="button"
+            className="underline"
+            title="Special thanks and open source resources in use"
+            onClick={onShowCredits}
+          >
+            Credits
+          </button>
+        </>
+      )}
+      {` - v${version}`}
     </div>
   );
 }

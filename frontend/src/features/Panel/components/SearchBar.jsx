@@ -1,31 +1,41 @@
 import { useRef } from 'react';
-import './SearchBar.sass';
-import { FiSearch } from 'react-icons/fi';
+import { Search } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import search from '../../../actions/search';
 
 function SearchBar() {
   const searchInput = useRef();
+  const searchTimeout = useRef(null);
   const setSearchResults = useGlobal('searchResults')[1];
   const [nav, setNav] = useGlobal('nav');
   const setSearch = useGlobal('search')[1];
 
   const onChange = (e) => {
+    const { value } = e.target;
     if (nav !== 'search') setNav('search');
-    setSearch(e.target.value);
-    search(e.target.value)
-      .then((res) => setSearchResults(res.data.users))
-      .catch((err) => console.log(err));
+    setSearch(value);
+
+    // Debounced: a search request per keystroke wastes data on slow/metered connections.
+    clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      search(value)
+        .then((res) => setSearchResults(res.data.users))
+        .catch((err) => console.log(err));
+    }, 300);
   };
 
   return (
-    <div className="search-bar uk-flex uk-flex-center uk-flex-middle">
-      <div className="icon" onClick={() => searchInput.current.focus()}>
-        <FiSearch />
-      </div>
-      <div className="uk-inline search">
-        <input className="uk-input uk-border-pill" placeholder="Search" ref={searchInput} onChange={onChange} />
-      </div>
+    <div className="flex h-10 items-center border-b bg-muted">
+      <Search
+        className="ml-3 h-4 w-4 shrink-0 cursor-pointer text-muted-foreground"
+        onClick={() => searchInput.current.focus()}
+      />
+      <input
+        className="w-full bg-transparent px-2 text-sm outline-none"
+        placeholder="Search"
+        ref={searchInput}
+        onChange={onChange}
+      />
     </div>
   );
 }

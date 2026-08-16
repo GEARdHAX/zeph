@@ -4,6 +4,9 @@ const sharp = require('sharp');
 const store = require('../store');
 const randomstring = require('randomstring');
 
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
 module.exports = async (req, res) => {
   const image = req.files.image;
   const { crop } = req.fields;
@@ -11,6 +14,14 @@ module.exports = async (req, res) => {
 
   if (!image) {
     return res.status(500).json({ status: 500, error: 'FILE_REQUIRED' });
+  }
+
+  if (image.size > MAX_IMAGE_SIZE) {
+    return res.status(413).json({ status: 413, error: 'FILE_TOO_LARGE' });
+  }
+
+  if (!ALLOWED_MIME_TYPES.has(image.type)) {
+    return res.status(415).json({ status: 415, error: 'FILE_TYPE_NOT_ALLOWED' });
   }
 
   const shield = randomstring.generate({ length: 120, charset: 'alphanumeric', capitalization: 'lowercase' });

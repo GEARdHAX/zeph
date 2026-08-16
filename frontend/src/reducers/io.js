@@ -38,10 +38,25 @@ const reducer = (state = initialState, action) => {
         ...state,
         messages: [...action.messages, ...state.messages],
       };
+    case Actions.SYNC_MESSAGES: {
+      const existingIDs = new Set(state.messages.map((m) => m._id));
+      const newOnes = action.messages.filter((m) => !existingIDs.has(m._id));
+      return {
+        ...state,
+        messages: [...state.messages, ...newOnes],
+      };
+    }
     case Actions.MESSAGE:
       return {
         ...state,
         messages: [...state.messages, action.message],
+      };
+    // Patches an in-place optimistic message by its temporary clientID (swap in the
+    // real server _id on success, or mark it failed/retrying without losing its position).
+    case Actions.MESSAGE_UPDATE:
+      return {
+        ...state,
+        messages: state.messages.map((m) => (m.clientID === action.clientID ? { ...m, ...action.patch } : m)),
       };
     case Actions.ONLINE_USERS:
       return {

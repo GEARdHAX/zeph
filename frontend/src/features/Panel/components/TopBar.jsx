@@ -1,12 +1,28 @@
-import './TopBar.sass';
-import { FiMoreHorizontal, FiExternalLink, FiSettings, FiHome, FiPlusCircle, FiCpu } from 'react-icons/fi';
+import {
+  MoreHorizontal, Settings, Home, PlusCircle, Cpu,
+} from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useSelector } from 'react-redux';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import getMeetingRoom from '../../../actions/getMeetingRoom';
+import logout from '../../../actions/logout';
 import Picture from '../../../components/Picture';
-import Config from '../../../config';
+
+const STATUS_COLOR = {
+  online: 'bg-emerald-500',
+  away: 'bg-orange-500',
+  busy: 'bg-destructive',
+};
 
 function TopBar() {
   const onlineUsers = useSelector((state) => state.io.onlineUsers);
@@ -23,9 +39,12 @@ function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const logout = async () => {
-    io.disconnect();
+  const onLogout = async () => {
     const { username } = user;
+    // Revoke the session server-side so the token can't be replayed after logout —
+    // fire-and-forget: local state is cleared regardless of whether this succeeds.
+    logout().catch(() => {});
+    io.disconnect();
     localStorage.removeItem('token');
     await setToken(null);
     await setUser({});
@@ -54,11 +73,14 @@ function TopBar() {
     return null;
   };
 
+  const isAdmin = user.level === 'root' || user.level === 'admin';
+
   return (
-    <div className="top-bar uk-flex uk-flex-between uk-flex-middle">
-      <div className="uk-flex uk-flex-middle">
-        <div
-          className="profile"
+    <div className="flex h-[54px] w-full items-center justify-between border-b bg-card">
+      <div className="flex items-center">
+        <button
+          type="button"
+          className="relative mx-3 h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-full [&_.img]:flex [&_.img]:h-10 [&_.img]:w-10 [&_.img]:items-center [&_.img]:justify-center [&_.img]:bg-secondary [&_.img]:text-lg [&_.img]:text-secondary-foreground"
           onClick={() => {
             setOver(true);
             setNav('rooms');
@@ -66,67 +88,70 @@ function TopBar() {
           }}
         >
           <Picture user={user || {}} />
-        </div>
-        {getStatus() && <div className={`dot ${getStatus()}`} />}
+        </button>
+        {getStatus() && (
+          <span className={cn('-ml-8 h-2.5 w-2.5 rounded-full border-2 border-card', STATUS_COLOR[getStatus()])} />
+        )}
       </div>
-      <div className="nav">
-        {(user.level === 'root' || user.level === 'admin') && (
-          <div
-            className={`button${location.pathname.startsWith('/admin') ? ' active' : ''}`}
+      <div className="flex items-center pr-2">
+        {isAdmin && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={location.pathname.startsWith('/admin') ? 'text-blue-700' : ''}
             onClick={() => {
               setOver(true);
               navigate('/admin', { replace: true });
             }}
           >
-            <FiCpu />
-          </div>
+            <Cpu />
+          </Button>
         )}
-        <div
-          className="button mobile"
+        <Button
+          variant="ghost"
+          size="icon"
+          className="sm:hidden"
           onClick={() => {
             setOver(true);
             navigate('/', { replace: true });
           }}
         >
-          <FiHome />
-        </div>
-        <div className="button" onClick={() => setPanel('createGroup')}>
-          <FiPlusCircle />
-        </div>
-        <div
-          className={`button${nav === 'settings' ? ' active' : ''}`}
-          onClick={() => {
-            setNav('settings');
-          }}
+          <Home />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => setPanel('createGroup')}>
+          <PlusCircle />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={nav === 'settings' ? 'text-blue-700' : ''}
+          onClick={() => setNav('settings')}
         >
-          <FiSettings />
-        </div>
-        <div className="uk-inline">
-          <div className="button" type="button">
-            <FiMoreHorizontal />
-          </div>
-          <div data-uk-dropdown="mode: click; offset: 5; boundary: .top-bar">
-            <div className="link" onClick={() => newMeeting()}>
-              New Meeting
-            </div>
-            {(user.level === 'root' || user.level === 'admin') && <div className="divider" />}
-            {(user.level === 'root' || user.level === 'admin') && (
-              <div
-                className="link"
+          <Settings />
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={newMeeting}>New Meeting</DropdownMenuItem>
+            {isAdmin && <DropdownMenuSeparator />}
+            {isAdmin && (
+              <DropdownMenuItem
                 onClick={() => {
                   setOver(true);
                   navigate('/admin', { replace: true });
                 }}
               >
                 Admin Panel
-              </div>
+              </DropdownMenuItem>
             )}
-            <div className="divider" />
-            <div className="link" onClick={logout}>
-              Logout
-            </div>
-          </div>
-        </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onLogout}>Logout</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

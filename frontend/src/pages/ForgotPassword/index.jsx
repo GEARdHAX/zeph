@@ -1,17 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Div100vh from 'react-div-100vh';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import Credits from './components/Credits';
 import Logo from './components/Logo';
 import Input from './components/Input';
-import './ForgotPassword.sass';
-import Config from '../../config';
 import sendCode from '../../actions/sendCode';
 import changePassword from '../../actions/changePassword';
 import backgroundImage from '../../assets/background.jpg';
 
-function Login() {
+function ForgotPassword() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -20,35 +20,17 @@ function Login() {
   const [codeErrors, setCodeErrors] = useState({});
   const [changeErrors, setChangeErrors] = useState({});
   const [sent, setSent] = useState(false);
-
-  useEffect(() => {
-    if (window.self !== window.top) {
-      toast.warn(
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            window.top.location.href = Config.url;
-          }}
-        >
-          <b>Click here to remove the Envato frame or meetings will not work properly.</b>
-        </a>,
-        {
-          autoClose: false,
-        },
-      );
-    }
-  }, []);
+  const [showCredits, setShowCredits] = useState(false);
 
   const onCode = async (e) => {
     e.preventDefault();
     try {
       await sendCode(email);
       setSent(true);
-    } catch (e) {
+    } catch (err) {
       let errors = {};
-      if (!e.response || typeof e.response.data !== 'object') errors.generic = 'Could not connect to server.';
-      else errors = e.response.data;
+      if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Could not connect to server.';
+      else errors = err.response.data;
       setCodeErrors(errors);
     }
   };
@@ -60,10 +42,10 @@ function Login() {
       navigate('/login', { replace: true });
       setSent(false);
       toast.success('Password changed! You may now sign in.');
-    } catch (e) {
+    } catch (err) {
       let errors = {};
-      if (!e.response || typeof e.response.data !== 'object') errors.generic = 'Could not connect to server.';
-      else errors = e.response.data;
+      if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Could not connect to server.';
+      else errors = err.response.data;
       setChangeErrors(errors);
     }
   };
@@ -71,16 +53,16 @@ function Login() {
   const codeInfo = Object.keys(codeErrors)
     .filter((key) => codeErrors[key] !== 'error')
     .map((key) => (
-      <div className="uk-text-center" key={key}>
-        <span className="uk-text-danger">{codeErrors[key]}</span>
+      <div className="text-center text-sm text-destructive" key={key}>
+        {codeErrors[key]}
       </div>
     ));
 
   const changeInfo = Object.keys(changeErrors)
     .filter((key) => changeErrors[key] !== 'error')
     .map((key) => (
-      <div className="uk-text-center" key={key}>
-        <span className="uk-text-danger">{changeErrors[key]}</span>
+      <div className="text-center text-sm text-destructive" key={key}>
+        {changeErrors[key]}
       </div>
     ));
 
@@ -91,93 +73,81 @@ function Login() {
   return (
     <Div100vh>
       <div
-        className="login uk-cover-container uk-background-secondary uk-flex uk-flex-center uk-flex-middle uk-overflow-hidden uk-light"
+        className="relative flex h-full w-screen items-center justify-center overflow-hidden bg-cover bg-center text-white"
         style={loginStyle}
       >
-        <div className="uk-position-cover uk-overlay-primary" />
-        <div className="login-scrollable uk-flex uk-flex-center uk-flex-middle uk-position-z-index">
-          <Credits />
+        <div className="absolute inset-0 bg-[rgba(0,71,171,0.54)]" />
+        <div className="relative z-10 flex h-full w-full items-center justify-center overflow-y-auto">
+          <Credits onShowCredits={() => setShowCredits(true)} />
 
-          <div className="login-inner uk-width-medium uk-padding-small" data-uk-scrollspy="cls: uk-animation-fade">
+          <div className="flex min-h-[420px] w-[400px] max-w-full flex-col items-center justify-center p-2">
             <Logo />
 
-            <div className="toggle-credits">
-              <form className="toggle-code" hidden={sent} onSubmit={onCode}>
-                {codeInfo}
-                <Input
-                  icon="mail"
-                  placeholder="Email"
-                  type="text"
-                  onChange={(e) => setEmail(e.target.value)}
-                  value={email}
-                />
-                <div className="uk-margin-bottom">
-                  <button type="submit" className="uk-button uk-button-primary uk-border-pill uk-width-1-1">
-                    SEND CODE
-                  </button>
-                </div>
-              </form>
+            {!showCredits && (
+              <div className="w-full text-foreground">
+                {!sent && (
+                  <form onSubmit={onCode} className="flex flex-col gap-2">
+                    {codeInfo}
+                    <Input
+                      icon="mail"
+                      placeholder="Email"
+                      type="text"
+                      onChange={(e) => setEmail(e.target.value)}
+                      value={email}
+                    />
+                    <Button type="submit" className="w-full rounded-full">
+                      SEND CODE
+                    </Button>
+                  </form>
+                )}
 
-              <form className="toggle-change" hidden={!sent} onSubmit={onChange}>
-                {changeInfo}
-                <Input
-                  icon="lock"
-                  placeholder="Auth Code"
-                  type="text"
-                  onChange={(e) => setAuthCode(e.target.value)}
-                  value={authCode}
-                />
-                <Input
-                  icon="lock"
-                  placeholder="New Password"
-                  type="password"
-                  onChange={(e) => setPassword(e.target.value)}
-                  value={password}
-                />
-                <div className="uk-margin-bottom">
-                  <button type="submit" className="uk-button uk-button-primary uk-border-pill uk-width-1-1">
-                    CHANGE PASSWORD
-                  </button>
-                </div>
-              </form>
+                {sent && (
+                  <form onSubmit={onChange} className="flex flex-col gap-2">
+                    {changeInfo}
+                    <Input
+                      icon="lock"
+                      placeholder="Auth Code"
+                      type="text"
+                      onChange={(e) => setAuthCode(e.target.value)}
+                      value={authCode}
+                    />
+                    <Input
+                      icon="lock"
+                      placeholder="New Password"
+                      type="password"
+                      onChange={(e) => setPassword(e.target.value)}
+                      value={password}
+                    />
+                    <Button type="submit" className="w-full rounded-full">
+                      CHANGE PASSWORD
+                    </Button>
+                  </form>
+                )}
 
-              <div>
-                <div className="uk-text-center">
-                  <a className="uk-link-reset uk-text-small" href="#">
-                    <Link to="/login">Back to Login</Link>
-                  </a>
+                <div className="mt-2 text-center text-sm">
+                  <Link to="/login" className="underline">
+                    Back to Login
+                  </Link>
                 </div>
               </div>
-            </div>
+            )}
 
-            <form className="toggle-credits uk-text-center" hidden>
-              <span>
-                Everyone has a sweet side
-                <br />
-                Everything can taste like honey
-                <br />
-              </span>
-              <br />
-              <br />
-              The default background image is from{' '}
-              <a href="https://picsum.photos/" target="_blank" rel="noopener noreferrer">
-                Picsum Photos
-              </a>
-              <br />
-              <br />A big thank you to all contributors to React, Redux, Socket.IO, Emoji Mart, Axios, SASS and Moment
-            </form>
-
-            <div>
-              <div className="uk-margin-top uk-text-center">
-                <a
-                  className="uk-link-reset uk-text-small toggle-credits"
-                  data-uk-toggle="target: .toggle-credits ;animation: uk-animation-fade"
-                  hidden
-                >
-                  <span data-uk-icon="arrow-left" /> Close Credits
+            {showCredits && (
+              <div className="w-full text-center text-sm text-foreground">
+                {'The default background image is from '}
+                <a href="https://picsum.photos/" target="_blank" rel="noopener noreferrer" className="underline">
+                  Picsum Photos
                 </a>
+                <br />
+                <br />A big thank you to all contributors to React, Redux, Socket.IO, Emoji Mart, Axios, SASS and Moment
+                <div className="mt-4">
+                  <Button variant="ghost" size="sm" onClick={() => setShowCredits(false)}>
+                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    Close Credits
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -185,4 +155,4 @@ function Login() {
   );
 }
 
-export default Login;
+export default ForgotPassword;

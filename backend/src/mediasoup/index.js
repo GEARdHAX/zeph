@@ -4,6 +4,7 @@ const store = require('../store');
 const User = require('../models/User');
 const Meeting = require('../models/Meeting');
 const mongoose = require('mongoose');
+const logger = require('../logger');
 
 let worker;
 let mediasoupRouter;
@@ -21,14 +22,13 @@ const init = async () => {
   });
 
   worker.on('died', () => {
-    console.error('mediasoup worker died, exiting in 2 seconds... [pid:%d]', worker.pid);
+    logger.error({ pid: worker.pid }, 'mediasoup worker died, exiting in 2 seconds...');
     setTimeout(() => process.exit(1), 2000);
   });
 
   const mediaCodecs = config.mediaCodecs;
   mediasoupRouter = await worker.createRouter({ mediaCodecs });
-  console.log('mediasoup worker running'.green);
-  console.log(`mediasoup ip is ${config.ipAddress.ip}`.green);
+  logger.info({ ip: config.ipAddress.ip }, 'mediasoup worker running');
 };
 
 async function createWebRtcTransport() {
@@ -60,7 +60,7 @@ async function createConsumer(producer, rtpCapabilities, consumerTransport) {
       rtpCapabilities,
     })
   ) {
-    console.error('can not consume');
+    logger.warn({ producerId: producer.id }, 'Cannot consume producer (incompatible rtpCapabilities)');
     return;
   }
   let consumer;
@@ -71,7 +71,7 @@ async function createConsumer(producer, rtpCapabilities, consumerTransport) {
       paused: producer.kind === 'video',
     });
   } catch (error) {
-    console.error('consume failed', error);
+    logger.error({ err: error, producerId: producer.id }, 'Consume failed');
     return;
   }
 
@@ -103,7 +103,7 @@ const initSocket = (socket) => {
       producerTransports[socket.id] = transport;
       callback(params);
     } catch (err) {
-      console.error(err);
+      logger.error({ err, socketId: socket.id }, 'Failed to create producer transport');
       callback({ error: err.message });
     }
   });
@@ -114,7 +114,7 @@ const initSocket = (socket) => {
       consumerTransports[socket.id] = transport;
       callback(params);
     } catch (err) {
-      console.error(err);
+      logger.error({ err, socketId: socket.id }, 'Failed to create consumer transport');
       callback({ error: err.message });
     }
   });
@@ -134,11 +134,11 @@ const initSocket = (socket) => {
     let producer = await producerTransports[socket.id].produce({ kind, rtpParameters });
 
     producer.on('transportclose', () => {
-      console.log("producer's transport closed", producer.id);
+      logger.debug({ producerId: producer.id }, "Producer's transport closed");
       closeProducer(producer, socket.id);
     });
     producer.observer.on('close', () => {
-      console.log('producer closed', producer.id);
+      logger.debug({ producerId: producer.id }, 'Producer closed');
       closeProducer(producer, socket.id);
     });
 
@@ -228,7 +228,7 @@ const initSocket = (socket) => {
           socket.to(user).emit('refresh-meetings', { timestamp: Date.now() });
         });
       })
-      .catch((err) => console.log(err));
+      .catch((err) => logger.error({ err, meetingId: data.roomID }, 'Failed to update meeting on join'));
 
     store.roomIDs[socket.id] = data.roomID;
 
@@ -258,7 +258,7 @@ const initSocket = (socket) => {
           socket.to(user).emit('refresh-meetings', { timestamp: Date.now() });
         });
       })
-      .catch((err) => console.log(err));
+      .catch((err) => logger.error({ err, meetingId: data.roomID }, 'Failed to update meeting on leave'));
 
     if (store.consumerUserIDs[data.roomID])
       store.consumerUserIDs[data.roomID].splice(store.consumerUserIDs[data.roomID].indexOf(socket.id), 1);
@@ -284,7 +284,7 @@ async function closeProducer(producer, socketID) {
   try {
     await producers[socketID][producer.id].close();
   } catch (e) {
-    console.log(e);
+    logger.debug({ err: e, producerId: producer.id }, 'closeProducer no-op (already closed)');
   }
 }
 
@@ -292,7 +292,7 @@ async function closeConsumer(consumer, socketID) {
   try {
     await consumers[socketID][consumer.id].close();
   } catch (e) {
-    // console.log(e);
+    logger.debug({ err: e, consumerId: consumer.id }, 'closeConsumer no-op (already closed)');
   }
 }
 

@@ -1,15 +1,13 @@
 import { useEffect } from 'react';
 import { useGlobal, setGlobal } from 'reactn';
 import Div100vh from 'react-div-100vh';
-import {
-  Route, Routes, useLocation, useNavigate,
-} from 'react-router-dom';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { cn } from '@/lib/utils';
 import CreateGroup from '../../features/Group/Create';
 import CreateGroup2 from '../../features/Group/Create2';
 import Panel from '../../features/Panel';
 import Details from '../../features/Details';
-import './Home.sass';
 import Conversation from '../../features/Conversation';
 import Meeting from '../../features/Meeting';
 import Welcome from '../../features/Welcome';
@@ -41,7 +39,6 @@ function Home() {
   }, [callIncrement, callData]);
 
   useEffect(() => {
-    console.log(location.pathname);
     if (location.pathname !== '/') setOver(true);
   }, [location]);
 
@@ -58,9 +55,15 @@ function Home() {
 
   return (
     <Div100vh>
-      <div className="app">
+      <div className="flex h-full w-full">
         {showPanel && getPanel()}
-        <div className={`main uk-flex uk-flex-column${over ? ' over' : ''}${over === false ? ' exit' : ''}`}>
+        <div
+          className={cn(
+            'flex flex-1 flex-col bg-muted max-sm:absolute max-sm:inset-0 max-sm:z-10 max-sm:hidden max-sm:h-full max-sm:w-full',
+            over && 'max-sm:flex max-sm:animate-[slide-in_0.2s_linear]',
+            over === false && 'max-sm:left-full max-sm:flex max-sm:animate-[slide-out_0.2s_linear]',
+          )}
+        >
           <Routes>
             <Route path="/" element={<Welcome />} />
             <Route path="/admin" element={<Admin />} />
@@ -68,9 +71,6 @@ function Home() {
             <Route path="/room/:id" element={<Conversation />} />
             <Route path="/room/:id/info" element={<Details />} />
             <Route path="/*" element={<NotFound />} />
-            {' '}
-            {/* Comment this line when Electron build */}
-            {/* <Route path="/" element={Welcome} />  Uncomment this line when Electron build */}
           </Routes>
         </div>
         {!location.pathname.endsWith('/info') && (showDetails || !location.pathname.startsWith('/meeting')) && (
