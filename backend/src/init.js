@@ -256,31 +256,42 @@ module.exports = (mediasoupEnabled) => {
       .then(() => {
         clearTimeout(connecting);
         const { username, email, password, firstName, lastName } = store.config.rootUser;
-        User.findOne({ email }).then((user) => {
-          if (!user)
-            argon2
+        // Matched by username OR email — a mismatch between the two (e.g. the
+        // ROOT_USER_EMAIL env var changed after the account was first seeded)
+        // must never be treated as "no root user exists yet": that path tries
+        // to INSERT a new user with the same unique `username`, which throws
+        // an uncaught E11000 duplicate-key error and crashes the whole
+        // process on boot — this is exactly what happened on Render, in a
+        // crash loop, because .save() had no .catch(). Provisioning the root
+        // user is a best-effort boot step, never allowed to take the server
+        // down.
+        User.findOne({ $or: [{ username }, { email }] })
+          .then((user) => {
+            if (!user) {
+              return argon2
+                .hash(password)
+                .then((hash) => new User({
+                  username, email, password: hash, firstName, lastName, level: 'root',
+                }).save());
+            }
+            return argon2
               .hash(password)
-              .then((hash) => new User({ username, email, password: hash, firstName, lastName, level: 'root' }).save());
-          else
-            argon2
-              .hash(password)
-              .then((hash) =>
-                User.findOneAndUpdate(
-                  { email },
-                  {
-                    $set: {
-                      username,
-                      usernameNormalized: username.toLowerCase(),
-                      email,
-                      password: hash,
-                      firstName,
-                      lastName,
-                      level: 'root',
-                    },
+              .then((hash) => User.findOneAndUpdate(
+                { _id: user._id },
+                {
+                  $set: {
+                    username,
+                    usernameNormalized: username.toLowerCase(),
+                    email,
+                    password: hash,
+                    firstName,
+                    lastName,
+                    level: 'root',
                   },
-                ),
-              );
-        });
+                },
+              ));
+          })
+          .catch((err) => logger.error({ err }, 'Failed to provision root user on boot'));
 
         Meeting.updateMany({}, { $set: { peers: [] } }).catch((err) => logger.error({ err }, 'Failed to reset meeting peers on boot'));
 
