@@ -17,41 +17,37 @@ import {
   ChevronUp,
   ChevronDown,
 } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
-import * as mediasoup from 'mediasoup-client';
+import { useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useGlobal, getGlobal } from 'reactn';
-import Actions from '../../constants/Actions';
+import { useGlobal } from 'reactn';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import Join from './components/Join';
 import AddPeers from './components/AddPeers';
 import Ringing from './components/Ringing';
 import Streams from './components/Streams';
 import LittleStreams from './components/LittleStreams';
-import postClose from '../../actions/postClose';
+import callManager from '../../lib/callManager';
 
-let transport;
-let videoProducer;
-let screenProducer;
-let audioProducer;
-
+// The mediasoup session itself (Device, transports, producers) lives in
+// callManager.js as module-level state, not here — that's what lets a call
+// survive navigating to a different route. This component is now just the
+// UI: it calls into callManager and renders whatever global/Redux state
+// currently holds, exactly like the always-mounted PictureInPicture tile
+// does when this component isn't mounted at all.
 function Meeting() {
-  const [device, setDevice] = useState(null);
-  const io = useSelector((state) => state.io.io);
-  const producers = useSelector((state) => state.rtc.producers);
   const lastLeave = useSelector((state) => state.rtc.lastLeave);
   const lastLeaveType = useSelector((state) => state.rtc.lastLeaveType);
   const increment = useSelector((state) => state.rtc.increment);
   const closingState = useSelector((state) => state.rtc.closingState);
   const [streams, setStreams] = useGlobal('streams');
-  const [localStream, setLocalStream] = useGlobal('localStream');
-  const [video, setVideo] = useGlobal('video');
-  const [audio, setAudio] = useGlobal('audio');
-  const [isScreen, setScreen] = useGlobal('screen');
-  const [audioStream, setAudioStream] = useGlobal('audioStream');
-  const [videoStream, setVideoStream] = useGlobal('videoStream');
+  const [localStream] = useGlobal('localStream');
+  const [video] = useGlobal('video');
+  const [audio] = useGlobal('audio');
+  const [isScreen] = useGlobal('screen');
   const setScreenStream = useGlobal('screenStream')[1];
-  const [callStatus, setCallStatus] = useGlobal('callStatus');
-  const callDirection = useGlobal('callDirection')[0];
+  const [callStatus] = useGlobal('callStatus');
+  const [callDirection] = useGlobal('callDirection');
   const [joined, setJoined] = useGlobal('joined');
   const [isMaximized, setMaximized] = useState(true);
   const [isGrid, setGrid] = useState(true);
@@ -61,7 +57,6 @@ function Meeting() {
   const setOver = useGlobal('over')[1];
   const setMeeting = useGlobal('meetingID')[1];
   const [addPeers, setAddPeers] = useState(false);
-  const counterpart = useSelector((state) => state.rtc.counterpart) || {};
 
   const answerIncrement = useSelector((state) => state.rtc.answerIncrement);
   const answerData = useSelector((state) => state.rtc.answerData);
@@ -69,8 +64,9 @@ function Meeting() {
   const params = useParams();
   const roomID = params.id;
 
-  const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const init = () => callManager.join(roomID);
 
   useEffect(() => {
     if (!answerData) return;
@@ -89,320 +85,44 @@ function Meeting() {
     }
   }, [acccepted]);
 
+  // No unmount cleanup here anymore — leaving this route must never
+  // implicitly end the call (that used to silently keep the camera/mic/
+  // screen-share broadcasting anyway, since the old guard on callStatus
+  // meant the cleanup never actually ran). The call now genuinely persists
+  // in the background via callManager, and stays visible via the
+  // always-mounted PictureInPicture tile. The only way to end a call is the
+  // explicit hang-up button, which calls callManager.leave().
   useEffect(() => {
     setMeeting(roomID);
-    return () => {
-      if (getGlobal().callStatus !== 'in-call') {
-        try {
-          if (getGlobal().audioStream) {
-            getGlobal()
-              .audioStream.getTracks()
-              .forEach((track) => track.stop());
-          }
-        } catch (e) {}
-        try {
-          if (getGlobal().videoStream) {
-            getGlobal()
-              .videoStream.getTracks()
-              .forEach((track) => track.stop());
-          }
-        } catch (e) {}
-      }
-    };
   }, []);
 
   const getAudio = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    setAudioStream(stream);
     return stream;
   };
-  const getVideo = async () => {
-    const stream = navigator.mediaDevices.getUserMedia({ video: true });
-    setVideoStream(stream);
-    return stream;
-  };
+  const getVideo = () => navigator.mediaDevices.getUserMedia({ video: true });
   const getScreen = async () => {
     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     setScreenStream(stream);
     return stream;
   };
 
-  const produceAudio = async (stream) => {
-    const useStream = stream || audioStream;
-    setAudio(true);
-    try {
-      const track = useStream.getAudioTracks()[0];
-      const params = { track };
-      audioProducer = await transport.produce(params);
-    } catch (err) {
-      console.log('getusermedia produce failed', err);
-      setAudio(false);
-    }
-  };
-
-  const produceVideo = async (stream) => {
-    const useStream = stream || videoStream;
-    setVideo(true);
-    try {
-      const track = useStream.getVideoTracks()[0];
-      const params = { track, appData: { isScreen: false } };
-      await setLocalStream(useStream);
-      videoProducer = await transport.produce(params);
-    } catch (err) {
-      console.log('getusermedia produce failed', err);
-      setVideo(false);
-    }
-  };
-
-  const produceScreen = async (stream) => {
-    try {
-      const track = stream.getVideoTracks()[0];
-      const params = { track, appData: { isScreen: true } };
-      await setLocalStream(stream);
-      screenProducer = await transport.produce(params);
-      await setScreen(true);
-    } catch (err) {
-      console.log('getusermedia produce failed', err);
-    }
-  };
-
-  const stopScreen = async () => {
-    try {
-      if (localStream) localStream.getVideoTracks()[0].stop();
-      await io.request('remove', { producerID: screenProducer.id, roomID });
-      screenProducer.close();
-      screenProducer = null;
-      await setScreen(false);
-    } catch (e) {
-      console.log(e);
-    }
-  };
-
-  const stopVideo = async () => {
-    try {
-      if (localStream) localStream.getVideoTracks()[0].stop();
-      await io.request('remove', { producerID: videoProducer.id, roomID });
-      videoProducer.close();
-      videoProducer = null;
-      await setVideo(false);
-    } catch (e) {
-      console.log(e);
-    }
-  };
-
-  const stopAudio = async () => {
-    try {
-      await io.request('remove', { producerID: audioProducer.id, roomID });
-      audioProducer.close();
-      audioProducer = null;
-      await setAudio(false);
-    } catch (e) {
-      console.log(e);
-    }
-  };
-
-  const init = async () => {
-    await setCallStatus('in-call');
-    await setShowPanel(false);
-    await setOver(true);
-
-    window.consumers = [];
-    await setStreams([]);
-
-    dispatch({ type: Actions.RTC_ROOM_ID, roomID });
-
-    const { producers, consumers, peers } = await io.request('join', { roomID });
-
-    dispatch({ type: Actions.RTC_CONSUMERS, consumers, peers });
-
-    const routerRtpCapabilities = await io.request('getRouterRtpCapabilities');
-    const device = new mediasoup.Device();
-    await device.load({ routerRtpCapabilities });
-
-    setDevice(device);
-
-    await subscribe(device);
-
-    dispatch({ type: Actions.RTC_PRODUCERS, producers: producers || [] });
-
-    const data = await io.request('createProducerTransport', {
-      forceTcp: false,
-      rtpCapabilities: device.rtpCapabilities,
-      roomID,
-    });
-
-    if (data.error) {
-      console.error(data.error);
-      return;
-    }
-
-    transport = device.createSendTransport(data);
-    transport.on('connect', async ({ dtlsParameters }, callback, errback) => {
-      io.request('connectProducerTransport', { dtlsParameters }).then(callback).catch(errback);
-    });
-
-    transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
-      try {
-        const { id } = await io.request('produce', {
-          transportId: transport.id,
-          kind,
-          rtpParameters,
-          roomID,
-          isScreen: appData && appData.isScreen,
-        });
-        callback({ id });
-      } catch (err) {
-        errback(err);
-      }
-    });
-
-    transport.on('connectionstatechange', (state) => {
-      switch (state) {
-        case 'connecting':
-          break;
-
-        case 'connected':
-          // document.querySelector('#local_video').srcObject = stream;
-          break;
-
-        case 'failed':
-          transport.close();
-          break;
-
-        default:
-          break;
-      }
-    });
-
-    await produceAudio();
-    await produceVideo();
-  };
-
   useEffect(() => {
-    if (lastLeaveType === 'leave') setStreams(getGlobal().streams.filter((s) => s.socketID !== lastLeave));
-    else setStreams(getGlobal().streams.filter((s) => s.producerID !== lastLeave));
-  }, [lastLeave, lastLeaveType, setStreams, increment]);
+    if (lastLeaveType === 'leave') setStreams(streams.filter((s) => s.socketID !== lastLeave));
+    else setStreams(streams.filter((s) => s.producerID !== lastLeave));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastLeave, lastLeaveType, increment]);
 
-  useEffect(() => {
-    const init = async () => {
-      if (!window.consumers) {
-        window.consumers = [];
-      }
-      const newStreams = [];
-      for (const producer of producers) {
-        if (!window.consumers.includes(producer.producerID) && producer.roomID === roomID) {
-          window.consumers.push(producer.producerID);
-
-          const stream = await consume(window.transport, producer);
-
-          stream.producerID = producer.producerID;
-          stream.socketID = producer.socketID;
-          stream.userID = producer.userID;
-
-          newStreams.push(stream);
-
-          io.request('resume', { producerID: producer.producerID, meetingID: roomID });
-        }
-      }
-      setStreams([...getGlobal().streams, ...newStreams]);
-    };
-    init();
-  }, [producers]);
-
-  const consume = async (transport, producer) => {
-    const { rtpCapabilities } = device;
-    const data = await io.request('consume', {
-      rtpCapabilities,
-      socketID: producer.socketID,
-      roomID,
-      producerID: producer.producerID,
-    });
-    const { producerId, id, kind, rtpParameters } = data;
-
-    const codecOptions = {};
-    const consumer = await transport.consume({
-      id,
-      producerId,
-      kind,
-      rtpParameters,
-      codecOptions,
-    });
-    consumer.on('producerclose', () => {
-      console.log('associated producer closed so consumer closed');
-    });
-    consumer.on('close', () => {
-      console.log('consumer closed');
-    });
-    const stream = new MediaStream();
-    stream.addTrack(consumer.track);
-    stream.isVideo = kind === 'video';
-    return stream;
-  };
-
-  const subscribe = async (device, socketID) => {
-    const data = await io.request('createConsumerTransport', {
-      forceTcp: false,
-      roomID,
-      socketID,
-    });
-
-    if (data.error) {
-      console.error(data.error);
-      return;
-    }
-
-    const transport = device.createRecvTransport(data);
-    transport.on('connect', ({ dtlsParameters }, callback, errback) => {
-      io.request('connectConsumerTransport', {
-        transportId: transport.id,
-        dtlsParameters,
-        socketID,
-      })
-        .then(callback)
-        .catch(errback);
-    });
-
-    transport.on('connectionstatechange', async (state) => {
-      switch (state) {
-        case 'connecting':
-          break;
-
-        case 'connected':
-          // document.querySelector('#remote_video').srcObject = await stream;
-          for (const producer of producers) {
-            await io.request('resume', { producerID: producer.producerID });
-          }
-          break;
-
-        case 'failed':
-          transport.close();
-          break;
-
-        default:
-          break;
-      }
-    });
-
-    window.transport = transport;
-  };
-
+  // callManager.leave() does the actual teardown (stop tracks, close
+  // transport, notify the server + counterpart, reset every call global) —
+  // it's self-contained so the PiP tile's hang-up button can call it too
+  // without this component being mounted. Navigate first, then tear down:
+  // callManager.leave() flips `joined` to false, and doing that before
+  // navigating away would otherwise flash this component's Join screen for
+  // a frame while still on /meeting/:id.
   const close = async () => {
-    try {
-      localStream.getVideoTracks()[0].stop();
-    } catch (e) {}
-    await setStreams([]);
-    try {
-      transport.close();
-    } catch (e) {}
-    try {
-      await io.request('leave', { roomID });
-    } catch (e) {}
-    postClose({ roomID, userID: counterpart._id });
     navigate('/', { replace: true });
-    await setJoined(false);
-    await setShowPanel(true);
-    await setCallStatus(null);
-    dispatch({ type: Actions.RTC_LEAVE });
+    await callManager.leave();
   };
 
   useEffect(() => {
@@ -411,7 +131,8 @@ function Meeting() {
 
   if (callDirection === 'incoming' && !joined) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-black">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-background/80 backdrop-blur-xl p-4">
+        <div className="absolute inset-0 bg-radial from-primary/10 via-transparent to-black/60 pointer-events-none" />
         <Ringing
           incoming
           meetingID={roomID}
@@ -426,7 +147,8 @@ function Meeting() {
 
   if (callDirection === 'outgoing' && !joined) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-black">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-background/80 backdrop-blur-xl p-4">
+        <div className="absolute inset-0 bg-radial from-primary/10 via-transparent to-black/60 pointer-events-none" />
         <Ringing incoming={false} meetingID={roomID} />
       </div>
     );
@@ -434,8 +156,14 @@ function Meeting() {
 
   if (!joined) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-black">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-background/80 backdrop-blur-xl p-4">
+        <div className="absolute inset-0 bg-radial from-primary/10 via-transparent to-black/60 pointer-events-none" />
         <Join
+          onClose={() => {
+            setShowPanel(true);
+            setOver(false);
+            navigate('/', { replace: true });
+          }}
           onJoin={() => {
             setJoined(true);
             init();
@@ -454,35 +182,40 @@ function Meeting() {
     }, [localStream]);
 
     return (
-      <div className="z-[1] flex h-[95px] min-h-[95px] w-full max-w-full flex-grow items-center bg-secondary max-sm:h-[85px] max-sm:min-h-[85px]">
-        <button
+      <div className="z-[1] flex h-[95px] min-h-[95px] w-full max-w-full flex-grow items-center gap-2 border-b border-border/40 bg-card/95 px-2 backdrop-blur-xl max-sm:h-[85px] max-sm:min-h-[85px]">
+        <Button
           type="button"
-          className="flex h-full w-[60px] min-w-[60px] items-center justify-center text-neutral-100 hover:bg-muted-foreground/20 max-sm:w-[50px] max-sm:min-w-[50px]"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
           onClick={() => {
             setShowPanel(!showPanel);
             setOver(showPanel);
           }}
+          title={showPanel ? 'Hide sidebar' : 'Show sidebar'}
         >
-          {showPanel ? <ChevronLeft /> : <Menu />}
-        </button>
+          {showPanel ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
         <LittleStreams streams={streams} />
-        <div className="flex-none">
+        <div className="shrink-0">
           <video
             hidden={!video && !isScreen}
-            className="mx-px h-[95px] w-[135px] cursor-pointer bg-black object-cover max-sm:h-[85px] max-sm:w-[110px]"
+            className="mx-0.5 h-[80px] w-[120px] scale-x-[-1] cursor-pointer rounded-xl border border-border/50 bg-black object-cover shadow-md max-sm:h-[70px] max-sm:w-[100px]"
             onLoadedMetadata={() => localVideoRef.current.play()}
             ref={localVideoRef}
-            style={{ zIndex: 1000 }}
             playsInline
           />
         </div>
-        <button
+        <Button
           type="button"
-          className="flex h-full w-[60px] min-w-[60px] items-center justify-center text-neutral-100 hover:bg-muted-foreground/20 max-sm:w-[50px] max-sm:min-w-[50px]"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
           onClick={() => setTopBar(!topBar)}
+          title={topBar ? 'Collapse top bar' : 'Expand top bar'}
         >
-          {topBar ? <ChevronDown /> : <ChevronUp />}
-        </button>
+          {topBar ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+        </Button>
       </div>
     );
   }
@@ -491,33 +224,64 @@ function Meeting() {
     const localVideoRef = useRef(null);
 
     useEffect(() => {
-      if (!localVideoRef) return;
+      if (!localStream || !localVideoRef.current) return;
       localVideoRef.current.srcObject = localStream;
-    }, [localVideoRef]);
+    }, [localStream]);
 
     return (
-      <div className="z-[1000] flex h-0 w-full justify-between">
-        <button
+      <div className="z-[1000] flex h-0 w-full items-start justify-between p-3">
+        <Button
           type="button"
-          className="relative flex h-[95px] w-[60px] min-w-[60px] items-center justify-center text-neutral-100"
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-black/60 hover:text-white"
           onClick={() => {
             setShowPanel(!showPanel);
             setOver(showPanel);
           }}
+          title={showPanel ? 'Hide sidebar' : 'Show sidebar'}
         >
-          {showPanel ? <ChevronLeft /> : <Menu />}
-        </button>
-        <div className="relative flex-none" style={{ minWidth: video || isScreen ? 137 : 0 }}>
+          {showPanel ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
+        {(video || isScreen) && (
           <video
             hidden={!video && !isScreen}
-            className="mx-px h-[105px] w-[140px] cursor-pointer bg-black object-cover"
+            className="h-[105px] w-[140px] scale-x-[-1] cursor-pointer rounded-2xl border border-white/15 bg-black object-cover shadow-2xl"
             onLoadedMetadata={() => localVideoRef.current.play()}
             ref={localVideoRef}
-            style={{ zIndex: 1000 }}
             playsInline
           />
-        </div>
+        )}
       </div>
+    );
+  }
+
+  // One shared shape for every pill control so seven near-identical
+  // className strings don't drift out of sync — active === the feature this
+  // button controls is currently ON (video/audio/screen-share), which gets
+  // a filled/tinted look instead of the flat neutral default, and danger is
+  // the one-off hang-up button.
+  function ControlButton({
+    icon: Icon, onClick, title, active, danger,
+  }) {
+    return (
+      <Button
+        type="button"
+        size="icon"
+        onClick={onClick}
+        title={title}
+        aria-label={title}
+        className={cn(
+          'h-12 w-12 shrink-0 rounded-full shadow-md transition-transform active:scale-95 sm:h-14 sm:w-14',
+          danger
+            ? 'bg-destructive text-white hover:bg-destructive/90'
+            : active
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+              : 'bg-white/10 text-white hover:bg-white/20',
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </Button>
     );
   }
 
@@ -534,58 +298,56 @@ function Meeting() {
         isMaximized={isMaximized}
       >
         <div
-          className="absolute z-[1] flex w-full items-center justify-center pb-[18px] max-sm:pb-3"
+          className="absolute z-[1] flex w-full items-center justify-center pb-5 max-sm:pb-3"
           style={{ bottom: topBar || isGrid ? 0 : 95 }}
         >
-          <button
-            type="button"
-            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
-            onClick={() => (video ? stopVideo() : getVideo().then((stream) => produceVideo(stream)))}
-          >
-            {video ? <Video /> : <VideoOff />}
-          </button>
-          <button
-            type="button"
-            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
-            onClick={() => (audio ? stopAudio() : getAudio().then((stream) => produceAudio(stream)))}
-          >
-            {audio ? <Mic /> : <MicOff />}
-          </button>
-          <button
-            type="button"
-            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
-            onClick={() => (isScreen ? stopScreen() : getScreen().then((stream) => produceScreen(stream)))}
-          >
-            {isScreen ? <XOctagon /> : <Monitor />}
-          </button>
-          <button
-            type="button"
-            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center border border-destructive bg-destructive text-white hover:border-red-700 hover:bg-red-700 max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
-            onClick={close}
-          >
-            <PhoneOff />
-          </button>
-          <button
-            type="button"
-            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
-            onClick={() => setAddPeers(true)}
-          >
-            <UserPlus />
-          </button>
-          <button
-            type="button"
-            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
-            onClick={() => setMaximized(!isMaximized)}
-          >
-            {isMaximized ? <Maximize /> : <Minimize />}
-          </button>
-          <button
-            type="button"
-            className="m-0.5 flex h-[50px] w-[7vw] max-w-[80px] min-w-[50px] items-center justify-center bg-secondary text-white hover:bg-muted-foreground max-sm:h-[50px] max-sm:w-[13.5vw] max-sm:min-w-[40px] max-sm:text-sm"
-            onClick={() => setGrid(!isGrid)}
-          >
-            {isGrid ? <Grid3x3 /> : <Columns2 />}
-          </button>
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/50 p-2 shadow-2xl backdrop-blur-xl sm:gap-2.5">
+            <ControlButton
+              icon={video ? Video : VideoOff}
+              active={video}
+              title={video ? 'Turn off camera' : 'Turn on camera'}
+              onClick={() => (video ? callManager.stopVideo() : getVideo().then((stream) => callManager.produceVideo(stream)))}
+            />
+            <ControlButton
+              icon={audio ? Mic : MicOff}
+              active={audio}
+              title={audio ? 'Mute microphone' : 'Unmute microphone'}
+              onClick={() => (audio ? callManager.stopAudio() : getAudio().then((stream) => callManager.produceAudio(stream)))}
+            />
+            <ControlButton
+              icon={isScreen ? XOctagon : Monitor}
+              active={isScreen}
+              title={isScreen ? 'Stop sharing screen' : 'Share screen'}
+              onClick={() => (isScreen ? callManager.stopScreen() : getScreen().then((stream) => callManager.produceScreen(stream)))}
+            />
+
+            <div className="mx-0.5 h-8 w-px bg-white/15" />
+
+            <ControlButton
+              icon={PhoneOff}
+              danger
+              title="Leave call"
+              onClick={close}
+            />
+
+            <div className="mx-0.5 h-8 w-px bg-white/15" />
+
+            <ControlButton
+              icon={UserPlus}
+              title="Add people"
+              onClick={() => setAddPeers(true)}
+            />
+            <ControlButton
+              icon={isMaximized ? Minimize : Maximize}
+              title={isMaximized ? 'Fit to screen' : 'Fill screen'}
+              onClick={() => setMaximized(!isMaximized)}
+            />
+            <ControlButton
+              icon={isGrid ? Columns2 : Grid3x3}
+              title={isGrid ? 'Switch to spotlight view' : 'Switch to grid view'}
+              onClick={() => setGrid(!isGrid)}
+            />
+          </div>
         </div>
       </Streams>
       {!isGrid && !topBar && <TopBar localStream={localStream} />}

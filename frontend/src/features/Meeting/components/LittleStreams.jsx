@@ -4,9 +4,9 @@ import { useGlobal } from 'reactn';
 import { cn } from '@/lib/utils';
 import Interface from './LittleInterface';
 
-function LittleStreams({ streams }) {
-  const consumers = useSelector((state) => state.rtc.consumers);
-  const peers = useSelector((state) => state.rtc.peers);
+function LittleStreams({ streams = [] }) {
+  const consumers = useSelector((state) => state.rtc.consumers) || [];
+  const peers = useSelector((state) => state.rtc.peers) || {};
   const socketID = useSelector((state) => state.io.id);
   const [mainStream, setMainStream] = useGlobal('mainStream');
   const el = useRef(null);
@@ -54,22 +54,26 @@ function LittleStreams({ streams }) {
   });
 
   const videos = actualPeers.map((peer, key) => (
-    <div
+    <button
+      type="button"
       // eslint-disable-next-line react/no-array-index-key
       key={key}
       className={cn(
-        'mx-px h-[95px] w-[135px] max-sm:h-[85px] max-sm:w-[110px]',
-        mainStream && mainStream.socketID === peer.socketID && 'box-border border-2 border-primary',
+        'mx-1 h-[80px] w-[120px] shrink-0 cursor-pointer rounded-xl transition-all max-sm:h-[70px] max-sm:w-[100px]',
+        mainStream && mainStream.socketID === peer.socketID
+          ? 'ring-2 ring-primary ring-offset-2 ring-offset-card'
+          : 'opacity-90 hover:opacity-100',
       )}
       onClick={() => setMainStream(peer)}
+      title={peer.user?.firstName ? `Focus on ${peer.user.firstName}` : 'Focus on this participant'}
     >
       <Interface isMaximized video={peer.video} audio={peer.audio} peer={peer.user} />
-    </div>
+    </button>
   ));
 
   return (
     <div
-      className="flex min-w-[137px] flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex min-w-[130px] flex-1 items-center overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       ref={el}
     >
       {actualPeers.length > 0 && videos}

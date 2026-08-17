@@ -1,158 +1,163 @@
+import { useState, useRef, useEffect } from 'react';
 import {
-  MoreHorizontal, Settings, Home, PlusCircle, Cpu,
+  Settings, Plus, Cpu, UserPlus, Users, Lock,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { useSelector } from 'react-redux';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import getMeetingRoom from '../../../actions/getMeetingRoom';
-import logout from '../../../actions/logout';
-import Picture from '../../../components/Picture';
-
-const STATUS_COLOR = {
-  online: 'bg-emerald-500',
-  away: 'bg-orange-500',
-  busy: 'bg-destructive',
-};
+import Config from '../../../config';
+import AddPeople from './AddPeople';
 
 function TopBar() {
-  const onlineUsers = useSelector((state) => state.io.onlineUsers);
-  const io = useSelector((state) => state.io.io);
-  const [nav, setNav] = useGlobal('nav');
-  const setToken = useGlobal('token')[1];
   const setPanel = useGlobal('panel')[1];
   const setOver = useGlobal('over')[1];
-  const [user, setUser] = useGlobal('user');
-  const setAudio = useGlobal('audio')[1];
-  const setVideo = useGlobal('video')[1];
-  const setCallDirection = useGlobal('callDirection')[1];
+  const [user] = useGlobal('user');
+  const [nav, setNav] = useGlobal('nav');
+  const [showAddPeople, setShowAddPeople] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  const menuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const onLogout = async () => {
-    const { username } = user;
-    // Revoke the session server-side so the token can't be replayed after logout —
-    // fire-and-forget: local state is cleared regardless of whether this succeeds.
-    logout().catch(() => {});
-    io.disconnect();
-    localStorage.removeItem('token');
-    await setToken(null);
-    await setUser({});
-    toast.success(`User ${username} logged out!`);
-    navigate('/login', { replace: true });
-  };
+  const isAdmin = user?.level === 'root' || user?.level === 'admin';
+  const initials = `${(user?.firstName || 'A').charAt(0)}${(user?.lastName || 'U').charAt(0)}`.toUpperCase();
 
-  const errorToast = (content) => toast.error(content);
-
-  const newMeeting = async () => {
-    await setAudio(true);
-    await setVideo(true);
-    await setCallDirection('meeting');
-    try {
-      const res = await getMeetingRoom();
-      navigate(`/meeting/${res.data._id}`, { replace: true });
-    } catch (e) {
-      errorToast('Server error. Unable to initiate call.');
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
     }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
+  const handleCreateGroup = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsMenuOpen(false);
+    setOver(true);
+    setPanel('createGroup');
   };
 
-  const getStatus = () => {
-    if (onlineUsers.filter((u) => u.id === user.id && u.status === 'busy').length > 0) return 'busy';
-    if (onlineUsers.filter((u) => u.id === user.id && u.status === 'online').length > 0) return 'online';
-    if (onlineUsers.filter((u) => u.id === user.id && u.status === 'away').length > 0) return 'away';
-    return null;
+  const handleAddPerson = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsMenuOpen(false);
+    setShowAddPeople(true);
   };
-
-  const isAdmin = user.level === 'root' || user.level === 'admin';
 
   return (
-    <div className="flex h-[54px] w-full items-center justify-between border-b bg-card">
+    <div className="flex h-16 w-full items-center justify-between px-4 bg-transparent border-b border-border/50">
+      {/* Left: User Avatar */}
       <div className="flex items-center">
-        <button
-          type="button"
-          className="relative mx-3 h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-full [&_.img]:flex [&_.img]:h-10 [&_.img]:w-10 [&_.img]:items-center [&_.img]:justify-center [&_.img]:bg-secondary [&_.img]:text-lg [&_.img]:text-secondary-foreground"
-          onClick={() => {
-            setOver(true);
-            setNav('rooms');
-            navigate('/', { replace: true });
-          }}
-        >
-          <Picture user={user || {}} />
-        </button>
-        {getStatus() && (
-          <span className={cn('-ml-8 h-2.5 w-2.5 rounded-full border-2 border-card', STATUS_COLOR[getStatus()])} />
-        )}
+        <Avatar className="h-9 w-9 border border-border bg-muted text-foreground">
+          {user?.picture && (
+            <img
+              src={`${Config.url || ''}/api/images/${user.picture.shieldedID}/256`}
+              alt=""
+              className="aspect-square size-full object-cover"
+            />
+          )}
+          <AvatarFallback className="bg-muted text-xs font-bold text-foreground">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
       </div>
-      <div className="flex items-center pr-2">
+
+      {/* Right Action Icons: Admin, New (+), Settings */}
+      <div className="flex items-center gap-1 text-muted-foreground">
         {isAdmin && (
           <Button
             variant="ghost"
             size="icon"
-            className={location.pathname.startsWith('/admin') ? 'text-blue-700' : ''}
+            className={`h-8 w-8 rounded-full hover:bg-muted hover:text-foreground ${
+              location.pathname.startsWith('/admin') ? 'text-primary' : ''
+            }`}
             onClick={() => {
               setOver(true);
               navigate('/admin', { replace: true });
             }}
+            title="Admin Console"
           >
-            <Cpu />
+            <Cpu className="h-4 w-4" />
           </Button>
         )}
+
+        {/* Plus: Add Person or Create Group (Reliable Direct Dropdown) */}
+        <div className="relative" ref={menuRef}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 rounded-full transition-colors ${
+              isMenuOpen ? 'bg-muted text-foreground' : 'hover:bg-muted hover:text-foreground'
+            }`}
+            title="Create or Add"
+            aria-label="Add person or create group"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            <Plus className={`h-4 w-4 transition-transform duration-200 ${isMenuOpen ? 'rotate-45 text-primary' : ''}`} />
+          </Button>
+
+          {isMenuOpen && (
+            <div className="absolute right-0 top-10 z-50 w-48 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl p-1 animate-in fade-in-0 zoom-in-95">
+              <button
+                type="button"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted focus:bg-muted transition-colors text-left"
+                onClick={handleAddPerson}
+              >
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+                <span>Add Person</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted focus:bg-muted transition-colors text-left"
+                onClick={handleCreateGroup}
+              >
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span>Create Group</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Private Vault */}
         <Button
           variant="ghost"
           size="icon"
-          className="sm:hidden"
+          className={cn('h-8 w-8 rounded-full hover:bg-muted hover:text-foreground', nav === 'vault' && 'text-primary')}
+          onClick={() => setNav('vault')}
+          title="Private Vault"
+          aria-label="Private Vault"
+        >
+          <Lock className="h-4 w-4" />
+        </Button>
+
+        {/* Settings */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full hover:bg-muted hover:text-foreground"
           onClick={() => {
             setOver(true);
-            navigate('/', { replace: true });
+            navigate('/settings', { replace: true });
           }}
+          title="Settings"
         >
-          <Home />
+          <Settings className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => setPanel('createGroup')}>
-          <PlusCircle />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={nav === 'settings' ? 'text-blue-700' : ''}
-          onClick={() => setNav('settings')}
-        >
-          <Settings />
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={newMeeting}>New Meeting</DropdownMenuItem>
-            {isAdmin && <DropdownMenuSeparator />}
-            {isAdmin && (
-              <DropdownMenuItem
-                onClick={() => {
-                  setOver(true);
-                  navigate('/admin', { replace: true });
-                }}
-              >
-                Admin Panel
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onLogout}>Logout</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
+
+      {showAddPeople && <AddPeople onClose={() => setShowAddPeople(false)} />}
     </div>
   );
 }

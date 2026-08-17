@@ -23,15 +23,21 @@ module.exports = async (req, res, next) => {
 
   email = email.toLowerCase();
 
-  const isUsername = await User.findOne({ username });
-  if (isUsername && username !== user.username) errors.username = 'Username taken.';
+  const isUsername = await User.findOne({ usernameNormalized: username.toLowerCase() });
+  if (isUsername && username.toLowerCase() !== user.username.toLowerCase()) errors.username = 'Username taken.';
 
   const isEmail = await User.findOne({ email });
   if (isEmail && email !== user.email) errors.email = 'Email already in use.';
 
   if (Object.keys(errors).length > 0) return res.status(400).json(errors);
 
-  let query = { username: xss(username), email: xss(email), firstName: xss(firstName), lastName: xss(lastName) };
+  let query = {
+    username: xss(username),
+    usernameNormalized: xss(username).toLowerCase(),
+    email: xss(email),
+    firstName: xss(firstName),
+    lastName: xss(lastName),
+  };
 
   if (typeof password === 'string' && password.length > 0) {
     argon2.hash(password).then((hash) => {

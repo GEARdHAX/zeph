@@ -1,7 +1,18 @@
 const Room = require('../models/Room');
+const requireVisibleConversation = require('../utils/requireVisibleConversation');
+const { hasValidVaultToken } = require('../vault/vaultToken');
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   let { id } = req.fields;
+
+  const visibility = await requireVisibleConversation({
+    roomID: id,
+    userID: req.user.id,
+    hasVaultAuth: hasValidVaultToken(req),
+  });
+  if (!visibility.ok) {
+    return res.status(visibility.status).json({ error: true, reason: visibility.reason });
+  }
 
   Room.findOne({ _id: id })
     .sort({ lastUpdate: -1 })

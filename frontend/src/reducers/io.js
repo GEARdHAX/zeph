@@ -58,6 +58,38 @@ const reducer = (state = initialState, action) => {
         ...state,
         messages: state.messages.map((m) => (m.clientID === action.clientID ? { ...m, ...action.patch } : m)),
       };
+    // "Delete for everyone" patches content in place (same row stays at the same
+    // position — ordering/pagination/reply anchoring untouched, matching how the
+    // server tombstones rather than removes the document). "Delete for me" removes
+    // the row from this client's own view entirely — it was never a shared record
+    // to begin with, just this user's visibility of it.
+    case Actions.MESSAGE_DELETE:
+      if (action.forEveryone) {
+        return {
+          ...state,
+          messages: state.messages.map((m) => (m._id === action.messageID
+            ? {
+              ...m, deletedForEveryone: true, deletedAt: action.deletedAt || new Date().toISOString(), content: null, file: null,
+            }
+            : m)),
+        };
+      }
+      return {
+        ...state,
+        messages: state.messages.filter((m) => m._id !== action.messageID),
+      };
+    // Hidden/deleted conversations disappear from the normal inbox the same
+    // way a delete-for-me message disappears from its room — filtered out of
+    // the array this client already has, no server round trip needed since
+    // we already know which id to remove. Unhide is handled separately (via
+    // a getRooms() refetch in initIO.js) since restoring a room needs the
+    // full populated object, which the socket event alone doesn't carry.
+    case Actions.CONVERSATION_HIDDEN:
+    case Actions.CONVERSATION_DELETED:
+      return {
+        ...state,
+        rooms: state.rooms.filter((r) => r._id !== action.conversationId),
+      };
     case Actions.ONLINE_USERS:
       return {
         ...state,

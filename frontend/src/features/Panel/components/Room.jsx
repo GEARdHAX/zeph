@@ -1,45 +1,29 @@
 import { useState } from 'react';
 import { useGlobal } from 'reactn';
-import { Phone, MoreHorizontal } from 'lucide-react';
 import moment from 'moment';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { useDispatch, useSelector } from 'react-redux';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { useSelector } from 'react-redux';
+import { Unlock, Trash2 } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import getMeetingRoom from '../../../actions/getMeetingRoom';
-import Picture from '../../../components/Picture';
-import postCall from '../../../actions/postCall';
-import Actions from '../../../constants/Actions';
-import removeRoom from '../../../actions/removeRoom';
-import getRooms from '../../../actions/getRooms';
+import unhideConversation from '../../../actions/unhideConversation';
+import deleteConversation from '../../../actions/deleteConversation';
+import Config from '../../../config';
 
-const STATUS_COLOR = {
-  online: 'bg-emerald-500',
-  away: 'bg-orange-500',
-  busy: 'bg-destructive',
-  offline: 'bg-gray-400',
-};
-
-function Room({ room }) {
-  const roomsWithNewMessages = useSelector((state) => state.messages.roomsWithNewMessages);
-  const onlineUsers = useSelector((state) => state.io.onlineUsers);
-  const currentRoom = useSelector((state) => state.io.room);
-  const [hover, setHover] = useState(false);
-  const user = useGlobal('user')[0];
-  const setAudio = useGlobal('audio')[1];
-  const setVideo = useGlobal('video')[1];
-  const setCallDirection = useGlobal('callDirection')[1];
-  const setMeeting = useGlobal('meeting')[1];
+// inVault + vaultToken: renders Unhide/Delete row actions instead of the
+// normal click-through, used only when this row is rendered inside
+// VaultUnlock.jsx's unlocked hidden-conversations list.
+function Room({ room, inVault, vaultToken }) {
+  const roomsWithNewMessages = useSelector((state) => state.messages.roomsWithNewMessages) || [];
+  const user = useGlobal('user')[0] || {};
+  const setOver = useGlobal('over')[1];
+  const [vaultRooms, setVaultRooms] = useGlobal('vaultRooms');
+  const [busy, setBusy] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const dispatch = useDispatch();
 
   let other = {};
 
@@ -63,148 +47,136 @@ function Room({ room }) {
 
   if (lastMessage.author === user.id && !room.isGroup) text += 'You: ';
 
-  switch (lastMessage.type) {
-    case 'file':
-      text += 'Sent a file.';
-      break;
-    case 'image':
-      text += 'Sent a picture.';
-      break;
-    default:
-      text += lastMessage.content || '';
+  if (lastMessage.deletedForEveryone) {
+    text += 'This message was deleted';
+  } else {
+    switch (lastMessage.type) {
+      case 'file':
+        text += 'Sent a file.';
+        break;
+      case 'image':
+        text += 'Sent a picture.';
+        break;
+      default:
+        text += lastMessage.content || '';
+    }
   }
 
-  const date = lastMessage ? moment(lastMessage.date).format('MMM D') : '';
-  const time = lastMessage ? moment(lastMessage.date).format('h:mm A') : '';
-
-  const popup = (content, type) => (type === 'success' ? toast.success(content) : toast.error(content));
-
-  const remove = async () => {
-    if (
-      window.confirm(
-        'Are you sure you want to remove this room? All associated messages will be deleted, both for you and other members.',
-      )
-    ) {
-      try {
-        await removeRoom(room._id);
-        popup('Room has been deleted.', 'success');
-        getRooms()
-          .then((res) => dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
-          .catch((err) => console.log(err));
-        if (currentRoom && room._id === currentRoom._id) navigate('/', { replace: true });
-      } catch (e) {
-        popup('Error while removing room. Please retry!', 'error');
-      }
-    }
-  };
-
-  const width = window.innerWidth;
-  const isMobile = width < 700;
-
-  const warningToast = (content) => toast.warn(content);
-  const errorToast = (content) => toast.error(content);
-
-  const call = async (callee, isVideo) => {
-    if (onlineUsers.filter((u) => u.id === other._id).length === 0 && !room.isGroup) {
-      warningToast("Can't call user because user is offline");
-      return;
-    }
-    await setAudio(true);
-    await setVideo(isVideo);
-    await setCallDirection('outgoing');
-    dispatch({ type: Actions.RTC_SET_COUNTERPART, counterpart: callee });
-    try {
-      const res = await getMeetingRoom({
-        startedAsCall: true,
-        caller: user.id,
-        callee: other._id,
-        callToGroup: room.isGroup,
-        group: room._id,
-      });
-      await setMeeting(res.data);
-      navigate(`/meeting/${res.data._id}`, { replace: true });
-      await postCall({ roomID: room._id, meetingID: res.data._id });
-    } catch (e) {
-      errorToast('Server error. Unable to initiate call.');
-    }
-  };
-
-  const getStatus = () => {
-    if (room.isGroup) return null;
-    if (onlineUsers.filter((u) => u.id === other._id && u.status === 'busy').length > 0) return 'busy';
-    if (onlineUsers.filter((u) => u.id === other._id && u.status === 'online').length > 0) return 'online';
-    if (onlineUsers.filter((u) => u.id === other._id && u.status === 'away').length > 0) return 'away';
-    return null;
-  };
-
+  const date = lastMessage?.date ? moment(lastMessage.date).format('MMM D') : '';
+  const time = lastMessage?.date ? moment(lastMessage.date).format('h:mm A') : '';
+  const isSelected = location.pathname.startsWith(`/room/${room._id}`);
   const hasUnread = roomsWithNewMessages.includes(room._id);
 
+  const initials = (room.isGroup
+    ? (room.title || 'G').charAt(0)
+    : `${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`
+  ).toUpperCase();
+
+  const onSelect = () => {
+    setOver(true);
+    navigate(`/room/${room._id}`);
+  };
+
+  const onUnhide = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      await unhideConversation(room._id, vaultToken);
+      setVaultRooms((vaultRooms || []).filter((r) => r._id !== room._id));
+      toast.success('Conversation restored to your inbox.');
+    } catch (err) {
+      toast.error('Could not unhide this conversation.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onVaultDelete = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      await deleteConversation(room._id, vaultToken);
+      setVaultRooms((vaultRooms || []).filter((r) => r._id !== room._id));
+      toast.success('Conversation deleted.');
+    } catch (err) {
+      toast.error('Could not delete this conversation.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div
-      className="flex h-[54px] cursor-pointer items-center border-b hover:bg-muted"
-      onMouseOver={!isMobile ? () => setHover(true) : undefined}
-      onFocus={!isMobile ? () => setHover(true) : undefined}
-      onMouseOut={!isMobile ? () => setHover(false) : undefined}
-      onBlur={!isMobile ? () => setHover(false) : undefined}
-      onClick={() => {
-        const target = `/room/${room._id}`;
-        if (location.pathname !== target) navigate(target, { replace: true });
-      }}
-    >
-      <div className="relative mx-3 h-10 w-10 shrink-0 overflow-hidden rounded-full [&_.img]:flex [&_.img]:h-10 [&_.img]:w-10 [&_.img]:items-center [&_.img]:justify-center [&_.img]:bg-secondary [&_.img]:text-lg [&_.img]:text-secondary-foreground">
-        <Picture user={other} group={room.isGroup} picture={room.picture} title={room.title} />
-      </div>
-      {getStatus() && (
-        <span
-          className={cn('-ml-8 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-card', STATUS_COLOR[getStatus()])}
-        />
-      )}
-      <div className="flex flex-1 flex-col justify-center overflow-hidden">
-        <div className={cn('truncate text-[13px] font-bold', hasUnread && 'text-foreground')}>
-          {title.substr(0, 20)}
-          {title.length > 20 && '...'}
-          {hasUnread ? ` (${roomsWithNewMessages.filter((r) => room._id === r).length})` : ''}
+    <div className="px-3 py-1">
+      <button
+        type="button"
+        onClick={inVault ? undefined : onSelect}
+        className={cn(
+          'group relative flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-all duration-200 hover:bg-accent/60',
+          isSelected ? 'bg-accent shadow-xs border border-border text-foreground' : 'bg-transparent text-foreground',
+        )}
+      >
+        {/* Avatar */}
+        <div className="relative shrink-0">
+          <Avatar className="h-10 w-10 border border-border bg-gradient-to-br from-rose-600 to-primary text-white font-bold">
+            {other.picture && (
+              <img
+                src={`${Config.url || ''}/api/images/${other.picture.shieldedID}/256`}
+                alt=""
+                className="aspect-square size-full object-cover"
+              />
+            )}
+            <AvatarFallback className="bg-transparent text-xs font-bold text-white">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
         </div>
-        <div className={cn('truncate text-[11px] text-muted-foreground', hasUnread && 'font-bold text-foreground')}>
-          {text.substr(0, 26)}
-          {text.length > 26 && '...'}
-        </div>
-      </div>
-      {!hover && (
-        <div className="flex items-center pr-1">
-          <div className="pr-2 text-right text-[10px] text-muted-foreground">
-            {date}
-            <br />
-            {time}
+
+        {/* Middle Info */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-1">
+            <span className="truncate text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+              {title}
+            </span>
+            <span className="shrink-0 text-[10px] text-muted-foreground">
+              {date || 'Today'}
+            </span>
+          </div>
+
+          <div className="mt-0.5 flex items-center justify-between gap-1">
+            <span className="truncate text-[11px] text-muted-foreground">
+              {text}
+            </span>
+            <span className="shrink-0 text-[10px] text-muted-foreground/80">
+              {time}
+            </span>
           </div>
         </div>
-      )}
-      {hover && (
-        <div className="flex items-center pr-1">
-          <button
+
+        {/* Unread dot */}
+        {!inVault && hasUnread && (
+          <span className="absolute right-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-card" />
+        )}
+      </button>
+
+      {inVault && (
+        <div className="flex items-center justify-end gap-1.5 px-3 pb-1 pt-1.5">
+          <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" onClick={onUnhide} disabled={busy}>
+            <Unlock className="h-3 w-3" />
+            Unhide
+          </Button>
+          <Button
             type="button"
-            className="flex h-full items-center p-1 text-muted-foreground hover:text-foreground"
-            onClick={(e) => {
-              e.stopPropagation();
-              call(other, false);
-            }}
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 text-[11px] text-destructive hover:text-destructive"
+            onClick={onVaultDelete}
+            disabled={busy}
           >
-            <Phone className="h-4 w-4" />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex h-full items-center p-1 text-muted-foreground hover:text-foreground"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenuItem onClick={remove}>Remove</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <Trash2 className="h-3 w-3" />
+            Delete
+          </Button>
         </div>
       )}
     </div>

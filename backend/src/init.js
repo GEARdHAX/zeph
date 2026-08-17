@@ -151,11 +151,55 @@ module.exports = (mediasoupEnabled) => {
     legacyHeaders: false,
     message: { status: 'error', message: 'AI request limit reached, please try again later.' },
   });
+  // Username search/profile-resolution/friend-requests/new-conversation-with-a-
+  // stranger are the enumeration + unsolicited-contact abuse surface (username
+  // brute-forcing, mass friend-request spam, spamming DMs at strangers) —
+  // tighter than general API traffic, looser than auth since search is used
+  // interactively while typing.
+  const discoveryLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: 'error', message: 'Too many requests, please try again later.' },
+  });
+  // Deletion is a mutation on data that already exists (not spam-creation),
+  // so this is deliberately looser than discoveryLimiter — but still bounded
+  // against a buggy client or script hammering delete on every message in a
+  // long thread.
+  const deleteLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: 'error', message: 'Too many requests, please try again later.' },
+  });
+  // PIN brute-force is the real risk on vault unlock — a 4-12 digit PIN has
+  // far less entropy than a password, so this is materially tighter than
+  // authLimiter's 20/15min despite being conceptually similar ("prove who
+  // you are"). Covers both unlock paths (PIN verify, passkey assertion
+  // verify) — either one is the attacker's target, not just one of them.
+  const vaultUnlockLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 8,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: 'error', message: 'Too many vault unlock attempts, please try again later.' },
+  });
   store.app.use(
     ['/api/login', '/api/register', '/api/auth/change', '/api/auth/code', '/api/auth/verify', '/api/check-user'],
     authLimiter,
   );
   store.app.use('/api/ai', aiLimiter);
+  store.app.use(
+    ['/api/search', '/api/users', '/api/friend-requests', '/api/friends', '/api/room/create', '/api/block', '/api/unblock'],
+    discoveryLimiter,
+  );
+  store.app.use(
+    ['/api/message/delete', '/api/conversation/hide', '/api/conversation/unhide', '/api/conversation/delete'],
+    deleteLimiter,
+  );
+  store.app.use(['/api/vault/unlock/pin', '/api/vault/webauthn/auth/verify'], vaultUnlockLimiter);
   store.app.use('/api', apiLimiter);
 
   store.app.use(formidableMiddleware());
@@ -223,12 +267,35 @@ module.exports = (mediasoupEnabled) => {
               .then((hash) =>
                 User.findOneAndUpdate(
                   { email },
-                  { $set: { username, email, password: hash, firstName, lastName, level: 'root' } },
+                  {
+                    $set: {
+                      username,
+                      usernameNormalized: username.toLowerCase(),
+                      email,
+                      password: hash,
+                      firstName,
+                      lastName,
+                      level: 'root',
+                    },
+                  },
                 ),
               );
         });
 
         Meeting.updateMany({}, { $set: { peers: [] } }).catch((err) => logger.error({ err }, 'Failed to reset meeting peers on boot'));
+
+        // Backfill usernameNormalized for users created before it existed (findOneAndUpdate/
+        // legacy documents bypass the pre-save hook that keeps it in sync). Idempotent —
+        // no-ops once every user has it, safe to run on every boot instead of a one-off script.
+        User.find({ username: { $exists: true, $ne: null }, usernameNormalized: { $exists: false } })
+          .then((users) =>
+            Promise.all(
+              users.map((u) => User.updateOne({ _id: u._id }, { $set: { usernameNormalized: u.username.toLowerCase() } })),
+            ))
+          .then((results) => {
+            if (results.length) logger.info({ count: results.length }, 'Backfilled usernameNormalized for legacy users');
+          })
+          .catch((err) => logger.error({ err }, 'Failed to backfill usernameNormalized'));
 
         logger.info('Connected to DB');
         store.connected = true;

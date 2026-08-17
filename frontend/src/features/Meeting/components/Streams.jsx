@@ -2,10 +2,12 @@ import { useSelector } from 'react-redux';
 import { useGlobal } from 'reactn';
 import Interface from './Interface';
 
-function Streams({ streams, children, isMaximized, isGrid }) {
-  const consumers = useSelector((state) => state.rtc.consumers);
-  const producers = useSelector((state) => state.rtc.producers);
-  const peers = useSelector((state) => state.rtc.peers);
+function Streams({
+  streams = [], children, isMaximized, isGrid,
+}) {
+  const consumers = useSelector((state) => state.rtc.consumers) || [];
+  const producers = useSelector((state) => state.rtc.producers) || [];
+  const peers = useSelector((state) => state.rtc.peers) || {};
   const socketID = useSelector((state) => state.io.id);
   const [mainStream, setMainStream] = useGlobal('mainStream');
 
@@ -24,9 +26,8 @@ function Streams({ streams, children, isMaximized, isGrid }) {
       if (stream.isVideo) return (actualPeer.video = stream);
       actualPeer.audio = stream;
     });
-    const isScreen =
-      (actualPeer.video || actualPeer.screen) &&
-      producers.filter((p) => p.producerID === actualPeer.video.producerID && p.isScreen).length > 0;
+    const isScreen = (actualPeer.video || actualPeer.screen)
+      && producers.filter((p) => p.producerID === actualPeer.video?.producerID && p.isScreen).length > 0;
     actualPeers.push({ ...actualPeer, isScreen });
   });
 
@@ -38,8 +39,9 @@ function Streams({ streams, children, isMaximized, isGrid }) {
     let mainPeer = mainStream;
     actualPeers.forEach((peer) => peer.socketID === mainPeer && (mainPeer = peer));
     return (
-      <div className="flex h-full w-full flex-1 flex-col items-center justify-center bg-black">
-        <div className="flex h-full w-full flex-1 flex-col">
+      <div className="relative flex h-full w-full flex-1 flex-col items-center justify-center overflow-hidden bg-background p-3 sm:p-4">
+        <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-black/80 pointer-events-none" />
+        <div className="relative z-10 flex h-full w-full flex-1 flex-col">
           <div className="relative flex flex-1 flex-row">
             <div className="relative flex-1">
               <Interface
@@ -57,7 +59,7 @@ function Streams({ streams, children, isMaximized, isGrid }) {
     );
   }
 
-  const side = Math.ceil(Math.sqrt(actualPeers.length));
+  const side = Math.max(1, Math.ceil(Math.sqrt(actualPeers.length)));
 
   const rows = [];
   let row = [];
@@ -66,7 +68,7 @@ function Streams({ streams, children, isMaximized, isGrid }) {
     if (row.length === side) {
       rows.push(
         // eslint-disable-next-line react/no-array-index-key
-        <div className="flex flex-1 flex-row" key={key}>
+        <div className="flex flex-1 flex-row gap-3 sm:gap-4" key={key}>
           {row}
         </div>,
       );
@@ -88,16 +90,26 @@ function Streams({ streams, children, isMaximized, isGrid }) {
 
   if (row.length > 0) {
     rows.push(
-      <div className="flex flex-1 flex-row" key="last">
+      <div className="flex flex-1 flex-row gap-3 sm:gap-4" key="last">
         {row}
       </div>,
     );
   }
 
   return (
-    <div className="flex h-full w-full flex-1 flex-col items-center justify-center bg-black">
-      {actualPeers.length === 0 && <p className="text-2xl font-bold text-white">Waiting for others to join...</p>}
-      {actualPeers.length > 0 && <div className="flex h-full w-full flex-col">{rows}</div>}
+    <div className="relative flex h-full w-full flex-1 flex-col items-center justify-center overflow-hidden bg-background p-3 sm:p-4">
+      <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-black/80 pointer-events-none" />
+
+      {actualPeers.length === 0 && (
+        <div className="relative z-10 flex flex-col items-center gap-3 text-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-base font-bold text-foreground sm:text-lg">Waiting for others to join...</p>
+          <p className="text-xs text-muted-foreground">The call will start once the other person joins</p>
+        </div>
+      )}
+      {actualPeers.length > 0 && (
+        <div className="relative z-10 flex h-full w-full flex-col gap-3 sm:gap-4">{rows}</div>
+      )}
       {children}
     </div>
   );

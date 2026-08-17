@@ -27,9 +27,39 @@ router.post('/room/remove', passport.authenticate('jwt', { session: false }, nul
 router.post('/search', passport.authenticate('jwt', { session: false }, null), require('./search'));
 router.post('/message', passport.authenticate('jwt', { session: false }, null), require('./message'));
 router.post('/message/read', passport.authenticate('jwt', { session: false }, null), require('./message-read'));
+router.post('/message/delete', passport.authenticate('jwt', { session: false }, null), require('./message-delete'));
 router.post('/messages/more', passport.authenticate('jwt', { session: false }, null), require('./more-messages'));
 router.post('/messages/sync', passport.authenticate('jwt', { session: false }, null), require('./sync-messages'));
 router.post('/group/create', passport.authenticate('jwt', { session: false }, null), require('./create-group'));
+
+router.post('/conversation/hide', passport.authenticate('jwt', { session: false }, null), require('./conversation-hide'));
+router.post('/conversation/unhide', passport.authenticate('jwt', { session: false }, null), require('./conversation-unhide'));
+router.post('/conversation/delete', passport.authenticate('jwt', { session: false }, null), require('./conversation-delete'));
+
+router.get('/vault/list', passport.authenticate('jwt', { session: false }, null), require('./vault-list'));
+router.get('/vault/status', passport.authenticate('jwt', { session: false }, null), require('./vault-status'));
+router.post('/vault/unlock/pin', passport.authenticate('jwt', { session: false }, null), require('./vault-unlock-pin'));
+router.post('/vault/pin/setup', passport.authenticate('jwt', { session: false }, null), require('./vault-pin-setup'));
+router.post(
+  '/vault/webauthn/register/options',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./vault-webauthn/register-options'),
+);
+router.post(
+  '/vault/webauthn/register/verify',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./vault-webauthn/register-verify'),
+);
+router.post(
+  '/vault/webauthn/auth/options',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./vault-webauthn/auth-options'),
+);
+router.post(
+  '/vault/webauthn/auth/verify',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./vault-webauthn/auth-verify'),
+);
 
 router.post('/rtc/create', passport.authenticate('jwt', { session: false }, null), require('./rtc/create'));
 router.post('/rtc/join', passport.authenticate('jwt', { session: false }, null), require('./rtc/join'));
@@ -59,6 +89,34 @@ router.post('/ai/draft-reply', passport.authenticate('jwt', { session: false }, 
 router.post('/logout', passport.authenticate('jwt', { session: false }, null), require('./logout'));
 router.get('/sessions', passport.authenticate('jwt', { session: false }, null), require('./sessions/list'));
 router.post('/sessions/revoke', passport.authenticate('jwt', { session: false }, null), require('./sessions/revoke'));
+
+router.get('/users/:username', passport.authenticate('jwt', { session: false }, null), require('./users/resolve'));
+
+router.get(
+  '/friend-requests',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./friend-requests/list'),
+);
+router.post(
+  '/friend-requests',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./friend-requests/send'),
+);
+router.post(
+  '/friend-requests/:id/accept',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./friend-requests/accept'),
+);
+router.post(
+  '/friend-requests/:id/decline',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./friend-requests/decline'),
+);
+
+router.get('/friends', passport.authenticate('jwt', { session: false }, null), require('./friends/list'));
+
+router.post('/block', passport.authenticate('jwt', { session: false }, null), require('./relationships/block'));
+router.post('/unblock', passport.authenticate('jwt', { session: false }, null), require('./relationships/unblock'));
 
 router.use('/info', require('./info'));
 

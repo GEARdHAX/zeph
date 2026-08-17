@@ -70,6 +70,44 @@ const initIO = (token) => (dispatch) => {
       .catch((err) => console.log(err));
   });
 
+  // "Delete for everyone" is emitted to every OTHER room member (see
+  // message-delete.js); "delete for me" is emitted to the deleting user's own
+  // personal room, so every other device/tab of that same user updates too —
+  // both land on this one listener regardless of which case it was.
+  io.on('message-deleted', (data) => {
+    const {
+      roomID, messageID, forEveryone, deletedAt,
+    } = data;
+    const currentRoom = store.getState().io.room;
+    if (currentRoom && currentRoom._id === roomID) {
+      store.dispatch({
+        type: Actions.MESSAGE_DELETE, messageID, forEveryone, deletedAt,
+      });
+    }
+  });
+
+  // Hide/delete are always emitted to the ACTING user's own personal room
+  // only (never the other participant) — every device/tab of this same user
+  // needs to reflect the change, and the room is already excluded from the
+  // next getRooms() response either way, so a direct array patch here is
+  // just a faster UI update, not the actual enforcement (that's server-side).
+  io.on('conversation-hidden', (data) => {
+    store.dispatch({ type: Actions.CONVERSATION_HIDDEN, conversationId: data.conversationId });
+  });
+
+  io.on('conversation-deleted', (data) => {
+    store.dispatch({ type: Actions.CONVERSATION_DELETED, conversationId: data.conversationId });
+  });
+
+  // Unhide needs the full populated room object to reinsert into the normal
+  // inbox list, which this event alone doesn't carry — refetch instead of
+  // trying to reconstruct it, same as message-in's existing getRooms() call.
+  io.on('conversation-unhidden', () => {
+    getRooms()
+      .then((res) => store.dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
+      .catch((err) => console.log(err));
+  });
+
   io.on('newProducer', (data) => {
     console.log('newProducer', data);
     if (data.socketID !== io.id) store.dispatch({ type: Actions.RTC_PRODUCER, data });

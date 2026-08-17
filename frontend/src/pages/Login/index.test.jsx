@@ -47,8 +47,8 @@ beforeEach(async () => {
 describe('Login tabbed auth flow', () => {
   it('shows the login form by default', () => {
     renderLogin();
-    expect(screen.getByPlaceholderText('Username (or email)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'LOG IN' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Username or email')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
   });
 
   it('switches to the register form when the Register tab is clicked, without losing the login tab', async () => {
@@ -59,7 +59,7 @@ describe('Login tabbed auth flow', () => {
 
     expect(screen.getByPlaceholderText('Username')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'REGISTER' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /register/i })).toBeInTheDocument();
     // The login tab trigger is still present (not unmounted, just inactive).
     expect(screen.getByRole('tab', { name: 'Log In' })).toBeInTheDocument();
   });
@@ -71,21 +71,21 @@ describe('Login tabbed auth flow', () => {
     await userEv.click(screen.getByRole('tab', { name: 'Register' }));
     await userEv.click(screen.getByRole('tab', { name: 'Log In' }));
 
-    expect(screen.getByRole('button', { name: 'LOG IN' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
   });
 
   it('keeps independent field state between the login and register forms', async () => {
     const userEv = userEvent.setup();
     renderLogin();
 
-    await userEv.type(screen.getByPlaceholderText('Username (or email)'), 'loginuser');
+    await userEv.type(screen.getByPlaceholderText('Username or email'), 'loginuser');
     await userEv.click(screen.getByRole('tab', { name: 'Register' }));
     await userEv.type(screen.getByPlaceholderText('Username'), 'registeruser');
 
     expect(screen.getByPlaceholderText('Username')).toHaveValue('registeruser');
 
     await userEv.click(screen.getByRole('tab', { name: 'Log In' }));
-    expect(screen.getByPlaceholderText('Username (or email)')).toHaveValue('loginuser');
+    expect(screen.getByPlaceholderText('Username or email')).toHaveValue('loginuser');
   });
 
   it('shows the credits panel instead of the auth forms when opened, and can be closed back to the forms', async () => {
@@ -98,9 +98,36 @@ describe('Login tabbed auth flow', () => {
 
     await userEv.click(creditsButton);
     expect(screen.getByText(/Picsum Photos/)).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('Username (or email)')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Username or email')).not.toBeInTheDocument();
 
     await userEv.click(screen.getByRole('button', { name: /close credits/i }));
-    expect(screen.getByPlaceholderText('Username (or email)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Username or email')).toBeInTheDocument();
+  });
+
+  it('toggles the theme and persists the choice to localStorage', async () => {
+    const userEv = userEvent.setup();
+    renderLogin();
+
+    const toggle = screen.getByRole('button', { name: /dark|light/i });
+    const initialLabel = toggle.textContent;
+
+    await userEv.click(toggle);
+
+    expect(toggle.textContent).not.toBe(initialLabel);
+    expect(['dark', 'light']).toContain(localStorage.getItem('theme'));
+  });
+
+  it('reveals and hides the password on toggle click', async () => {
+    const userEv = userEvent.setup();
+    renderLogin();
+
+    const passwordInput = screen.getByPlaceholderText('Password');
+    expect(passwordInput).toHaveAttribute('type', 'password');
+
+    await userEv.click(screen.getByRole('button', { name: /show password/i }));
+    expect(passwordInput).toHaveAttribute('type', 'text');
+
+    await userEv.click(screen.getByRole('button', { name: /hide password/i }));
+    expect(passwordInput).toHaveAttribute('type', 'password');
   });
 });

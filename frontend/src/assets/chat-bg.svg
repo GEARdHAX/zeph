@@ -1,0 +1,78 @@
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="fadeGlow" cx="20%" cy="15%" r="65%" fx="20%" fy="15%">
+      <stop offset="0%" stop-color="#e11d48" stop-opacity="0.35" />
+      <stop offset="50%" stop-color="#e11d48" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#e11d48" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="fadeGlowBottom" cx="85%" cy="85%" r="65%" fx="85%" fy="85%">
+      <stop offset="0%" stop-color="#e11d48" stop-opacity="0.35" />
+      <stop offset="55%" stop-color="#e11d48" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#e11d48" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="waveGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.75" />
+      <stop offset="40%" stop-color="#e11d48" stop-opacity="0.5" />
+      <stop offset="80%" stop-color="#be123c" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#881337" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="waveGradient2" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.75" />
+      <stop offset="40%" stop-color="#e11d48" stop-opacity="0.5" />
+      <stop offset="80%" stop-color="#be123c" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#881337" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Ambient Glows -->
+  <rect width="100%" height="100%" fill="url(#fadeGlow)" pointer-events="none" />
+  <rect width="100%" height="100%" fill="url(#fadeGlowBottom)" pointer-events="none" />
+
+  <!-- Top-Left Flowing Dotted Waves -->
+  <g stroke="url(#waveGradient1)" stroke-linecap="round" fill="none" opacity="0.85">
+    <path d="M-100,-40 C120,60 220,180 180,320 C140,460 380,540 680,480" stroke-width="1.8" stroke-dasharray="3, 7" />
+    <path d="M-90,-20 C130,80 235,195 195,335 C155,475 395,550 700,490" stroke-width="1.8" stroke-dasharray="3.5, 7" />
+    <path d="M-80,0 C140,100 250,210 210,350 C170,490 410,560 720,500" stroke-width="1.8" stroke-dasharray="4, 7.5" />
+    <path d="M-70,20 C150,120 265,225 225,365 C185,505 425,570 740,510" stroke-width="1.8" stroke-dasharray="4, 7.5" />
+    <path d="M-60,40 C160,140 280,240 240,380 C200,520 440,580 760,520" stroke-width="1.8" stroke-dasharray="4, 8" />
+    <path d="M-50,60 C170,160 295,255 255,395 C215,535 455,590 780,530" stroke-width="1.8" stroke-dasharray="4, 8" />
+    <path d="M-40,80 C180,180 310,270 270,410 C230,550 470,600 800,540" stroke-width="1.8" stroke-dasharray="4, 8.5" />
+    <path d="M-30,100 C190,200 325,285 285,425 C245,565 485,610 820,550" stroke-width="1.8" stroke-dasharray="4, 8.5" />
+    <path d="M-20,120 C200,220 340,300 300,440 C260,580 500,620 840,560" stroke-width="1.8" stroke-dasharray="4.5, 9" />
+    <path d="M-10,140 C210,240 355,315 315,455 C275,595 515,630 860,570" stroke-width="1.8" stroke-dasharray="4.5, 9" />
+    <path d="M0,160 C220,260 370,330 330,470 C290,610 530,640 880,580" stroke-width="1.8" stroke-dasharray="4.5, 9" />
+    <path d="M10,180 C230,280 385,345 345,485 C305,625 545,650 900,590" stroke-width="1.8" stroke-dasharray="4.5, 9" />
+    <path d="M20,200 C240,300 400,360 360,500 C320,640 560,660 920,600" stroke-width="1.8" stroke-dasharray="4.5, 9.5" />
+    <path d="M30,220 C250,320 415,375 375,515 C335,655 575,670 940,610" stroke-width="1.8" stroke-dasharray="4.5, 9.5" />
+    <path d="M40,240 C260,340 430,390 390,530 C350,670 590,680 960,620" stroke-width="1.8" stroke-dasharray="5, 10" />
+    <path d="M50,260 C270,360 445,405 405,545 C365,685 605,690 980,630" stroke-width="1.8" stroke-dasharray="5, 10" />
+    <path d="M60,280 C280,380 460,420 420,560 C380,700 620,700 1000,640" stroke-width="1.8" stroke-dasharray="5, 10" />
+    <path d="M70,300 C290,400 475,435 435,575 C395,715 635,710 1020,650" stroke-width="1.8" stroke-dasharray="5, 10.5" />
+    <path d="M80,320 C300,420 490,450 450,590 C410,730 650,720 1040,660" stroke-width="1.8" stroke-dasharray="5, 10.5" />
+    <path d="M90,340 C310,440 505,465 465,605 C425,745 665,730 1060,670" stroke-width="1.8" stroke-dasharray="5, 10.5" />
+  </g>
+
+  <!-- Bottom-Right Flowing Dotted Waves -->
+  <g stroke="url(#waveGradient2)" stroke-linecap="round" fill="none" opacity="0.85">
+    <path d="M1540,940 C1320,840 1220,720 1260,580 C1300,440 1060,360 760,420" stroke-width="1.8" stroke-dasharray="3, 7" />
+    <path d="M1530,920 C1310,820 1205,705 1245,565 C1285,425 1045,350 740,410" stroke-width="1.8" stroke-dasharray="3.5, 7" />
+    <path d="M1520,900 C1300,800 1190,690 1230,550 C1270,410 1030,340 720,400" stroke-width="1.8" stroke-dasharray="4, 7.5" />
+    <path d="M1510,880 C1290,780 1175,675 1215,535 C1255,395 1015,330 700,390" stroke-width="1.8" stroke-dasharray="4, 7.5" />
+    <path d="M1500,860 C1280,760 1160,660 1200,520 C1240,380 1000,320 680,380" stroke-width="1.8" stroke-dasharray="4, 8" />
+    <path d="M1490,840 C1270,740 1145,645 1185,505 C1225,365 985,310 660,370" stroke-width="1.8" stroke-dasharray="4, 8" />
+    <path d="M1480,820 C1260,720 1130,630 1170,490 C1210,350 970,300 640,360" stroke-width="1.8" stroke-dasharray="4, 8.5" />
+    <path d="M1470,800 C1250,700 1115,615 1155,475 C1195,335 955,290 620,350" stroke-width="1.8" stroke-dasharray="4, 8.5" />
+    <path d="M1460,780 C1240,680 1100,600 1140,460 C1180,320 940,280 600,340" stroke-width="1.8" stroke-dasharray="4.5, 9" />
+    <path d="M1450,760 C1230,660 1085,585 1125,445 C1165,305 925,270 580,330" stroke-width="1.8" stroke-dasharray="4.5, 9" />
+    <path d="M1440,740 C1220,640 1070,570 1110,430 C1150,290 910,260 560,320" stroke-width="1.8" stroke-dasharray="4.5, 9" />
+    <path d="M1430,720 C1210,620 1055,555 1095,415 C1135,275 895,250 540,310" stroke-width="1.8" stroke-dasharray="4.5, 9" />
+    <path d="M1420,700 C1200,600 1040,540 1080,400 C1120,260 880,240 520,300" stroke-width="1.8" stroke-dasharray="4.5, 9.5" />
+    <path d="M1410,680 C1190,580 1025,525 1065,385 C1105,245 865,230 500,290" stroke-width="1.8" stroke-dasharray="4.5, 9.5" />
+    <path d="M1400,660 C1180,560 1010,510 1050,370 C1090,230 850,220 480,280" stroke-width="1.8" stroke-dasharray="5, 10" />
+    <path d="M1390,640 C1170,540 995,495 1035,355 C1075,215 835,210 460,270" stroke-width="1.8" stroke-dasharray="5, 10" />
+    <path d="M1380,620 C1160,520 980,480 1020,340 C1060,200 820,200 440,260" stroke-width="1.8" stroke-dasharray="5, 10" />
+    <path d="M1370,600 C1150,500 965,465 1005,325 C1045,185 805,190 420,250" stroke-width="1.8" stroke-dasharray="5, 10.5" />
+    <path d="M1360,580 C1140,480 950,450 990,310 C1030,170 790,180 400,240" stroke-width="1.8" stroke-dasharray="5, 10.5" />
+    <path d="M1350,560 C1130,460 935,435 975,295 C1015,155 775,170 380,230" stroke-width="1.8" stroke-dasharray="5, 10.5" />
+  </g>
+</svg>

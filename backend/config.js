@@ -19,6 +19,30 @@ module.exports = {
   aiProvider: process.env.AI_PROVIDER || 'none',
   ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'llama3.2:1b',
+  // "Delete for everyone" window — how long after sending a message its
+  // author can still delete it for every participant, not just themselves.
+  // 1 hour by default: generous enough for normal "wrong chat/typo" use,
+  // short enough to defend as "you can't rewrite history from days ago."
+  messageDeletionWindowMs: Number(process.env.MESSAGE_DELETION_WINDOW_MS) || 60 * 60 * 1000,
+  // Private Vault: how long a vault-unlock (PIN or passkey) stays valid
+  // before the user must re-authenticate to reach hidden conversations.
+  vaultTokenTtl: process.env.VAULT_TOKEN_TTL || '10m',
+  // WebAuthn's rpID must be a bare hostname (no scheme/port) and must match
+  // the browser's origin hostname exactly. Derived from the first configured
+  // CORS origin so there's no separate hostname to keep in sync by hand;
+  // override explicitly via VAULT_RP_ID if the deploy topology ever needs a
+  // different value than the primary frontend origin.
+  vaultRpId: process.env.VAULT_RP_ID || (() => {
+    try {
+      const corsOrigin = process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(',')[0].trim()
+        : 'http://localhost:5173';
+      return new URL(corsOrigin).hostname;
+    } catch (e) {
+      return 'localhost';
+    }
+  })(),
+  vaultRpName: 'Chitcx',
   mongo: {
     uri: process.env.MONGO_URI,
     srv: (process.env.MONGO_SRV || '').toString() === 'true',

@@ -120,75 +120,111 @@ const initSocket = (socket) => {
   });
 
   socket.on('connectProducerTransport', async (data, callback) => {
-    await producerTransports[socket.id].connect({ dtlsParameters: data.dtlsParameters });
-    callback();
+    try {
+      const transport = producerTransports[socket.id];
+      if (!transport) throw new Error('No producer transport for this socket — call createProducerTransport first');
+      await transport.connect({ dtlsParameters: data.dtlsParameters });
+      callback();
+    } catch (err) {
+      logger.error({ err, socketId: socket.id }, 'Failed to connect producer transport');
+      callback({ error: err.message });
+    }
   });
 
   socket.on('connectConsumerTransport', async (data, callback) => {
-    await consumerTransports[socket.id].connect({ dtlsParameters: data.dtlsParameters });
-    callback();
+    try {
+      const transport = consumerTransports[socket.id];
+      if (!transport) throw new Error('No consumer transport for this socket — call createConsumerTransport first');
+      await transport.connect({ dtlsParameters: data.dtlsParameters });
+      callback();
+    } catch (err) {
+      logger.error({ err, socketId: socket.id }, 'Failed to connect consumer transport');
+      callback({ error: err.message });
+    }
   });
 
   socket.on('produce', async (data, callback) => {
-    const { kind, rtpParameters, isScreen } = data;
-    let producer = await producerTransports[socket.id].produce({ kind, rtpParameters });
+    try {
+      const { kind, rtpParameters, isScreen } = data;
+      const transport = producerTransports[socket.id];
+      if (!transport) throw new Error('No producer transport for this socket — call createProducerTransport first');
+      const producer = await transport.produce({ kind, rtpParameters });
 
-    producer.on('transportclose', () => {
-      logger.debug({ producerId: producer.id }, "Producer's transport closed");
-      closeProducer(producer, socket.id);
-    });
-    producer.observer.on('close', () => {
-      logger.debug({ producerId: producer.id }, 'Producer closed');
-      closeProducer(producer, socket.id);
-    });
+      producer.on('transportclose', () => {
+        logger.debug({ producerId: producer.id }, "Producer's transport closed");
+        closeProducer(producer, socket.id);
+      });
+      producer.observer.on('close', () => {
+        logger.debug({ producerId: producer.id }, 'Producer closed');
+        closeProducer(producer, socket.id);
+      });
 
-    await store.peers.asyncInsert({
-      type: 'producer',
-      socketID: socket.id,
-      userID: socket.decoded_token.id,
-      roomID: data.roomID || 'general',
-      producerID: producer.id,
-      isScreen,
-    });
-
-    !producers[socket.id] && (producers[socket.id] = {});
-    producers[socket.id][producer.id] = producer;
-
-    socket
-      .to(data.roomID)
-      .emit('newProducer', {
+      await store.peers.asyncInsert({
+        type: 'producer',
+        socketID: socket.id,
         userID: socket.decoded_token.id,
         roomID: data.roomID || 'general',
-        socketID: socket.id,
         producerID: producer.id,
         isScreen,
       });
 
-    callback({ id: producer.id });
+      !producers[socket.id] && (producers[socket.id] = {});
+      producers[socket.id][producer.id] = producer;
+
+      socket
+        .to(data.roomID)
+        .emit('newProducer', {
+          userID: socket.decoded_token.id,
+          roomID: data.roomID || 'general',
+          socketID: socket.id,
+          producerID: producer.id,
+          isScreen,
+        });
+
+      callback({ id: producer.id });
+    } catch (err) {
+      logger.error({ err, socketId: socket.id }, 'Failed to produce');
+      callback({ error: err.message });
+    }
   });
 
   socket.on('consume', async (data, callback) => {
-    const obj = await createConsumer(
-      producers[data.socketID][data.producerID],
-      data.rtpCapabilities,
-      consumerTransports[socket.id],
-    );
+    try {
+      const producer = producers[data.socketID] && producers[data.socketID][data.producerID];
+      if (!producer) throw new Error('Producer not found — it may have already left');
 
-    obj.consumer.on('transportclose', () => {
-      closeConsumer(obj.consumer, socket.id);
-    });
-    obj.consumer.on('producerclose', () => {
-      closeConsumer(obj.consumer, socket.id);
-    });
+      const consumerTransport = consumerTransports[socket.id];
+      if (!consumerTransport) throw new Error('No consumer transport for this socket — call createConsumerTransport first');
 
-    !consumers[socket.id] && (consumers[socket.id] = {});
-    consumers[socket.id][data.producerID] = obj.consumer;
-    callback(obj.response);
+      const obj = await createConsumer(producer, data.rtpCapabilities, consumerTransport);
+      if (!obj) throw new Error('Cannot consume this producer (incompatible rtpCapabilities)');
+
+      obj.consumer.on('transportclose', () => {
+        closeConsumer(obj.consumer, socket.id);
+      });
+      obj.consumer.on('producerclose', () => {
+        closeConsumer(obj.consumer, socket.id);
+      });
+
+      !consumers[socket.id] && (consumers[socket.id] = {});
+      consumers[socket.id][data.producerID] = obj.consumer;
+      callback(obj.response);
+    } catch (err) {
+      logger.error({ err, socketId: socket.id }, 'Failed to consume');
+      callback({ error: err.message });
+    }
   });
 
   socket.on('resume', async (data, callback) => {
-    await consumers[socket.id][data.producerID].resume();
-    callback();
+    try {
+      const consumer = consumers[socket.id] && consumers[socket.id][data.producerID];
+      if (!consumer) throw new Error('Consumer not found — it may have already left');
+      await consumer.resume();
+      callback();
+    } catch (err) {
+      logger.error({ err, socketId: socket.id }, 'Failed to resume consumer');
+      callback({ error: err.message });
+    }
   });
 
   socket.on('create', async (data, callback) => {

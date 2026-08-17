@@ -4,28 +4,43 @@ import { Link, useNavigate } from 'react-router-dom';
 import jwtDecode from 'jwt-decode';
 import { useDispatch } from 'react-redux';
 import Div100vh from 'react-div-100vh';
-import { ArrowLeft } from 'lucide-react';
+import {
+  ArrowLeft, ArrowRight, Moon, Sun, MessageCircle, Video, Users, ShieldCheck,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import {
-  Tabs, TabsList, TabsTrigger, TabsContent,
-} from '@/components/ui/tabs';
-import Credits from './components/Credits';
-import Logo from './components/Logo';
 import Input from './components/Input';
 import login from '../../actions/login';
 import register from '../../actions/register';
 import setAuthToken from '../../actions/setAuthToken';
 import initIO from '../../actions/initIO';
 import getInfo from '../../actions/getInfo';
-import backgroundImage from '../../assets/background.jpg';
+import useTheme from '../../lib/useTheme';
+import logo from '../../assets/logo.png';
+import Config from '../../config';
+
+const FEATURES = [
+  { Icon: MessageCircle, title: 'Real-time Messaging', text: 'Instant delivery across all your devices.' },
+  { Icon: Video, title: 'Voice & Video Calls', text: 'High quality calls for you and your team.' },
+  { Icon: Users, title: 'Groups & Channels', text: 'Stay connected with everyone.' },
+  { Icon: ShieldCheck, title: 'Secure & Private', text: 'Your data is always protected.' },
+];
+
+function ChitcxLogo({ className = 'h-8 w-8' }) {
+  return (
+    <div className={`relative flex items-center justify-center shrink-0 ${className}`}>
+      <img src={logo} alt="Chitcx" className="h-full w-full object-contain" />
+    </div>
+  );
+}
 
 function Login() {
   const dispatch = useDispatch();
   const [info, setInfo] = useState({});
   const [tab, setTab] = useState('login');
   const [showCredits, setShowCredits] = useState(false);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -91,6 +106,8 @@ function Login() {
       setUser(jwtDecode(res.data.token));
       setToken(res.data.token);
       dispatch(initIO(res.data.token));
+      navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath, { replace: true });
+      await setEntryPath(null);
     } catch (err) {
       let errors = {};
       if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Could not connect to server.';
@@ -100,97 +117,225 @@ function Login() {
   };
 
   const loginInfo = Object.keys(loginErrors).map((key) => (
-    <div className="text-center text-sm text-destructive" key={key}>
+    <div className="text-center text-sm font-medium text-destructive" key={key}>
       {loginErrors[key]}
     </div>
   ));
 
   const registerInfo = Object.keys(registerErrors).map((key) => (
-    <div className="text-center text-sm text-destructive" key={key}>
+    <div className="text-center text-sm font-medium text-destructive" key={key}>
       {registerErrors[key]}
     </div>
   ));
 
-  const loginStyle = {
-    backgroundImage: `url('${backgroundImage}')`,
-  };
-
   return (
     <Div100vh>
-      <div
-        className="relative flex h-full w-screen items-center justify-center overflow-hidden bg-cover bg-center text-white"
-        style={loginStyle}
-      >
-        <div className="absolute inset-0 bg-[rgba(0,71,171,0.54)]" />
-        <div className="relative z-10 flex h-full w-full items-center justify-center overflow-y-auto">
-          <Credits onShowCredits={() => setShowCredits(true)} />
+      <div className="flex h-full w-full overflow-y-auto bg-background text-foreground lg:overflow-hidden">
+        {/* Left Side: Dark Hero Marketing Panel */}
+        <div className="relative hidden w-[45%] max-w-[560px] min-w-[380px] shrink-0 flex-col justify-between overflow-hidden bg-[#070708] p-10 text-white lg:flex xl:p-14">
+          {/* Top Branding */}
+          <div>
+            <Link to="/login" className="flex items-center gap-3">
+              <ChitcxLogo className="h-8 w-8" />
+              <span className="text-2xl font-bold tracking-tight text-white">{Config.brand || 'Chitcx'}</span>
+            </Link>
 
-          <div className="flex min-h-[420px] w-[400px] max-w-full flex-col items-center justify-center p-2">
-            <Logo />
+            <h1 className="mt-14 text-4xl font-extrabold leading-[1.15] tracking-tight xl:text-[42px]">
+              Your conversations.
+              <br />
+              <span className="text-primary">Simplified.</span>
+            </h1>
+            <p className="mt-4 max-w-[340px] text-sm leading-relaxed text-zinc-400">
+              Real-time messaging, voice &amp; video calls, group chats and more. Built for speed, security and
+              seamless communication.
+            </p>
 
-            {!showCredits && (
-              <div className="w-full text-foreground">
-                <Tabs value={tab} onValueChange={setTab}>
-                  <TabsList className="mb-2 w-full">
-                    <TabsTrigger value="login" className="flex-1">
-                      Log In
-                    </TabsTrigger>
-                    <TabsTrigger value="register" className="flex-1">
-                      Register
-                    </TabsTrigger>
-                  </TabsList>
+            {/* Feature List */}
+            <div className="mt-10 flex flex-col gap-4">
+              {FEATURES.map(({ Icon, title, text }) => (
+                <div key={title} className="flex items-start gap-3.5">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-primary border border-white/[0.05]">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-zinc-200">{title}</div>
+                    <div className="text-xs text-zinc-400 mt-0.5">{text}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-                  <TabsContent value="login">
-                    <form onSubmit={onLogin} className="flex flex-col gap-2">
-                      {loginInfo}
+          {/* Footer branding and credits */}
+          <div className="text-xs text-zinc-500 z-10">
+            {`© ${new Date().getFullYear()} ${(Config.brand || 'ADARSH ARYA')} · `}
+            <span className="text-primary font-medium">{Config.brand || 'Chitcx'}</span>
+            {` v${info.version || '2.9.1'}`}
+            {Config.showCredits && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  className="text-primary underline hover:text-primary/80"
+                  title="Special thanks and open source resources in use"
+                  onClick={() => setShowCredits(true)}
+                >
+                  Credits
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Refined Diagonal Accent Glow */}
+          <div
+            className="pointer-events-none absolute -bottom-28 -right-28 h-80 w-80 rounded-full opacity-35 blur-[90px]"
+            style={{ background: 'radial-gradient(circle, var(--color-primary, #e11d48) 0%, transparent 70%)' }}
+          />
+          <div
+            className="pointer-events-none absolute -bottom-10 right-0 h-48 w-48 rotate-45 opacity-20"
+            style={{
+              background: 'linear-gradient(135deg, transparent 40%, var(--color-primary, #e11d48) 100%)',
+            }}
+          />
+        </div>
+
+        {/* Right Side: Auth Panel with Equal Margins and Responsive Layout */}
+        <div className="relative flex flex-1 flex-col justify-between overflow-y-auto px-6 py-6 sm:px-10 sm:py-8 lg:px-12 xl:px-16">
+          {/* Top Bar: Mobile Brand + Theme Toggle */}
+          <div className="flex w-full items-center justify-between">
+            <div className="lg:hidden">
+              <Link to="/login" className="flex items-center gap-2">
+                <ChitcxLogo className="h-7 w-7" />
+                <span className="text-lg font-bold tracking-tight">{Config.brand || 'Chitcx'}</span>
+              </Link>
+            </div>
+            <div className="ml-auto">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {theme === 'dark' ? 'Light' : 'Dark'}
+              </button>
+            </div>
+          </div>
+
+          {/* Centered Form Box */}
+          <div className="mx-auto my-auto w-full max-w-[420px] py-4">
+            {!showCredits ? (
+              <div>
+                {/* Header: Icon + Welcome back + Greeting */}
+                <div className="mb-6 flex flex-col items-center text-center">
+                  <div className="mb-3 flex h-14 w-14 items-center justify-center">
+                    <ChitcxLogo className="h-12 w-12" />
+                  </div>
+                  <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+                    Welcome back
+                    {' '}
+                    <span aria-hidden className="inline-block animate-pulse">👋</span>
+                  </h2>
+                  <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
+                    Login to continue to
+                    {' '}
+                    <span className="font-medium text-foreground">{Config.brand || 'Chitcx'}</span>
+                  </p>
+                </div>
+
+                {/* Switch Tabs (Clean underline/segmented style matching mockup) */}
+                <div className="mb-6 flex w-full border-b border-border/80">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'login'}
+                    onClick={() => setTab('login')}
+                    className={`relative flex-1 pb-3 text-center text-sm font-semibold transition-all duration-200 ${
+                      tab === 'login'
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Log In
+                    {tab === 'login' && (
+                      <span className="absolute bottom-0 left-0 h-[2.5px] w-full rounded-t-full bg-primary" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'register'}
+                    onClick={() => setTab('register')}
+                    className={`relative flex-1 pb-3 text-center text-sm font-semibold transition-all duration-200 ${
+                      tab === 'register'
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Register
+                    {tab === 'register' && (
+                      <span className="absolute bottom-0 left-0 h-[2.5px] w-full rounded-t-full bg-primary" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Tab 1: Log In */}
+                {tab === 'login' && (
+                  <form onSubmit={onLogin} className="flex flex-col gap-4">
+                    {loginInfo}
+                    <div className="flex flex-col gap-1.5">
                       <Input
-                        icon="user"
-                        placeholder="Username (or email)"
+                        id="login-email"
+                        icon="mail"
+                        placeholder="Username or email"
                         type="text"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                       />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
                       <Input
+                        id="login-password"
                         icon="lock"
                         placeholder="Password"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                       />
-                      <Label className="my-1 gap-2 text-white">
-                        <Checkbox checked={keep} onCheckedChange={(checked) => setKeep(checked === true)} />
-                        Keep me logged in
-                      </Label>
-                      <Button type="submit" className="w-full rounded-full">
-                        LOG IN
-                      </Button>
-                      {info.nodemailerEnabled && (
-                        <div className="mt-2 text-center text-sm">
-                          <Link to="/forgot-password" className="underline">
-                            Forgot your password?
-                          </Link>
-                        </div>
-                      )}
-                    </form>
-                  </TabsContent>
+                    </div>
 
-                  <TabsContent value="register">
-                    <form onSubmit={onRegister} className="flex flex-col gap-2">
-                      {registerInfo}
-                      <Input
-                        icon="user"
-                        placeholder="Username"
-                        type="text"
-                        value={registerUsername}
-                        onChange={(e) => setRegisterUsername(e.target.value)}
-                      />
-                      <Input
-                        icon="mail"
-                        placeholder="Email"
-                        type="email"
-                        value={registerEmail}
-                        onChange={(e) => setRegisterEmail(e.target.value)}
-                      />
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                      <label htmlFor="keep-login" className="flex cursor-pointer select-none items-center gap-2 text-muted-foreground hover:text-foreground">
+                        <Checkbox
+                          id="keep-login"
+                          checked={keep}
+                          onCheckedChange={(checked) => setKeep(checked === true)}
+                          className="rounded data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                        <span>Keep me logged in</span>
+                      </label>
+                      {info.nodemailerEnabled && (
+                        <Link to="/forgot-password" className="font-semibold text-primary hover:underline">
+                          Forgot password?
+                        </Link>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      size="lg"
+                      className="mt-1 h-11 w-full gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99]"
+                    >
+                      Log In
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </form>
+                )}
+
+                {/* Tab 2: Register */}
+                {tab === 'register' && (
+                  <form onSubmit={onRegister} className="flex flex-col gap-3.5">
+                    {registerInfo}
+                    <div className="grid grid-cols-2 gap-3">
                       <Input
                         icon="pencil"
                         placeholder="First Name"
@@ -205,39 +350,68 @@ function Login() {
                         value={registerLastName}
                         onChange={(e) => setRegisterLastName(e.target.value)}
                       />
-                      <Input
-                        icon="lock"
-                        placeholder="Password"
-                        type="password"
-                        value={registerPassword}
-                        onChange={(e) => setRegisterPassword(e.target.value)}
-                      />
-                      <Input
-                        icon="lock"
-                        placeholder="Repeat Password"
-                        type="password"
-                        value={registerRepeatPassword}
-                        onChange={(e) => setRegisterRepeatPassword(e.target.value)}
-                      />
-                      <Button type="submit" className="w-full rounded-full">
-                        REGISTER
-                      </Button>
-                    </form>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            )}
+                    </div>
+                    <Input
+                      icon="user"
+                      placeholder="Username"
+                      type="text"
+                      value={registerUsername}
+                      onChange={(e) => setRegisterUsername(e.target.value)}
+                    />
+                    <Input
+                      icon="mail"
+                      placeholder="Email"
+                      type="email"
+                      value={registerEmail}
+                      onChange={(e) => setRegisterEmail(e.target.value)}
+                    />
+                    <Input
+                      icon="lock"
+                      placeholder="Password"
+                      type="password"
+                      value={registerPassword}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                    />
+                    <Input
+                      icon="lock"
+                      placeholder="Repeat Password"
+                      type="password"
+                      value={registerRepeatPassword}
+                      onChange={(e) => setRegisterRepeatPassword(e.target.value)}
+                    />
+                    <Button
+                      type="submit"
+                      size="lg"
+                      className="mt-1 h-11 w-full gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99]"
+                    >
+                      Register
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </form>
+                )}
 
-            {showCredits && (
-              <div className="w-full text-center text-sm text-foreground">
+                {/* Bottom Toggle Prompt */}
+                <div className="mt-6 text-center text-xs sm:text-sm text-muted-foreground">
+                  {tab === 'login' ? "Don't have an account? " : 'Already have an account? '}
+                  <button
+                    type="button"
+                    className="font-bold text-primary transition-colors hover:underline"
+                    onClick={() => setTab(tab === 'login' ? 'register' : 'login')}
+                  >
+                    {tab === 'login' ? 'Register' : 'Log In'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border bg-card p-6 text-center text-sm shadow-sm">
                 {'The default background image is from '}
-                <a href="https://picsum.photos/" target="_blank" rel="noopener noreferrer" className="underline">
+                <a href="https://picsum.photos/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">
                   Picsum Photos
                 </a>
                 <br />
                 <br />
                 A big thank you to all contributors to React, Redux, Socket.IO, Emoji Mart, Axios, SASS and Moment
-                <div className="mt-4">
+                <div className="mt-5">
                   <Button variant="ghost" size="sm" onClick={() => setShowCredits(false)}>
                     <ArrowLeft className="mr-1 h-4 w-4" />
                     Close Credits
@@ -246,6 +420,9 @@ function Login() {
               </div>
             )}
           </div>
+
+          {/* Bottom spacing anchor for balanced equal margins */}
+          <div className="hidden lg:block h-6" aria-hidden="true" />
         </div>
       </div>
     </Div100vh>

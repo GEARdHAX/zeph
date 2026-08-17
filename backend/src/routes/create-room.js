@@ -1,9 +1,13 @@
 const Message = require('../models/Message');
 const Room = require('../models/Room');
 const xss = require('xss');
+const { authorizeAction, Actions, Decisions } = require('../authorization/policy');
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   let { counterpart } = req.fields;
+
+  const authz = await authorizeAction({ actor: req.user.id, target: counterpart, action: Actions.START_CONVERSATION });
+  if (authz.decision !== Decisions.ALLOW) return res.status(403).json({ error: true, reason: authz.reason });
 
   const findMessagesAndEmit = (room) => {
     Message.find({ room: room._id })
@@ -34,6 +38,9 @@ module.exports = (req, res, next) => {
           })
           .then((images) => {
             messages.reverse();
+            const visibleMessages = messages.filter(
+              (m) => !m.deletedFor.some((uid) => uid.toString() === req.user.id.toString()),
+            );
             res.status(200).json({
               room: {
                 _id: room._id,
@@ -43,7 +50,7 @@ module.exports = (req, res, next) => {
                 lastUpdate: room.lastUpdate,
                 lastAuthor: room.lastAuthor,
                 lastMessage: room.lastMessage,
-                messages,
+                messages: visibleMessages,
                 images,
               },
             });

@@ -24,7 +24,7 @@ module.exports = async (req, res, next) => {
 
   email = email.toLowerCase();
 
-  const isUsername = await User.findOne({ username });
+  const isUsername = await User.findOne({ usernameNormalized: username.toLowerCase() });
   if (isUsername) errors.username = 'Username taken.';
 
   const isEmail = await User.findOne({ email });

@@ -1,22 +1,27 @@
 import { useEffect, useRef } from 'react';
-import Picture from '../../../components/Picture';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import Config from '../../../config';
 
-function LittleInterface({ audio, video, peer, isMaximized }) {
+function LittleInterface({
+  audio, video, peer = {}, isMaximized,
+}) {
   const audioRef = useRef(null);
   const videoRef = useRef(null);
 
   useEffect(() => {
     if (!audio) return;
-    if (audio) audioRef.current.srcObject = audio;
+    audioRef.current.srcObject = audio;
   }, [audio]);
 
   useEffect(() => {
     if (!video) return;
-    if (video) videoRef.current.srcObject = video;
+    videoRef.current.srcObject = video;
   }, [video]);
 
+  const initials = `${(peer?.firstName || 'U').charAt(0)}${(peer?.lastName || '').charAt(0)}`.toUpperCase();
+
   return (
-    <div className="flex h-full flex-col items-center justify-center overflow-hidden">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-card shadow-md">
       {audio && (
         <audio
           ref={audioRef}
@@ -24,31 +29,34 @@ function LittleInterface({ audio, video, peer, isMaximized }) {
           className="hidden"
           controls={false}
           hidden
-          data-user={peer}
         />
       )}
-      {video && (
+      {video ? (
         <video
           ref={videoRef}
           onLoadedMetadata={() => videoRef.current.play()}
           className="h-full w-full"
           playsInline
           controls={false}
-          data-user={peer}
           style={{ objectFit: isMaximized ? 'cover' : 'contain' }}
         />
-      )}
-      {!video && (
-        <div className="flex h-full w-full flex-1 flex-col items-center justify-center bg-muted">
-          <div className="flex h-[16px] items-end py-px text-[11px] font-bold text-muted-foreground">
-            {`${peer.firstName} ${peer.lastName}`}
-          </div>
-          <div className="h-10 w-10 min-w-10 [&_.img]:flex [&_.img]:h-10 [&_.img]:w-10 [&_.img]:items-center [&_.img]:justify-center [&_.img]:rounded-full [&_.img]:bg-muted-foreground [&_.img]:text-base [&_.img]:text-background [&_img]:h-10 [&_img]:w-10 [&_img]:rounded-full">
-            <Picture user={peer} />
-          </div>
-          <div className="flex h-[16px] items-start py-px text-[11px] font-bold text-muted-foreground">
-            {!video && !audio ? 'Spectator' : 'Audio Only'}
-          </div>
+      ) : (
+        <div className="flex h-full w-full flex-1 flex-col items-center justify-center gap-1 bg-muted/60 p-1">
+          <Avatar className="h-9 w-9 border border-border bg-gradient-to-br from-rose-600 to-primary text-white">
+            {peer?.picture && (
+              <img
+                src={`${Config.url || ''}/api/images/${peer.picture.shieldedID}/256`}
+                alt=""
+                className="aspect-square size-full object-cover"
+              />
+            )}
+            <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <span className="max-w-full truncate text-[10px] font-semibold text-foreground">
+            {peer?.firstName || 'Guest'}
+          </span>
         </div>
       )}
     </div>

@@ -46,7 +46,11 @@ app.use('/meeting/*', express.static(`${__dirname}/../frontend/dist`));
 const server = http.createServer(app);
 store.app = app;
 store.config = Config;
-store.io = io(server);
+// Socket.IO's engine.io transport does its own CORS check, independent of
+// Express's cors() middleware above — without this, the initial polling/
+// websocket handshake is rejected as cross-origin before any app-level auth
+// logic runs, and every socket silently fails to connect in a browser.
+store.io = io(server, { cors: { origin: Config.corsOrigin, credentials: true } });
 init(mediasoupEnabled);
 if (mediasoupEnabled && mediasoup) {
   mediasoup.init();

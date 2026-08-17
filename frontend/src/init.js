@@ -54,9 +54,12 @@ const init = async () => {
     store.dispatch(initIO(token));
   }
 
+  const storedTheme = localStorage.getItem('theme');
+
   const state = {
     version: '2.9.1',
     entryPath: window.location.pathname,
+    theme: storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : Config.theme,
     token,
     user: user || (token ? jwtDecode(token) : {}),
     rooms: [],
@@ -64,6 +67,11 @@ const init = async () => {
     favorites: [],
     meetings: [],
     nav: 'rooms',
+    // Private Vault step-up token — intentionally NOT persisted to
+    // localStorage (unlike token/user above) or restored on refresh; a
+    // 10-minute step-up expiring on reload is the expected/secure behavior.
+    vaultToken: null,
+    vaultRooms: [],
     search: '',
     over: null,
     isPicker: false,

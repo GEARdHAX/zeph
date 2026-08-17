@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useGlobal } from 'reactn';
 import { Lightbox } from 'react-modal-image';
-import { Button } from '@/components/ui/button';
+import { Users, Image as ImageIcon } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
 
@@ -10,23 +11,25 @@ const STATUS_COLOR = {
   online: 'bg-emerald-500',
   away: 'bg-orange-500',
   busy: 'bg-destructive',
-  offline: 'bg-gray-400',
+  offline: 'bg-zinc-400',
 };
 
 function Room() {
-  const room = useSelector((state) => state.io.room);
-  const onlineUsers = useSelector((state) => state.io.onlineUsers);
-  const imagesNumber = useSelector((state) => state.io.room.images.length);
-  const user = useGlobal('user')[0];
+  const room = useSelector((state) => state.io.room) || {};
+  const onlineUsers = useSelector((state) => state.io.onlineUsers) || [];
+  const imagesNumber = useSelector((state) => state.io.room?.images?.length || 0);
+  const user = useGlobal('user')[0] || {};
 
   const scrollContainer = useRef(null);
 
   const [scrollHeight, setScrollHeight] = useState(0);
   const [open, setOpen] = useState(null);
-  const [viewMembers, setViewMembers] = useState(false);
+  const [tab, setTab] = useState('members'); // 'members' | 'media'
 
   useEffect(() => {
-    if (scrollContainer.current.scrollTop === 0) scrollContainer.current.scrollTop = scrollHeight;
+    if (scrollContainer.current && scrollContainer.current.scrollTop === 0) {
+      scrollContainer.current.scrollTop = scrollHeight;
+    }
   }, [imagesNumber]);
 
   let other = {
@@ -40,29 +43,21 @@ function Room() {
     });
   }
 
-  function Picture({ picture, user: pictureUser, group }) {
-    if (picture) {
-      return (
-        <img
-          src={`${Config.url || ''}/api/images/${picture.shieldedID}/256`}
-          alt="Picture"
-          className="h-full w-full object-cover"
-        />
-      );
-    }
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-secondary text-secondary-foreground">
-        {group ? room.title.substr(0, 1) : `${pictureUser.firstName.substr(0, 1)}${pictureUser.lastName.substr(0, 1)}`}
-      </div>
-    );
-  }
+  const initials = (room.isGroup
+    ? (room.title || 'G').charAt(0)
+    : `${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`
+  ).toUpperCase();
+
+  const title = room.isGroup ? room.title : `${other.firstName} ${other.lastName}`;
 
   const rows = [];
   let row = [];
 
-  room.images.forEach((message) => {
+  const roomImages = room.images || [];
+
+  roomImages.forEach((message) => {
     row.push(message);
-    if (row.length === 2) {
+    if (row.length === 3) {
       rows.push(row);
       row = [];
     }
@@ -74,46 +69,27 @@ function Room() {
       // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
       <img
         src={`${Config.url || ''}/api/images/${message.content}/256`}
-        alt={`Sent by @${message.author.username}`}
+        alt={`Sent by @${message.author?.username || 'user'}`}
         onClick={() => setOpen(message)}
         key={message.content}
-        className="mb-0.5 h-[147px] w-[147px] flex-1 cursor-pointer object-cover first:ml-0.5 last:mr-0.5"
+        className="aspect-square h-20 w-20 rounded-xl cursor-pointer object-cover border border-border transition-transform hover:scale-[1.03]"
       />
     ));
     // eslint-disable-next-line react/no-array-index-key
     return (
-      <div className="flex min-h-[149px] flex-row" key={key}>
+      <div className="flex gap-2 mb-2" key={key}>
         {rowImages}
       </div>
     );
   });
 
   const onScroll = () => {
-    setScrollHeight(scrollContainer.current.scrollHeight);
-  };
-
-  function Notice() {
-    if (images.length === 0) {
-      return (
-        <div className="p-5 text-center text-sm text-muted-foreground">
-          There are no images in this conversation yet.
-        </div>
-      );
+    if (scrollContainer.current) {
+      setScrollHeight(scrollContainer.current.scrollHeight);
     }
-    return null;
-  }
-
-  const compare = (a, b) => {
-    if (a.firstName < b.firstName) return -1;
-    if (a.firstName > b.firstName) return 1;
-    if (a.lastName < b.lastName) return -1;
-    if (a.lastName > b.lastName) return 1;
-    return 0;
   };
 
-  const { people } = room;
-
-  people.sort(compare);
+  const { people = [] } = room;
 
   const getStatus = (id) => {
     if (onlineUsers.filter((u) => u.id === id && u.status === 'busy').length > 0) return 'busy';
@@ -122,42 +98,126 @@ function Room() {
     return 'offline';
   };
 
-  const members = people.map((person) => (
-    <div key={person._id} className="flex h-[54px] items-center border-b text-sm last:border-b-0">
-      <div className="mx-4 h-10 w-10 shrink-0 overflow-hidden rounded-full">
-        <Picture picture={person.picture} user={person} />
+  const members = people.map((person) => {
+    const pInitials = `${(person.firstName || 'U').charAt(0)}${(person.lastName || '').charAt(0)}`.toUpperCase();
+
+    return (
+      <div key={person._id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl hover:bg-muted/50 transition-colors">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative shrink-0">
+            <Avatar className="h-9 w-9 border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-bold">
+              {person.picture && (
+                <img
+                  src={`${Config.url || ''}/api/images/${person.picture.shieldedID}/256`}
+                  alt=""
+                  className="aspect-square size-full object-cover"
+                />
+              )}
+              <AvatarFallback className="bg-transparent text-xs font-bold text-white">
+                {pInitials}
+              </AvatarFallback>
+            </Avatar>
+            <span className={cn('absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card', STATUS_COLOR[getStatus(person._id)])} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs font-semibold text-foreground">
+              {person.firstName}
+              {' '}
+              {person.lastName}
+            </div>
+            <div className="truncate text-[10px] text-muted-foreground">{`@${person.username}`}</div>
+          </div>
+        </div>
       </div>
-      <div className="flex-1">{`${person.firstName} ${person.lastName}`}</div>
-      <span className={cn('mr-4 h-2.5 w-2.5 shrink-0 rounded-full', STATUS_COLOR[getStatus(person._id)])} />
-    </div>
-  ));
+    );
+  });
 
   return (
-    <div className="flex h-full min-w-[280px] flex-col items-center overflow-hidden bg-background">
-      <div className="m-10 h-[200px] w-[200px] shrink-0 overflow-hidden rounded-full text-5xl">
-        <Picture group={room.isGroup} picture={room.isGroup ? room.picture : other.picture} user={other} />
+    <div className="flex h-full w-full flex-col bg-card text-card-foreground overflow-y-auto">
+      {/* Top Banner / Avatar Header */}
+      <div className="flex flex-col items-center p-6 border-b border-border/60 text-center">
+        <div className="relative mb-3">
+          <Avatar className="h-20 w-20 border-2 border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-extrabold text-2xl shadow-md">
+            {(room.isGroup ? room.picture : other.picture) && (
+              <img
+                src={`${Config.url || ''}/api/images/${(room.isGroup ? room.picture : other.picture).shieldedID}/256`}
+                alt=""
+                className="aspect-square size-full object-cover"
+              />
+            )}
+            <AvatarFallback className="bg-transparent text-2xl font-bold text-white">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+
+        <h3 className="text-sm font-bold text-foreground truncate max-w-[220px]">
+          {title}
+        </h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {room.isGroup ? `${people.length} members in this group` : `@${other.username || 'user'}`}
+        </p>
       </div>
-      <Button variant="secondary" className="w-full" onClick={() => setViewMembers(!viewMembers)}>
-        {`View ${viewMembers ? 'Images' : 'Members'}`}
-      </Button>
-      {viewMembers && <div className="h-full w-full overflow-y-auto py-0 pr-5">{members}</div>}
-      <div
-        className="flex w-full flex-1 flex-col overflow-y-auto overflow-x-hidden py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        ref={scrollContainer}
-        onScroll={onScroll}
-        hidden={viewMembers}
-      >
-        {open && (
-          <Lightbox
-            medium={`${Config.url || ''}/api/images/${open.content}/1024`}
-            large={`${Config.url || ''}/api/images/${open.content}/2048`}
-            alt="Lightbox"
-            hideDownload
-            onClose={() => setOpen(null)}
-          />
-        )}
-        {images}
-        <Notice />
+
+      {/* Segmented Switcher (Members / Media) */}
+      <div className="p-4">
+        <div className="flex rounded-xl bg-muted/60 p-1">
+          <button
+            type="button"
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all',
+              tab === 'members' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setTab('members')}
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>Members</span>
+          </button>
+          <button
+            type="button"
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all',
+              tab === 'media' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setTab('media')}
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+            <span>Media</span>
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        <div className="mt-3">
+          {tab === 'members' && (
+            <div className="flex flex-col gap-0.5">
+              {members}
+            </div>
+          )}
+
+          {tab === 'media' && (
+            <div
+              className="flex flex-col overflow-y-auto"
+              ref={scrollContainer}
+              onScroll={onScroll}
+            >
+              {open && (
+                <Lightbox
+                  medium={`${Config.url || ''}/api/images/${open.content}/1024`}
+                  large={`${Config.url || ''}/api/images/${open.content}/2048`}
+                  alt="Lightbox"
+                  hideDownload
+                  onClose={() => setOpen(null)}
+                />
+              )}
+              {images}
+              {roomImages.length === 0 && (
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  No images shared in this conversation yet.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

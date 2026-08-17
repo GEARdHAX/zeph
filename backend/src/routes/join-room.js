@@ -1,9 +1,21 @@
 const Message = require('../models/Message');
 const Room = require('../models/Room');
 const logger = require('../logger');
+const sanitizeDeletedMessage = require('../utils/sanitizeDeletedMessage');
+const requireVisibleConversation = require('../utils/requireVisibleConversation');
+const { hasValidVaultToken } = require('../vault/vaultToken');
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   let { id } = req.fields;
+
+  const visibility = await requireVisibleConversation({
+    roomID: id,
+    userID: req.user.id,
+    hasVaultAuth: hasValidVaultToken(req),
+  });
+  if (!visibility.ok) {
+    return res.status(visibility.status).json({ error: true, reason: visibility.reason });
+  }
 
   const findMessagesAndEmit = (room) => {
     Message.find({ room: room._id })
@@ -43,19 +55,23 @@ module.exports = (req, res, next) => {
                 lastAuthor: room.lastAuthor,
                 lastMessage: room.lastMessage,
                 picture: room.picture,
-                messages: messages.map((e) => {
-                  if (e.author) {
-                    return e;
-                  } else {
-                    return {
-                      ...e,
-                      author: {
-                        firstName: 'Deleted',
-                        lastName: 'User',
-                      },
-                    };
-                  }
-                }),
+                messages: messages
+                  // Own "delete for me" state stays hidden on every fresh load too.
+                  .filter((e) => !(e.deletedFor || []).some((uid) => uid.toString() === req.user.id.toString()))
+                  .map((e) => {
+                    const message = sanitizeDeletedMessage(e);
+                    if (message.author) {
+                      return message;
+                    } else {
+                      return {
+                        ...message,
+                        author: {
+                          firstName: 'Deleted',
+                          lastName: 'User',
+                        },
+                      };
+                    }
+                  }),
                 images,
               },
             });

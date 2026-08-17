@@ -1,24 +1,29 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Users } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { Button } from '@/components/ui/button';
-import Picture from '../../../components/Picture';
 
 function TopBar({ back }) {
   const title = useGlobal('groupTitle')[0];
-  const room = { title: 'Group', isGroup: true };
 
   return (
-    <div className="flex h-[54px] w-full items-center justify-between border-b bg-card">
-      <div className="flex items-center">
-        <Button variant="ghost" size="icon" onClick={back}>
-          <ArrowLeft />
+    <div className="flex h-16 w-full items-center justify-between border-b border-border/60 bg-card px-4">
+      <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          onClick={back}
+        >
+          <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full [&_.img]:flex [&_.img]:h-10 [&_.img]:w-10 [&_.img]:items-center [&_.img]:justify-center [&_.img]:rounded-full [&_.img]:bg-secondary [&_.img]:text-lg [&_.img]:text-secondary-foreground">
-          <Picture user={room} group={room.isGroup} picture={room.picture} title={room.title} />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+          <Users className="h-4 w-4" />
         </div>
-        <div className="flex flex-col justify-center pl-2">
-          <div className="text-[13px] font-bold">Create Group</div>
-          <div className="text-[11px] text-muted-foreground">{title || 'Type a group name...'}</div>
+        <div className="flex flex-col justify-center">
+          <div className="text-xs font-bold text-foreground">Create Group</div>
+          <div className="text-[11px] text-muted-foreground truncate max-w-[170px]">
+            {title || 'Select participants'}
+          </div>
         </div>
       </div>
     </div>

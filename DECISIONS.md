@@ -5,6 +5,658 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-033: In-call UI brought up to the shadcn/Tailwind design system — 2026-08-17
+
+**Problem:** `Meeting/index.jsx`'s in-call screen (control bar, top bars) and
+`LittleInterface.jsx` (small remote-peer tiles) had never been migrated off
+the pre-D-020 template UI — flat rectangular buttons with raw `bg-secondary`
+fills, no hover/active states beyond a background swap, `7vw`-based sizing,
+and `LittleInterface.jsx` still used the legacy `Picture` component (bare
+`.img`/`.picture` classnames, no Tailwind) instead of the shadcn `Avatar`
+already used everywhere else, including its own sibling `Interface.jsx`.
+This was the one screen in the app CLAUDE.md's "sitewide, not just chat"
+design-language rule hadn't reached yet.
+
+**Decision:** Rebuilt the control bar as a single floating rounded pill
+(glassmorphism: `bg-black/50` + `backdrop-blur-xl`, matching the vocabulary
+already established in `Join.jsx`/`Ringing.jsx`) using a small local
+`ControlButton` helper so seven near-identical className strings couldn't
+drift out of sync, with a real active/inactive visual state (primary-tinted
+when a feature is on, neutral white/10 when off) instead of a flat uniform
+fill — and fixed the icon semantics along the way: buttons now show the
+icon for the action a click performs (e.g. a Minimize icon while maximized,
+offering to shrink), not the current state, which the original had
+backwards. `Interface.jsx` and `LittleInterface.jsx` both moved to
+`Avatar`/`AvatarFallback` with the same gradient-fallback treatment used
+throughout Conversation/Panel, and `Streams.jsx` gained gap spacing between
+grid tiles (previously touching edge-to-edge, now that `Interface.jsx` has
+rounded corners) plus the same ambient radial-glow background already used
+on the Join/Ringing pre-call screens.
+
+**Bug fixed in passing:** `TopBarTransparent`'s local-preview `useEffect`
+depended on `[localVideoRef]` — a ref object, which never changes identity
+across renders — so the effect only ever ran once on mount, meaning the
+grid-mode local camera preview could silently never receive its stream if
+the `<video>` element wasn't present at first mount. Changed to depend on
+`[localStream]`, matching the sibling `TopBar` function's already-correct
+pattern.
+
+**Testing:** No new unit-testable surface (pure presentational change) —
+verified via the existing 55/55 frontend test suite (unaffected) and a
+clean production build. Visual correctness not yet confirmed against a live
+call in this pass.
+
+---
+
+## D-032: Calls survive route navigation — mediasoup session hoisted out of the Meeting route component — 2026-08-17
+
+**Amendment (2026-08-17, same day):** The hoist introduced a real
+regression — a complete black screen on every call. Root cause: in
+`callManager.js`'s `join()`, the initial `RTC_PRODUCERS` dispatch (the
+batch of producers already active in the room at join time — i.e. the
+other participant's already-on camera/mic) ran *before* the
+`store.subscribe()` listener that consumes new producers was registered.
+`store.subscribe()` only fires on *subsequent* state changes after
+registration — unlike the original component's `useEffect([producers])`,
+which always runs at least once on mount regardless of code order. The
+practical effect: the initial producer batch was recorded in Redux but
+never consumed into an actual `MediaStream`, so nothing ever rendered.
+Fixed by registering both the producers-subscription and the
+closing-state-subscription *before* the `RTC_PRODUCERS` dispatch, so the
+dispatch itself is what the listener reacts to — restoring the same
+"always see the initial batch" guarantee the old mount-effect had.
+Confirmed via user report that calls worked before this refactor and
+broke immediately after, isolating it to this ordering bug rather than a
+pre-existing mediasoup/server config issue. Frontend 55/55 unaffected
+(no unit-testable WebRTC surface); fix verified by static trace of the
+dispatch/subscribe ordering, not yet by a live call — flagging that this
+still needs a manual verification pass.
+
+**Problem:** The entire mediasoup call session (Device, send/recv
+transports, audio/video/screen producers) lived as `<Meeting/>`
+component-local `useState` and module-level `let`s. `/meeting/:id` is a
+plain sibling React Router route, so navigating to any other route (a
+different DM, Settings, the vault) fully unmounted `<Meeting/>`. Two broken
+outcomes followed: (1) the only unmount cleanup was gated behind
+`callStatus !== 'in-call'`, which is always false mid-call, so the cleanup
+never ran — camera, mic, and **screen-share** kept broadcasting
+indefinitely with zero in-app indication, and no `leave` socket event ever
+reached the server, which has no concept of frontend routes and just kept
+relaying forever; (2) clicking "Go back to the meeting" remounted
+`<Meeting/>` fresh — `joined`/`callStatus` (reactn globals) survived and
+skipped the Join/Ringing screens, but `device` (component `useState`) reset
+to `null` while `transport`/producers (module `let`s) still referenced the
+live pre-navigation session. Any code needing `device` — consuming a new
+remote producer that appeared while away — threw
+`Cannot destructure property 'rtpCapabilities' of null`, silently.
+
+**Decision:** Hoist the entire session into `frontend/src/lib/callManager.js`,
+a plain module-level singleton — not React state, since mediasoup objects
+aren't render-driven and don't need to be. `join`, `produceAudio/Video/
+Screen`, `stopAudio/Video/Screen`, `consume`, and the one true teardown path
+`leave()` all live there now. `<Meeting/>` (`frontend/src/features/Meeting/
+index.jsx`) is a thin UI shell: it calls into `callManager` and renders
+whatever `reactn`/Redux state is current, exactly like the new
+`PictureInPicture` tile does when `<Meeting/>` isn't mounted at all. Two
+Redux-store subscriptions that used to be component effects — "consume a
+new remote producer" and "the counterpart hung up" (`RTC_CLOSE` →
+`closingState`) — moved into `callManager` itself, since both need to keep
+working while `<Meeting/>` isn't mounted; previously the latter only fired
+inside `<Meeting/>`'s own effect, meaning a remote hang-up while the local
+user had navigated away was never noticed and the local session kept
+running with no one on the other end.
+
+**Also added: a persistent floating PiP video tile**
+(`frontend/src/features/PictureInPicture/index.jsx`), mounted once at the
+app root as a sibling to `<Routes>` in `App.jsx` so it's never unmounted by
+navigation. Visible whenever a call is active and the user isn't on
+`/meeting/:id`, showing the live local camera/screen-share feed (not just a
+static "in call" bar) plus a direct hang-up button. This is the fix for the
+privacy half of the bug: the user can now *see* they're still broadcasting
+while browsing other chats, rather than the previous behavior of either
+silently continuing invisibly or being unable to leave the meeting page at
+all without ending the call.
+
+**Trade-off:** Navigating away from a call no longer implicitly ends it —
+that's now only possible via the explicit hang-up button (in `<Meeting/>`
+or the PiP tile). This is the intended behavior per the existing
+`MeetingBar` "return to call" affordance, which previously didn't actually
+work correctly (bug #2 above) — it does now, since remounting `<Meeting/>`
+is purely a UI reattachment to the same live `callManager` session, not a
+new one.
+
+**Testing:** No unit-testable WebRTC/mediasoup surface (no real media stack
+in the test environment) — verified via full existing test-suite regression
+(55/55 frontend tests unaffected, confirming no import cycles or render
+breakage from the refactor) plus a clean production build. Manual
+verification: start a call, toggle screen-share, navigate to a different
+DM — confirm the PiP tile shows the live feed and the remote participant's
+stream is uninterrupted; have the remote participant join a third peer or
+toggle their camera while the local user is away — confirm the new stream
+renders correctly on return with no console error (the direct regression
+check for the null-`device` crash); confirm hang-up from either the Meeting
+page or the PiP tile cleanly stops capture and notifies the other
+participant.
+
+---
+
+## D-031: Private Vault — per-user conversation hide/delete, WebAuthn+PIN step-up auth — 2026-08-17
+
+**Amendment (2026-08-17, same day):** The initial implementation had
+`requireVisibleConversation` 404 on `deletedAt` for every read route
+(join-room/get-room/more-messages/sync-messages) — the intent was an
+IDOR-style "can't route around delete via a stale link" guarantee, but
+`deletedAt` only ever reflects the *requesting* user's own delete action on
+their own state row; there is no other-user scenario it protects against,
+since nobody can be blocked by anyone's delete but their own. In practice
+this meant a user who deleted a conversation and then reopened it (still
+had the tab open, deep-linked back in) got a hard "Room Not Found" and
+**could not send a message back into their own conversation** — confirmed
+via live report with screenshots. Fixed by removing the `deletedAt` check
+from `requireVisibleConversation` entirely (`isHidden`/vault-token gating
+is unaffected); deleting a conversation now only removes it from the inbox
+*listing*, never blocks the deleter's own direct access or ability to
+reply, matching WhatsApp's actual behavior (delete a chat, reopen it,
+message — it just works and un-deletes). Also fixed `message.js`'s
+reappear-on-new-message logic, which previously only cleared `deletedAt`
+for *recipients* — the sender messaging back into a conversation they'd
+deleted never cleared their own `deletedAt`, so it stayed hidden from their
+own inbox indefinitely even while actively being used. Now both sender and
+recipients get `deletedAt` cleared on any new message in the room. 30
+backend tests updated/added (`test/conversation-privacy.test.js`) — the
+one test asserting the old 404-after-delete behavior was replaced with one
+asserting 200, plus a new test covering the sender's-own-message
+un-delete case. Backend 144/144, frontend 55/55.
+
+**Problem:** No per-user conversation privacy existed at all. `Room.js` had
+zero hide/mute/archive fields, and the only existing "remove conversation"
+route (`remove-room.js`) is a destructive hard delete affecting every
+participant with no socket notification — unusable as a basis for "hide this
+DM from just me."
+
+**Data model:** New `ConversationUserState` collection —
+`{conversation, user, isHidden, hiddenAt, deletedAt}` with a unique
+`(conversation, user)` index — rather than array fields bolted onto `Room`,
+since two independent per-user booleans are naturally one row per pair, and
+rows are created lazily only on first hide/delete (no row = normal visible
+state, the common case). Mirrors the tombstone-not-hard-delete philosophy of
+D-030: `Room`/`Message` documents are never touched by hide or delete.
+
+**Delete vs. Hide, kept conceptually separate as specified:** "Delete DM"
+sets `deletedAt` on the requester's own state row only — the other
+participant's copy and the shared message history are completely
+untouched, and it's idempotent (`findOneAndUpdate` upsert). "Hide/Lock DM"
+sets `isHidden` and moves the conversation behind a second, separate
+authorization gate — the Private Vault — rather than just filtering it
+client-side.
+
+**Vault authorization — a short-lived, purpose-scoped step-up token, not a
+second auth system:** unlocking (via PIN or WebAuthn passkey) issues a JWT
+signed with the same secret/library as the main login token, scoped by a
+`purpose: 'vault'` claim and a 10-minute expiry, sent as a separate
+`X-Vault-Token` header (the frontend's `axios.defaults.headers.common.
+Authorization` slot is already permanently owned by the main login JWT, so a
+second credential needed its own channel). The vault token can never grant
+anything the main JWT doesn't already imply — `requireVaultAuth` re-checks
+`decoded.id === req.user.id` on every use, so a stolen vault token can't be
+replayed against a different account, and every underlying route still
+independently re-verifies room membership and ownership.
+
+**Every read path re-checks visibility independently — no route trusts a
+sibling route's earlier check:** `join-room`, `get-room`, `more-messages`,
+and `sync-messages` each call the same `requireVisibleConversation` helper
+and each require a *currently valid* vault token whenever the conversation is
+hidden. This was a deliberate fix during planning — an earlier draft assumed
+only `join-room` needed the check since "the client already unlocked once to
+get here," but a vault token expires in 10 minutes while a room stays open
+far longer, so a stale room id could otherwise pull hidden content through
+`more-messages`/`sync-messages` after the token expired. `list-rooms.js`
+excludes hidden/deleted conversations from the normal inbox entirely
+(batch-loaded exclusion list, same shape as `search.js`'s relationship
+annotation) — hidden content cannot be discovered through the normal
+inbox/search/unread-preview surface, satisfying the "excluded server-side,
+not CSS-hidden" requirement.
+
+**WebAuthn passkey registration is a privileged action once a vault already
+exists:** registering a *new* passkey with only the main JWT (no vault
+token) is allowed solely on first-ever setup, when there's nothing yet to
+protect. Once a PIN or any credential exists, registering another passkey
+requires a valid vault token — otherwise a stolen main JWT alone could
+silently enroll an attacker's own authenticator and gain standing vault
+access. Registration/authentication challenges are stored in a single-use,
+delete-on-read in-process Map (`webauthnChallenges.js`) rather than a signed
+JWT challenge — a JWT challenge is time-limited but replayable any number of
+times within its TTL, which fails the "truly single-use" bar; the in-process
+Map has the same multi-instance ceiling as the existing `store.onlineUsers`
+presence tracking, not a new one.
+
+**Reappear-on-new-message (WhatsApp-like):** a "deleted" conversation
+un-deletes back into the recipient's inbox the moment the other participant
+sends a new message — it's "delete my current view," not a block (blocking
+already exists separately via `relationships/block.js`). A *hidden*
+conversation does not auto-unhide on a new message — it stays in the vault,
+and the sender is never told the conversation was hidden, per spec.
+
+**Rate limiting:** vault-unlock attempts (PIN verify, passkey assertion
+verify) get their own tier — 8/15min, materially tighter than the 20/15min
+`authLimiter` — since a 4-12 digit PIN has far less brute-force resistance
+than a password. Hide/unhide/delete mutations reuse the existing
+`deleteLimiter` tier (60/15min), same reasoning already documented there for
+message deletion: a mutation on existing data, not spam-creation.
+
+**Testing:** 29 new backend tests (`test/conversation-privacy.test.js`) —
+delete-for-me-only-not-other-participant, idempotent hide/unhide/delete, IDOR
+rejection on manipulated conversation ids, all four read routes independently
+rejecting a hidden room without a vault token (including the specific
+regression case of a token expiring after `join-room` already succeeded),
+vault-token cross-user rejection, PIN wrong-vs-unconfigured returning the
+same generic reason (no enumeration side-channel), WebAuthn registration
+authorization tiers, WebAuthn challenge single-use, and multi-device
+Socket.IO sync (hiding on device A reaches device B, never the other
+participant). 13 new frontend tests covering the six-item dropdown menu
+(Search/Mute/Report disabled, Hide/Delete/Block functional), the
+confirm-before-mutate dialogs, first-time PIN setup, PIN and passkey unlock,
+and the unlocked vault list. Backend 134/134, frontend 52/52, both builds
+clean.
+
+---
+
+## D-030: WhatsApp-style message deletion — tombstone, not hard delete — 2026-08-17
+
+**Problem:** No way to delete or retract a sent message. Needed both a
+private "remove from my view" and a real "delete for everyone" that revokes
+content for the whole room, without breaking ordering, pagination, replies,
+or reconnect-resync.
+
+**Decision — tombstone over hard delete:** `Message` gained
+`deletedForEveryone` (Boolean), `deletedAt` (Date), and `deletedFor`
+(`[ObjectId]`, mirroring the existing `readBy` array pattern). The document
+is never removed — its position in the room's message history stays fixed,
+which is what pagination/reply-anchoring/sync already depend on. A schema-level
+`toJSON` transform nulls `content`/`file` once `deletedForEveryone` is true,
+so any route serializing a real Mongoose document gets automatic stripping
+for free. Routes using `.lean()` (`more-messages`, `sync-messages`,
+`join-room`) bypass that transform, so they run a shared
+`sanitizeDeletedMessage()` helper explicitly, and all three also filter out
+messages present in the requesting user's `deletedFor` array — verified this
+was necessary for `create-room.js` specifically by writing a throwaway script
+confirming `toJSON` *does* fire on documents nested inside a plain object via
+`JSON.stringify`, so that one route needed only the `deletedFor` filter, not
+manual stripping.
+
+**Authorization:** `POST /api/message/delete` accepts `{roomID, messageID,
+forEveryone}`. Delete-for-me: any room member, any message — same rule
+WhatsApp uses, since it only affects the requester's own view. Delete-for-
+everyone: author-only (403 `not_author` otherwise) and inside a configurable
+window (`config.messageDeletionWindowMs`, default 1 hour via
+`MESSAGE_DELETION_WINDOW_MS`), enforced server-side only — the client always
+shows the option and surfaces the server's 403 `deletion_window_expired`
+rather than duplicating the window as a second source of truth.
+
+**Idempotency:** delete-for-me uses `$addToSet` (naturally idempotent);
+delete-for-everyone checks `if (!message.deletedForEveryone)` before
+mutating, so a retry/double-click returns the existing tombstoned state
+instead of erroring or re-stamping `deletedAt`.
+
+**Realtime sync:** reuses the existing personal-room-emit pattern from
+`message.js`/`message-read.js`. Delete-for-everyone broadcasts
+`message-deleted` to every other room member (not the actor, who already has
+optimistic local state). Delete-for-me broadcasts only to the actor's own
+personal room, so their other devices/tabs hide the message too — it never
+reaches other participants, since it's not their state to change.
+
+**Frontend:** one new `MESSAGE_DELETE` reducer case — `forEveryone: true`
+patches the message in place (position preserved, content nulled) so the
+bubble renders a muted "This message was deleted" placeholder;
+`forEveryone: false` filters the row out of `state.messages` entirely. A
+hover-revealed dropdown (shadcn `DropdownMenu`) offers "Delete for me"
+always, "Delete for everyone" only when `isMine`, gated behind a
+confirmation `Dialog` for the destructive/shared action only — matching
+WhatsApp's own asymmetry of confirming the action visible to others but not
+the purely-local one.
+
+**A real jsdom gap found while testing this:** Radix's `DropdownMenu` opens
+on `pointerdown` and jsdom has no Pointer Events capture API
+(`hasPointerCapture`/`setPointerCapture`), so `fireEvent.click` alone never
+opened the menu in tests. Fixed two ways: added no-op polyfills to
+`setupTests.js` (same pattern already used there for `ResizeObserver`), and
+switched the interaction tests to `@testing-library/user-event`, which
+dispatches the full pointer/mouse event sequence Radix actually listens for.
+
+**Testing:** 18 new backend tests (`test/message-deletion.test.js`) —
+delete-for-me (hides for requester, any member can do it, idempotent,
+rejects non-member), delete-for-everyone (author-only within window, IDOR
+rejection, expired-window rejection, idempotent without re-stamping
+`deletedAt`, non-member rejection, validation, auth), and content-stripping
+verified across every message-listing route (join-room, more-messages,
+sync-messages) plus a regression check that plain message sending still
+works. Backend 105/105. 9 new frontend tests covering the placeholder, menu
+visibility by ownership, delete-for-me firing immediately, delete-for-
+everyone requiring confirmation first, and the expired-window error path.
+Frontend 39/39. Lint clean, production build clean.
+
+---
+
+## D-029: Instagram-style friend-request lifecycle — 2026-08-17
+
+**What was already correct (D-026/D-028), confirmed before changing
+anything:** the server already rejected a duplicate request while one was
+pending (unique index on `{requester, recipient}`, 409 response) — frontend
+disabling alone was never the only enforcement. The real gaps were narrower
+than "implement server-side enforcement": decline had no way back to a fresh
+request, search result cards showed no relationship status at all, and the
+"Requested" state only appeared after the network round-trip instead of on
+click.
+
+**Decline → re-request:** `friend-requests/send.js` previously treated *any*
+existing relationship row — including a `declined` one — as a 409 conflict,
+so a decline was a permanent dead end. Fixed by reusing the existing row
+(same pattern already established for blocking in `relationships/block.js`):
+a `declined` row gets reset to `pending` with `requester`/`recipient`
+reassigned to reflect who's sending the new request, rather than inserting a
+second row (which the unique index wouldn't allow anyway). Any other status
+(`pending`/`accepted`/`blocked`) still 409s as before.
+
+**"Friends" badge in search results:** `POST /api/search` and `GET
+/api/friends` now annotate every returned user with `relationshipStatus`
+(`'accepted'` / `'pending'` / `null`) and, for pending, `relationshipDirection`
+— computed via one batched `Relationship` query across the whole result set,
+not one lookup per row. A `blocked` relationship is deliberately reported as
+`relationshipStatus: null` in list results (not surfaced as a badge at all)
+for the same reason `resolve.js` already hides block direction: search
+results are not the place to reveal that a relationship exists at all when
+it's blocked. Both `AddPeople.jsx`'s dialog search and `Panel/User.jsx`'s
+`/search` page result cards render the same "Friends" badge from this shared
+field, and both skip the profile-preview step for an already-accepted friend
+— clicking the card opens the DM directly via the same `create-room.js` path
+every DM already uses (find-or-create, no duplicate rooms).
+
+**Optimistic "Requested" state:** `AddPeople.jsx`'s `sendRequest()` now sets
+`relationship` to `{status: 'pending', direction: 'outgoing'}` synchronously,
+before the `sendFriendRequest()` call even starts — the button disables and
+relabels to "Requested" on the same render as the click, which is what
+actually prevents a rapid second click (React re-renders with `disabled`
+before any network round-trip completes). On a genuine failure (not a 409)
+the optimistic state reverts to "Add Friend"; on a 409 it stays "Requested"
+since that remains an accurate reflection of server state. This is UX
+responsiveness layered on top of the real enforcement, not a replacement for
+it — the server-side unique-index/policy check is unchanged and is what
+actually stops a spammed request, exactly as it already did before this pass.
+
+**A real bug found while testing this, not present before:** the first
+attempt at the `search.js` annotation called `.toObject()` on each result,
+assuming they were Mongoose documents — but `search.js` uses
+`User.aggregate()`, which returns plain JS objects, not documents.
+`.toObject()` doesn't exist on those and threw inside every search request.
+Caught immediately by the existing search test suite failing (not new tests
+— the pre-existing `search.js` regression tests), fixed by spreading the
+plain object directly instead.
+
+**Testing:** 10 new backend tests (`test/friend-request-lifecycle.test.js`)
+— duplicate-pending rejection (both directions of an accepted relationship
+too), decline-then-resend in both directions, pending-cannot-be-resent
+(decline-only reuse), and search/friends annotation correctness including
+the blocked-stays-hidden case. 5 new frontend tests covering the optimistic
+disable-on-click (including a same-tick second-click-is-inert assertion),
+revert-on-real-failure, the Friends badge appearing/not-appearing correctly,
+and both click-through paths (friend → direct DM, non-friend → profile
+preview). Backend 87/87, frontend 32/32, both builds clean.
+
+---
+
+## D-028: Friend/stranger chat authorization — blocking + centralized policy + call/voice fixes — 2026-08-17
+
+**Starting point, confirmed before writing anything:** Chitcx was already
+messaging-first — `create-room.js` never checked friendship (it just finds-or-
+creates a 1:1 room), and `message.js` already authorized by conversation
+membership, not relationship status. The actual gaps against the requested
+architecture were narrower than "implement messaging-first": no `blocked`
+relationship state existed anywhere, authorization checks were scattered
+per-route rather than centralized, and there was no stranger-specific rate
+limiting.
+
+**Relationship model:** added `'blocked'` to `Relationship.status`'s enum and
+a new `blockedBy` field. The existing `{requester, recipient}` unique index
+(one row per direction) meant blocking couldn't insert a second row without
+colliding — a block instead **overwrites** whatever row already exists
+between the two users (reusing it regardless of its prior status), while
+`blockedBy` (independent of `requester`/`recipient`) records who actually
+did the blocking. Unblocking deletes the row outright rather than trying to
+restore whatever state a block overwrote, since that prior state is genuinely
+gone — both users return to NONE and can re-request from scratch.
+
+**Centralized authorization policy** (`backend/src/authorization/policy.js`,
+new module, same shape as the existing `src/ai/` module convention):
+`authorizeAction({actor, target, action})` → `{decision: ALLOW|DENY, reason?}`.
+Checks self-targeting and block status first, unconditionally, before any
+action-specific logic — block always wins. Wired into `create-room.js`
+(START_CONVERSATION), `message.js` (SEND_MESSAGE, 1:1 rooms only — see
+below), and `friend-requests/send.js` (SEND_FRIEND_REQUEST), replacing their
+previous ad-hoc self-target/relationship-lookup logic. **Deliberately not**
+wired into `friend-requests/accept.js` — that route's existing
+`{_id, recipient: req.user.id, status: 'pending'}` query is already more
+precise than the policy's generic actor/target lookup (it's scoped to one
+specific request by ID, which the generic version has no way to express) —
+routing it through the shared policy would have been a regression, not a
+simplification. Not every check needs to go through the shared module; the
+principle is "don't duplicate scattered ad-hoc logic," not "eliminate all
+route-specific authorization."
+
+**Group vs. 1:1 scoping, a deliberate boundary:** block enforcement only
+applies to 1:1 DMs. A block is a relationship between two people, not a
+group-membership/moderation concern — per the spec's own "Friendship ≠ DM
+membership ≠ Group membership ≠ Group role" principle, a 1:1 block does not
+reach into a group conversation both users already share. Tested explicitly
+(D-028 test suite): a group message from a user who's been 1:1-blocked by
+another member still succeeds.
+
+**New routes:** `POST /api/block`, `POST /api/unblock` (both mounted under
+the existing `discoveryLimiter`, alongside `/api/room/create` which was also
+added to that limiter for the first time — per the spec's explicit "rate
+limit new conversations" ask). `users/resolve.js`'s relationship payload now
+omits `direction` and normalizes to `{status: 'blocked', direction: null}`
+for a blocked relationship, regardless of which side blocked — leaking block
+direction would let a blocked user infer they were specifically targeted
+rather than just observing "user unavailable."
+
+**Frontend:** `AddPeople.jsx`'s `ProfilePreview` now renders all five states
+from the spec's UX table (NONE/PENDING_SENT/PENDING_RECEIVED/ACCEPTED/BLOCKED)
+— Start Chat stays primary throughout except when blocked, where it's
+replaced entirely by a "User unavailable" state per "frontend visibility is
+UX only, server authorization remains mandatory." New "Accept Request" and
+"Block" actions added to the preview.
+
+**Explicitly not built this pass, matching "don't over-engineer the MVP":**
+per-contact stranger message-count throttling (the spec calls this optional/
+configurable) — only the existing IP/session-based rate limiters apply to
+stranger messaging, no new per-relationship throttling logic. Report-user
+action (mentioned in the spec's action list but no moderation/report
+infrastructure exists to receive it yet — would be a stub with nothing behind
+it). Neither React Query nor a second server-state system — reused the
+existing axios-action + Redux/reactn pattern throughout, per the spec's own
+explicit instruction not to introduce a competing pattern.
+
+**Also fixed in the same pass (found via a "deep check" of the voice/video
+calling system per a separate user report):**
+- `backend/.env` was missing `MEDIASOUP_ENABLED` entirely (not `false` —
+  simply absent), so the whole calling subsystem silently never initialized.
+  Every `join`/`produce`/`consume` request from the client hung forever with
+  no error, because `frontend/src/lib/socket.io-promise.js`'s Promise
+  wrapper never rejected — only resolved on ack, no timeout. This is likely
+  what "server issues with meeting calling" actually was.
+- Fixed the promise wrapper itself: added a 15s timeout and reject-on-
+  `{error}`-response, so a hung request now surfaces a real error instead of
+  freezing the UI silently — this was a real bug independent of the missing
+  env var, and would have caused the same silent-hang symptom for any future
+  transient mediasoup failure.
+- Added try/catch + proper `{error}` callbacks to five mediasoup socket
+  handlers (`connectProducerTransport`, `connectConsumerTransport`, `produce`,
+  `consume`, `resume`) that previously had no error handling at all — an
+  unhandled throw in any of them (e.g. a missing transport after a stale
+  reconnect) silently killed the handler with the client-side promise still
+  hanging, per the same root cause above.
+
+**Testing:** 16 new tests (`test/authorization-policy.test.js`) covering the
+spec's explicit list — stranger DM/message/request with no relationship,
+duplicate-DM prevention, block overriding accepted state, blocked user denied
+on both new-DM and existing-DM messaging, blocked user denied on new friend
+requests, unblock restoring access, only-the-blocker-can-unblock, group
+messages unaffected by a 1:1 block, non-member denial independent of
+relationship, self-targeting denial. Plus 1 existing test updated for
+`resolve.js`'s new `relationship._id` field. Backend 77/77, frontend 27/27,
+both builds clean.
+
+---
+
+## D-027: WhatsApp-style day separators + Socket.IO CORS fix + friends-only default search listing — 2026-08-17
+
+**Day separators:** `Conversation/components/Messages.jsx` now inserts a
+"Today"/"Yesterday"/full-date pill between messages whenever the calendar day
+changes (`moment(...).isSame(..., 'day')`), matching WhatsApp's actual
+behavior — a calendar-day boundary, not a rolling 24h window, so 11:59pm and
+12:01am the next minute correctly land on separate days. Reused the existing
+`moment` dependency already used throughout the conversation UI; no new
+dependency. 4 new tests (`Messages.test.jsx`) cover same-day dedup, the
+midnight-boundary split, and the "older than yesterday" full-date fallback.
+
+**Real bug found and fixed while investigating an unrelated report ("chat is
+not RTC" — real-time delivery not arriving live):** `backend/index.js`
+constructed the Socket.IO server with `io(server)` — no `cors` option. Express's
+`cors()` middleware only covers HTTP routes; Socket.IO's engine.io transport
+does its own independent CORS check on the polling/WebSocket handshake. Since
+frontend (`:5173`) and backend (`:4002`) are different origins, every socket
+connection was silently rejected at the transport level — HTTP requests (login,
+send, room list) all worked fine, masking the problem, but `message-in` could
+never reach a recipient because the socket never actually connected. This bug
+predates this session. Fixed by passing `Config.corsOrigin` (the same allowlist
+already used for Express) to the Socket.IO constructor. Requires a backend
+restart to take effect (boot-time config).
+
+**Also chased and ruled out during the same investigation:** two apparent
+"broken dropdown"/"broken message layout" reports both turned out to be a
+stale browser tab holding a dead Vite HMR connection, not real bugs — confirmed
+by comparing the DOM's actual Tailwind class list against current source
+(they didn't match, even after a hard refresh) and only resolved by a full
+tab close + reopen. Worth remembering: a hard refresh (Ctrl+Shift+R) bypasses
+the HTTP cache but not a stuck WebSocket/HMR connection or a lingering service
+worker — closing the tab is the real fix for that class of symptom.
+
+**Friends-only default search listing:** `/search` previously called
+`search()` with no query on mount, returning the *entire user directory*
+(minus yourself) unfiltered — a real over-exposure, not by design. New
+`GET /api/friends` route (`backend/src/routes/friends/list.js`) returns only
+users with an **accepted** `Relationship` in either direction — reuses the
+same `Relationship` model built for D-026's Add People feature (this is
+exactly the extension point that model's generic requester/recipient/status
+shape was designed for). `Panel/index.jsx`'s default listing and
+`SearchBar.jsx`'s empty-query state both now call `getFriends()` instead of
+the unrestricted `search()`. **Typing an actual @username still searches
+everyone** — unrestricted lookup-by-username is the intended discovery
+mechanism (Add People's whole purpose), only the *default, no-query-typed*
+listing changed. Mounted behind the existing `discoveryLimiter` alongside
+`/api/search`/`/api/users`/`/api/friend-requests`. 3 new backend tests cover
+both-direction acceptance, exclusion of pending/declined/unrelated users, and
+the auth gate.
+
+**Testing:** backend 61/61, frontend 27/27, both builds clean.
+
+---
+
+## D-026: Add People (Phase 1) — username search, profile preview, friend requests — 2026-08-17
+**Problem:** Discovering and messaging a new person was a single, ungated action —
+clicking a search result immediately created a DM (`create-room.js`), with no
+profile-preview step and no concept of a relationship between two users beyond
+"a room exists." A much larger spec was requested (username search, QR codes,
+invite links, friend requests, rate limiting, abuse detection, and forward-looking
+Zero Trust/threat-intel/eBPF/AI security layers) — implemented as **Phase 1 only**
+(username search + profile preview + Start Chat / Send Request), per the spec's
+own phased rollout and two explicit scope decisions made with the user before
+writing code (see below). QR codes and invite links are deliberately deferred.
+
+**Decision — data-fetching pattern:** the spec called for React Query throughout.
+This codebase has zero React Query usage anywhere — every existing feature
+(including everything built earlier this session) uses plain axios action
+functions + Redux/reactn globals. Introducing React Query for one feature would
+mean two parallel state-management paradigms living side by side, which
+CLAUDE.md's own rule against introducing patterns that conflict with the existing
+system already argues against. **Built with the existing pattern instead** —
+debouncing via the same `useRef` timeout pattern already used in
+`Panel/components/SearchBar.jsx`, cancellation via a raw `AbortController` wired
+through `axios`'s `signal` option (a small, backward-compatible addition to the
+existing `actions/search.js`, not a new dependency).
+
+**Decision — relationship model scope:** the spec wanted a full friend-request
+gate before any messaging. **Kept "Start Chat" instant** (unchanged,
+`create-room.js` untouched) and added "Send Request" as a new, separate,
+optional action — matching the spec's own Phase 1 description ("search +
+profile preview + start chat/request") rather than the larger, riskier
+behavior change of gating all existing messaging behind approval.
+
+**Implementation:**
+- `User.usernameNormalized` (new field, lowercased mirror of `username`, unique+sparse
+  index, kept in sync by a `pre('save')` hook) — makes username lookup/uniqueness
+  case-insensitive, which Mongo doesn't support natively on a unique index. Every
+  existing username-uniqueness check site (`register.js`, `user-edit.js`,
+  `init.js`'s root-user bootstrap) was updated to use it — two of these bypass
+  Mongoose's `save()` (`findOneAndUpdate`), so a one-time idempotent backfill runs
+  on every boot in `init.js` for legacy users created before the field existed.
+- `User.discoveryEnabled` (new field, default `true`) — the privacy gate the spec's
+  "Discovery Service" section calls for. A user with discovery disabled and a
+  genuinely nonexistent username both return **404**, not 403 — a distinguishable
+  response would let an attacker enumerate which usernames are real even when
+  hidden (the spec's own anti-enumeration requirement).
+- `Relationship` model (new, deliberately not named "Friend") — generic
+  requester/recipient/status shape (`pending`/`accepted`/`declined`), per the
+  spec's explicit "don't hard-code around friends" instruction — adding a
+  `blocked` status or a `room` field for group invites later is additive, not a
+  schema rewrite. Compound unique index on `{requester, recipient}` (one row per
+  direction) plus `{recipient, status}` for the incoming-requests list query.
+- New routes, following the codebase's existing inline
+  `passport.authenticate('jwt', ...)` mounting convention exactly:
+  `GET /api/users/:username` (profile resolution), `GET/POST /api/friend-requests`
+  (list / send), `POST /api/friend-requests/:id/{accept,decline}`. Accept/decline
+  are IDOR-checked — scoped to `{_id, recipient: req.user.id, status: 'pending'}`
+  — the requester or a third party cannot respond to a request addressed to
+  someone else, regression-tested.
+- New `discoveryLimiter` (100/15min, `express-rate-limit`, same pattern as the
+  existing `authLimiter`/`aiLimiter`) mounted on `/api/search`, `/api/users`,
+  `/api/friend-requests` — tighter than general API traffic given this is the
+  spec's named enumeration/spam-abuse surface, looser than auth since search is
+  used interactively while typing. Redis-backed rate limiting was considered
+  (per the spec's "Redis where it makes sense" language) and explicitly not
+  built — Redis has zero lines of usage anywhere in this backend today, it's
+  documented-aspirational only; adding it for one feature's rate limiter would
+  be new infrastructure introduced through the back door of a feature request,
+  not a real capacity need. The existing in-memory limiter is correct for a
+  single-process ₹0 deployment.
+
+**Frontend:** `AddPeople.jsx` (search → results → profile-preview dialog →
+Start Chat / Send Request), reachable from a new "Add Person" item in the
+existing "+" menu in `Panel/components/TopBar.jsx` (previously single-purpose,
+"Create Group" only). Incoming requests surface in the already-existing
+Notifications page with accept/decline actions.
+
+**What was explicitly not built (per the spec's own phasing, not an oversight):**
+QR code generation/scanning (Phase 2), invite links with expiry/revocation
+(Phase 3), dedicated abuse-detection beyond the rate limiter (Phase 4), and
+every security-evolution item in the spec's later sections (Zero Trust risk
+scoring, threat intelligence, eBPF, AI-based policy engine — Phases 5-8). The
+model boundaries (`Relationship`'s generic shape, `discoveryEnabled`, a
+dedicated rate limiter already separated from general API traffic) are exactly
+what the spec asked to establish now so those phases don't require a rewrite
+later — that groundwork is what Phase 1 was scoped to deliver.
+
+**Testing:** 22 new backend tests (`test/add-people.test.js`) covering
+case-insensitive uniqueness, profile resolution (including the 404-not-403
+discovery-disabled case and the never-leak-email/password check), send/accept/
+decline with IDOR and duplicate-request/reverse-relationship checks, and the
+incoming/outgoing list split. 4 new frontend tests (`AddPeople.test.jsx`)
+covering the minimum-query-length gate, debounce-coalescing behavior, and the
+search → profile-preview → send-request flow end to end. Full suites green:
+backend 58/58, frontend 23/23.
+
+---
+
 ## D-024: Device-identity/session system — the E2EE prerequisite named in D-012 — 2026-08-16
 **Problem:** `docs/E2EE-THREAT-MODEL.md` §3 and D-012 both concluded E2EE cannot
 be built on the existing auth model — one long-lived (60-day) JWT per login,

@@ -15,6 +15,7 @@ import getRooms from '../../../actions/getRooms';
 import typing from '../../../actions/typing';
 import retryWithBackoff from '../../../lib/retryWithBackoff';
 import draftReply from '../../../actions/draftReply';
+import useTheme from '../../../lib/useTheme';
 
 function BottomBar({ aiEnabled }) {
   const imageInput = useRef(null);
@@ -22,7 +23,8 @@ function BottomBar({ aiEnabled }) {
 
   const ref = useGlobal('ref')[0];
   const room = useSelector((state) => state.io.room);
-  const user = useGlobal('user')[0];
+  const user = useGlobal('user')[0] || {};
+  const { theme } = useTheme();
 
   const [text, setText] = useState('');
   const [isPicker, showPicker] = useGlobal('isPicker');
@@ -32,8 +34,6 @@ function BottomBar({ aiEnabled }) {
   const dispatch = useDispatch();
   const typingTimeout = useRef(null);
 
-  // Debounced: a "typing" POST per keystroke wastes data on slow/metered connections.
-  // Only the "stopped typing" signal (text cleared) needs to fire immediately.
   useEffect(() => {
     if (text === '') {
       clearTimeout(typingTimeout.current);
@@ -46,7 +46,7 @@ function BottomBar({ aiEnabled }) {
   }, [text]);
 
   const sendMessage = () => {
-    if (text.length === 0) return;
+    if (text.trim().length === 0) return;
 
     const clientID = crypto.randomUUID();
     const newMessage = {
@@ -81,8 +81,11 @@ function BottomBar({ aiEnabled }) {
   };
 
   const handleKeyPress = (event) => {
-    showPicker(false);
-    if (event.key === 'Enter') sendMessage();
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      showPicker(false);
+      sendMessage();
+    }
   };
 
   const draft = async () => {
@@ -97,21 +100,18 @@ function BottomBar({ aiEnabled }) {
     }
   };
 
-  // ponytail: image/file sends still use the old fire-and-forget fake-_id pattern with no
-  // retry/failure UI — upload retry needs re-sendable FormData, a bigger change than the
-  // text-message retry above. Apply the same clientID+retryWithBackoff treatment here if
-  // upload reliability on flaky networks becomes a reported problem.
-  const sendImages = async (images) => {
+  const sendImages = async (files) => {
     const tmpRefs = [];
-    for (let i = 0; i < images.length; i++) {
-      const image = images[i];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       tmpRefs.push(ref + i);
-      const res = await uploadImage(image, ref + i);
+      const res = await uploadImage(file, ref + i);
       message({
         roomID: room._id,
         authorID: user.id,
         content: res.data.image.shieldedID,
         type: 'image',
+        imageID: res.data.image._id,
       });
       const newMessage = {
         _id: Math.random(),
@@ -130,12 +130,6 @@ function BottomBar({ aiEnabled }) {
   };
 
   const sendFiles = async (files) => {
-    for (let i = 0; i < files.length; i++) {
-      if (files[i].size / (1024 * 1024) > 10) {
-        alert('File exceeds 10MB limit!');
-        return;
-      }
-    }
     const tmpRefs = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -166,70 +160,102 @@ function BottomBar({ aiEnabled }) {
   };
 
   return (
-    <div className="relative flex min-h-[54px] max-h-[54px] w-full items-center border-t bg-card">
+    <div className="relative flex w-full items-center gap-2 border-t border-border/60 bg-card px-3.5 pt-3 pb-6 sm:py-2.5 text-card-foreground">
       {isPicker && (
-        <div className="absolute bottom-[451px] left-0">
-          <Picker onSelect={(emoji) => setText(text + emoji.native)} theme="light" title="Emoji" native />
+        <div className="absolute bottom-[84px] left-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-border">
+          <Picker
+            onSelect={(emoji) => setText((prev) => prev + (emoji.native || ''))}
+            theme={theme === 'dark' ? 'dark' : 'light'}
+            title="Emoji"
+            native
+          />
         </div>
       )}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="mx-2"
-        aria-label="Toggle emoji picker"
-        onClick={() => showPicker(!isPicker)}
-      >
-        <Smile />
-      </Button>
-      <input
-        className="hidden"
-        type="file"
-        ref={imageInput}
-        accept="image/*"
-        multiple
-        onChange={(e) => sendImages(e.target.files)}
-      />
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Attach image"
-        onClick={() => imageInput && imageInput.current && imageInput.current.click()}
-      >
-        <Image />
-      </Button>
-      <input className="hidden" type="file" ref={fileInput} multiple onChange={(e) => sendFiles(e.target.files)} />
-      <Button
-        variant="ghost"
-        size="icon"
-        className="mx-2"
-        aria-label="Attach file"
-        onClick={() => fileInput && fileInput.current && fileInput.current.click()}
-      >
-        <Paperclip />
-      </Button>
-      <input
-        className="h-10 w-full flex-1 bg-transparent px-2 text-sm outline-none"
-        type="text"
-        placeholder="Type something to send..."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyPress={handleKeyPress}
-        onFocus={() => showPicker(false)}
-      />
-      {aiEnabled && (
+
+      <div className="flex items-center gap-0.5 text-muted-foreground shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Draft reply with AI"
-          disabled={drafting}
-          onClick={draft}
+          className="h-8 w-8 rounded-full hover:text-foreground"
+          aria-label="Toggle emoji picker"
+          onClick={() => showPicker(!isPicker)}
         >
-          <Sparkles />
+          <Smile className="h-4 w-4" />
         </Button>
-      )}
-      <Button variant="ghost" size="icon" className="mr-2" aria-label="Send message" onClick={sendMessage}>
-        <Send />
-      </Button>
+
+        <input
+          className="hidden"
+          type="file"
+          ref={imageInput}
+          accept="image/*"
+          multiple
+          onChange={(e) => sendImages(e.target.files)}
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full hover:text-foreground"
+          aria-label="Attach image"
+          onClick={() => imageInput?.current?.click()}
+        >
+          <Image className="h-4 w-4" />
+        </Button>
+
+        <input
+          className="hidden"
+          type="file"
+          ref={fileInput}
+          multiple
+          onChange={(e) => sendFiles(e.target.files)}
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full hover:text-foreground"
+          aria-label="Attach file"
+          onClick={() => fileInput?.current?.click()}
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Text input with clean rounded container */}
+      <div className="relative flex-1 flex items-center">
+        <input
+          className="h-10 w-full rounded-xl border border-input bg-muted/40 px-3.5 text-xs text-foreground placeholder:text-muted-foreground outline-none transition-all focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/20"
+          type="text"
+          placeholder="Type something to send..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyPress={handleKeyPress}
+          onFocus={() => showPicker(false)}
+        />
+      </div>
+
+      <div className="flex items-center gap-1.5 ml-2">
+        {aiEnabled && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary"
+            aria-label="Draft reply with AI"
+            disabled={drafting}
+            onClick={draft}
+            title="Draft with AI"
+          >
+            <Sparkles className="h-4 w-4" />
+          </Button>
+        )}
+
+        <Button
+          size="icon"
+          className="h-9 w-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+          aria-label="Send message"
+          onClick={sendMessage}
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useGlobal } from 'reactn';
 import Info from './components/Info';
 import Room from './components/Room';
 import TopBar from './components/TopBar';
@@ -7,23 +8,35 @@ import TopBar from './components/TopBar';
 function Details() {
   const location = useLocation();
   const room = useSelector((state) => state.io.room);
+  const [showDetails, setShowDetails] = useGlobal('showDetails');
 
   const navigate = useNavigate();
 
-  const back = () => navigate(`/room/${room._id}`, { replace: true });
+  const isInfoRoute = location.pathname.endsWith('/info');
+  const isRoomRoute = location.pathname.startsWith('/room');
 
-  const expand = location.pathname.endsWith('/info');
+  const closeDetails = () => {
+    if (isInfoRoute && room) {
+      navigate(`/room/${room._id}`, { replace: true });
+    } else {
+      setShowDetails(false);
+    }
+  };
 
   const getComponent = () => {
-    if (location.pathname.startsWith('/room') && room) return <Room />;
-    if (expand && room) return <Room />;
+    if ((isRoomRoute || isInfoRoute) && room) return <Room />;
     return <Info />;
   };
 
   return (
-    <div className={expand ? 'h-full w-full border-l' : 'hidden h-full w-[300px] border-l lg:block'}>
-      {expand && <TopBar back={back} />}
-      {getComponent()}
+    <div className="relative flex h-full w-full flex-col border-l border-border bg-card text-card-foreground">
+      {/* Top Header with Back / Close Button */}
+      <TopBar back={closeDetails} />
+
+      {/* Main Panel Content */}
+      <div className="flex-1 overflow-y-auto">
+        {getComponent()}
+      </div>
     </div>
   );
 }
