@@ -1,13 +1,18 @@
 const Message = require('../models/Message');
 const Room = require('../models/Room');
+const User = require('../models/User');
 const ConversationUserState = require('../models/ConversationUserState');
 const store = require('../store');
 const xss = require('xss');
 const { authorizeAction, Actions, Decisions } = require('../authorization/policy');
+const roomHasBoundaryViolation = require('../utils/roomHasBoundaryViolation');
+const groupPolicy = require('../authorization/groupPolicy');
 const logger = require('../logger');
 
 module.exports = async (req, res, next) => {
-  const { roomID, content, type, fileID } = req.fields;
+  const {
+    roomID, content, type, fileID, mediaID,
+  } = req.fields;
   const authorID = req.user.id;
 
   let room;
@@ -22,10 +27,29 @@ module.exports = async (req, res, next) => {
   }
 
   // Conversation access is membership, not friendship — this check is
-  // unchanged from before the authorization policy existed.
-  const isMember = room.people.some((person) => person.toString() === authorID.toString());
-  if (!isMember) {
-    return res.status(403).json({ error: true });
+  // unchanged from before the authorization policy existed. For groups,
+  // GroupMember is the source of truth (not the Room.people cache), and
+  // send permission is capability-gated — see groupPolicy.js, DECISIONS.md D-035.
+  if (room.isGroup) {
+    const membership = await groupPolicy.getMembershipWithFallback(room._id, authorID);
+    if (!membership || !groupPolicy.hasCapability(membership.role, groupPolicy.Capabilities.SEND_MESSAGE)) {
+      return res.status(403).json({ error: true });
+    }
+  } else {
+    const isMember = room.people.some((person) => person.toString() === authorID.toString());
+    if (!isMember) {
+      return res.status(403).json({ error: true });
+    }
+  }
+
+  // Admin privacy boundary — independent of the read-path gates
+  // (join-room/get-room/list-rooms), since a room id could be sent to
+  // directly without ever going through those. See DECISIONS.md.
+  const boundaryViolation = await roomHasBoundaryViolation({
+    room, callerID: authorID, callerLevel: req.user.level,
+  });
+  if (boundaryViolation) {
+    return res.status(404).json({ error: true });
   }
 
   // Block enforcement only applies to 1:1 DMs — a block is a relationship
@@ -34,8 +58,31 @@ module.exports = async (req, res, next) => {
   if (!room.isGroup) {
     const other = room.people.find((person) => person.toString() !== authorID.toString());
     if (other) {
-      const authz = await authorizeAction({ actor: authorID, target: other, action: Actions.SEND_MESSAGE });
-      if (authz.decision !== Decisions.ALLOW) return res.status(403).json({ error: true, reason: authz.reason });
+      const otherUser = await User.findById(other).select('level accountStatus');
+      // Recipient's account no longer exists (hard-deleted) or was
+      // deactivated — distinct from "blocked"/"admin_boundary", same
+      // generic reason for both so neither case is distinguishable from
+      // the other (anti-enumeration, same posture as admin_boundary).
+      if (!otherUser || otherUser.accountStatus === 'DELETED') {
+        return res.status(404).json({ error: true, reason: 'recipient_unavailable' });
+      }
+      if (otherUser.accountStatus === 'DEACTIVATED') {
+        return res.status(403).json({ error: true, reason: 'recipient_unavailable' });
+      }
+      const authz = await authorizeAction({
+        actor: authorID,
+        target: other,
+        action: Actions.SEND_MESSAGE,
+        actorLevel: req.user.level,
+        targetLevel: otherUser && otherUser.level,
+      });
+      if (authz.decision !== Decisions.ALLOW) {
+        // Never leak the admin_boundary reason string — see DECISIONS.md.
+        // (Also defense-in-depth here: roomHasBoundaryViolation above
+        // already 404s a boundary-violating room before this ever runs.)
+        if (authz.reason === 'admin_boundary') return res.status(404).json({ error: true });
+        return res.status(403).json({ error: true, reason: authz.reason });
+      }
     }
   }
 
@@ -45,13 +92,14 @@ module.exports = async (req, res, next) => {
     content: xss(content),
     type,
     file: fileID,
+    media: mediaID,
   })
     .save()
     .then((message) => {
       Message.findById(message._id)
         .populate({
           path: 'author',
-          select: '-email -password -friends -__v',
+          select: '-email -password -friends -__v -vaultPinHash',
           populate: [
             {
               path: 'picture',
@@ -59,6 +107,7 @@ module.exports = async (req, res, next) => {
           ],
         })
         .populate([{ path: 'file', strictPopulate: false }])
+        .populate([{ path: 'media', strictPopulate: false }])
         .then((message) => {
           Room.findByIdAndUpdate(roomID, {
             $set: { lastUpdate: message.date, lastMessage: message._id, lastAuthor: authorID },
@@ -78,6 +127,12 @@ module.exports = async (req, res, next) => {
                 // inbox despite actively using it. Hidden/vaulted state is
                 // untouched here — a vaulted conversation getting a new
                 // message stays hidden, it doesn't auto-reveal.
+                //
+                // deletedBefore is intentionally NOT cleared here (unlike
+                // deletedAt) — restoring the conversation to someone's inbox
+                // must only reveal NEW activity from this point forward, not
+                // silently resurrect the full pre-delete history. See
+                // ConversationUserState's model comment and DECISIONS.md.
                 ConversationUserState.updateOne(
                   { conversation: roomID, user: personUserID, deletedAt: { $ne: null } },
                   { $set: { deletedAt: null } },

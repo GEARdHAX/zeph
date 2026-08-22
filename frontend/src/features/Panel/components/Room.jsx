@@ -31,8 +31,16 @@ function Room({ room, inVault, vaultToken }) {
     if (user.id !== person._id) other = person;
   });
 
-  if (!other.firstName) {
+  // "Deleted User" only when the other participant genuinely couldn't be
+  // resolved at all (their account was removed — Mongoose leaves a dangling
+  // unpopulated ObjectId with no _id property in that case). A real,
+  // existing account with no firstName/lastName set is a different,
+  // unrelated situation — fall back to their @username instead of
+  // mislabeling a live account as deleted.
+  if (!other._id) {
     other = { ...other, firstName: 'Deleted', lastName: 'User' };
+  } else if (!other.firstName && !other.lastName) {
+    other = { ...other, firstName: `@${other.username || 'user'}`, lastName: '' };
   }
 
   const title = (room.isGroup ? room.title : `${other.firstName} ${other.lastName}`).substr(0, 22);

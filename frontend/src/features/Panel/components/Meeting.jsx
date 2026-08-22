@@ -1,13 +1,17 @@
+import { useState } from 'react';
 import { useGlobal } from 'reactn';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
-import { Phone, Video, Users } from 'lucide-react';
+import { toast } from 'react-toastify';
+import { Video, Users, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import Actions from '../../../constants/Actions';
 import postCall from '../../../actions/postCall';
+import deleteMeeting from '../../../actions/deleteMeeting';
 
-function Meetings({ meeting }) {
+function Meetings({ meeting, onDeleted }) {
   const setMeeting = useGlobal('meetingID')[1];
   const setOver = useGlobal('over')[1];
   const setShowPanel = useGlobal('showPanel')[1];
@@ -15,6 +19,7 @@ function Meetings({ meeting }) {
   const setVideo = useGlobal('video')[1];
   const setCallDirection = useGlobal('callDirection')[1];
   const user = useGlobal('user')[0] || {};
+  const [deleting, setDeleting] = useState(false);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -73,6 +78,21 @@ function Meetings({ meeting }) {
     navigate(`/meeting/${meeting._id}`, { replace: true });
   };
 
+  // Never offered for an active meeting (someone currently in the call) —
+  // the server also rejects this independently, this is just UX.
+  const handleDelete = async (e) => {
+    e.stopPropagation();
+    setDeleting(true);
+    try {
+      await deleteMeeting(meeting._id);
+      onDeleted?.(meeting._id);
+    } catch (err) {
+      toast.error('Could not delete this meeting from your history.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div
       className="flex items-center gap-3.5 px-4 py-3.5 mx-2 my-1 rounded-2xl cursor-pointer border border-transparent hover:border-border/60 hover:bg-muted/50 transition-all duration-200"
@@ -109,6 +129,20 @@ function Meetings({ meeting }) {
         </div>
         <div className="text-[10px] text-muted-foreground/60 truncate font-mono mt-0.5">{`ID: ${meeting._id}`}</div>
       </div>
+
+      {!hasActivePeers && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+          disabled={deleting}
+          onClick={handleDelete}
+          aria-label="Delete from history"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   );
 }

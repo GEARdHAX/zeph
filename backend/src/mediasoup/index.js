@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Meeting = require('../models/Meeting');
 const mongoose = require('mongoose');
 const logger = require('../logger');
+const { broadcastPresence } = require('../presence');
 
 let worker;
 let mediasoupRouter;
@@ -260,8 +261,18 @@ const initSocket = (socket) => {
       },
     )
       .then((meeting) => {
+        // Personal-room delivery keys rooms by the plain string passed to
+        // socket.join(id) in init.js (socket.decoded_token.id, a JWT-payload
+        // string) — meeting.users is an array of raw Mongoose ObjectId
+        // instances (never populated here), and Socket.IO's room lookup is
+        // a string-keyed Map, so socket.to(objectIdInstance) silently
+        // matched no room at all: every "someone joined/left" notification
+        // was emitted into the void, and the sidebar's meeting list only
+        // ever showed whatever getMeetings() happened to fetch once on
+        // mount — exactly the reported "shows 0 participants until I
+        // reopen/refresh" symptom.
         meeting.users.forEach((user) => {
-          socket.to(user).emit('refresh-meetings', { timestamp: Date.now() });
+          socket.to(user.toString()).emit('refresh-meetings', { timestamp: Date.now() });
         });
       })
       .catch((err) => logger.error({ err, meetingId: data.roomID }, 'Failed to update meeting on join'));
@@ -269,8 +280,8 @@ const initSocket = (socket) => {
     store.roomIDs[socket.id] = data.roomID;
 
     store.onlineUsers.delete(socket);
-    store.onlineUsers.set(socket, { id: socket.decoded_token.id, status: 'busy' });
-    store.io.emit('onlineUsers', Array.from(store.onlineUsers.values()));
+    store.onlineUsers.set(socket, { id: socket.decoded_token.id, status: 'busy', level: socket.decoded_token.level });
+    broadcastPresence().catch((err) => logger.error({ err }, 'Failed to broadcast presence'));
 
     callback({
       producers: peers,
@@ -290,8 +301,9 @@ const initSocket = (socket) => {
 
     await Meeting.findOneAndUpdate({ _id: data.roomID }, { lastLeave: Date.now(), $pull: { peers: socket.id } })
       .then((meeting) => {
+        // Same string-vs-ObjectId fix as the join handler above.
         (meeting.users || []).forEach((user) => {
-          socket.to(user).emit('refresh-meetings', { timestamp: Date.now() });
+          socket.to(user.toString()).emit('refresh-meetings', { timestamp: Date.now() });
         });
       })
       .catch((err) => logger.error({ err, meetingId: data.roomID }, 'Failed to update meeting on leave'));
@@ -303,8 +315,8 @@ const initSocket = (socket) => {
     socket.to(data.roomID).emit('leave', { socketID: socket.id });
 
     store.onlineUsers.delete(socket);
-    store.onlineUsers.set(socket, { id: socket.decoded_token.id, status: 'online' });
-    store.io.emit('onlineUsers', Array.from(store.onlineUsers.values()));
+    store.onlineUsers.set(socket, { id: socket.decoded_token.id, status: 'online', level: socket.decoded_token.level });
+    broadcastPresence().catch((err) => logger.error({ err }, 'Failed to broadcast presence'));
 
     if (callback) callback();
   });

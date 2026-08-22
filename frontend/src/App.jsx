@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { getGlobal, useGlobal, setGlobal } from 'reactn';
 import {
-  BrowserRouter as Router, Routes, Route, Navigate,
+  BrowserRouter as Router, Routes, Route, Navigate, useNavigate,
 } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ToastContainer, toast } from 'react-toastify';
@@ -12,8 +12,21 @@ import ForgotPassword from './pages/ForgotPassword';
 import setAuthToken from './actions/setAuthToken';
 import initIO from './actions/initIO';
 import PictureInPicture from './features/PictureInPicture';
+import { registerNavigate } from './lib/navigation';
 
 import 'react-toastify/dist/ReactToastify.css';
+
+// initIO.js fires a new-message toast that needs to navigate on click, but
+// it's a plain action (no component tree), so useNavigate() can't be called
+// there directly. This registers the real navigate function for it to use —
+// rendered here since it must be inside <Router> to call the hook.
+function NavigateRegistrar() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    registerNavigate(navigate);
+  }, [navigate]);
+  return null;
+}
 
 function App() {
   const dispatch = useDispatch();
@@ -112,8 +125,14 @@ function App() {
         pauseOnFocusLoss
         draggable
         pauseOnHover
+        icon={false}
+        toastClassName="!rounded-2xl !border !border-border !bg-card !text-card-foreground !shadow-2xl !p-0 !min-h-0"
+        bodyClassName="!p-4 !m-0"
+        progressClassName="!bg-primary"
+        closeButton={false}
       />
       <Router>
+        <NavigateRegistrar />
         <Routes>
           <Route path="/forgot-password" element={token ? <Navigate to="/" /> : <ForgotPassword />} />
           <Route path="/login" element={token ? <Navigate to="/" /> : <Login />} />

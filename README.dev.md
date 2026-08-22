@@ -139,7 +139,7 @@ MongoDB is still initializing. The backend retries every 10 seconds. Wait 30 sec
 Check logs: `docker compose logs backend`
 Most common causes:
 - `AUTH_SECRET` not set in `backend/.env`
-- `MONGO_URI` wrong (in Docker it's automatically `mongodb://mongo:27017/clover`)
+- `MONGO_URI` wrong (in Docker it's automatically `mongodb://mongo:27017/chitcx`)
 
 ### Frontend can't connect to backend
 Ensure `VITE_BACKEND_URL` in `frontend/.env` matches the backend's actual address.

@@ -3,6 +3,7 @@ import {
 } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
 import { setGlobal } from 'reactn';
@@ -35,7 +36,9 @@ function renderMessages(msgs) {
 
   render(
     <Provider store={store}>
-      <Messages />
+      <MemoryRouter>
+        <Messages />
+      </MemoryRouter>
     </Provider>,
   );
 }

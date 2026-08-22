@@ -1,6 +1,9 @@
 const Room = require('../models/Room');
 const requireVisibleConversation = require('../utils/requireVisibleConversation');
+const roomHasBoundaryViolation = require('../utils/roomHasBoundaryViolation');
+const attachBlockState = require('../utils/attachBlockState');
 const { hasValidVaultToken } = require('../vault/vaultToken');
+const groupPolicy = require('../authorization/groupPolicy');
 
 module.exports = async (req, res, next) => {
   let { id } = req.fields;
@@ -19,18 +22,52 @@ module.exports = async (req, res, next) => {
     .populate([{ path: 'picture', strictPopulate: false }])
     .populate({
       path: 'people',
-      select: '-email -password -friends -__v',
+      select: '-email -password -friends -__v -vaultPinHash',
       populate: {
         path: 'picture',
       },
     })
     .populate('lastMessage')
-    .exec((err, room) => {
+    .exec(async (err, room) => {
       if (err || !room) return res.status(404).json({ error: true });
 
       const isMember = room.people.some((person) => person._id.toString() === req.user.id.toString());
       if (!isMember) return res.status(403).json({ error: true });
 
-      res.status(200).json({ room });
+      // Defense in depth for groups: Room.people is a synced cache, but
+      // GroupMember is authoritative — re-check it independently in case of
+      // drift. See DECISIONS.md D-035.
+      if (room.isGroup) {
+        const membership = await groupPolicy.getMembershipWithFallback(room._id, req.user.id);
+        if (!membership) return res.status(404).json({ error: true });
+      }
+
+      // Admin privacy boundary — see DECISIONS.md. 404, not 403, so a
+      // manipulated/guessed room id for an admin's DM is indistinguishable
+      // from one that doesn't exist at all.
+      const boundaryViolation = await roomHasBoundaryViolation({
+        room, callerID: req.user.id, callerLevel: req.user.level,
+      });
+      if (boundaryViolation) return res.status(404).json({ error: true });
+
+      // Built as a plain object, NOT reassigned onto `room.people` —
+      // `room` is a live Mongoose document and `people`'s schema path is
+      // typed as ObjectId refs, so setting it back to an array of plain
+      // objects gets silently cast back down to bare ObjectIds by
+      // Mongoose on serialization (verified empirically: `people` came
+      // back over the wire as raw id strings despite this map running
+      // first). See DECISIONS.md D-035/D-036.
+      const sanitizedPeople = room.people.map((person) => {
+        const obj = person.toObject ? person.toObject() : person;
+        delete obj.level;
+        return obj;
+      });
+
+      const sanitizedRoom = {
+        ...room.toObject(),
+        people: await attachBlockState(sanitizedPeople, req.user.id),
+      };
+
+      res.status(200).json({ room: sanitizedRoom });
     });
 };

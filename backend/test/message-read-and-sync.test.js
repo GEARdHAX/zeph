@@ -74,6 +74,41 @@ describe('POST /api/message/read', () => {
     const updated = await Message.findById(message._id);
     expect(updated.readBy.length).toBe(1);
   });
+
+  it('marks a whole unread backlog read in one request via messageIDs', async () => {
+    const sender = await createUser();
+    const reader = await createUser();
+    const room = await Room.create({ people: [sender._id, reader._id], title: 'Room', isGroup: true });
+    const m1 = await Message.create({ author: sender._id, room: room._id, content: 'one', type: 'text' });
+    const m2 = await Message.create({ author: sender._id, room: room._id, content: 'two', type: 'text' });
+    const m3 = await Message.create({ author: sender._id, room: room._id, content: 'three', type: 'text' });
+
+    const res = await request(app)
+      .post('/api/message/read')
+      .set('Authorization', `Bearer ${tokenFor(reader)}`)
+      .send({ roomID: room._id.toString(), messageIDs: [m1._id.toString(), m2._id.toString(), m3._id.toString()] });
+
+    expect(res.status).toBe(200);
+    const updated = await Message.find({ _id: { $in: [m1._id, m2._id, m3._id] } });
+    updated.forEach((m) => {
+      expect(m.readBy.map((id) => id.toString())).toContain(reader._id.toString());
+    });
+  });
+
+  it('rejects a batch read for a room the caller is not a member of', async () => {
+    const sender = await createUser();
+    const reader = await createUser();
+    const outsider = await createUser();
+    const room = await Room.create({ people: [sender._id, reader._id], title: 'Room', isGroup: true });
+    const m1 = await Message.create({ author: sender._id, room: room._id, content: 'one', type: 'text' });
+
+    const res = await request(app)
+      .post('/api/message/read')
+      .set('Authorization', `Bearer ${tokenFor(outsider)}`)
+      .send({ roomID: room._id.toString(), messageIDs: [m1._id.toString()] });
+
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('POST /api/messages/sync', () => {

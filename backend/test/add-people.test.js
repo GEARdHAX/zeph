@@ -4,6 +4,8 @@ const db = require('./helpers/db');
 const { buildApp, tokenFor } = require('./helpers/app');
 const User = require('../src/models/User');
 const Relationship = require('../src/models/Relationship');
+const Room = require('../src/models/Room');
+const GroupMember = require('../src/models/GroupMember');
 
 let app;
 
@@ -111,6 +113,121 @@ describe('GET /api/users/:username — profile resolution', () => {
       status: 'pending',
       direction: 'outgoing',
     });
+  });
+
+  it('includes the target\'s bio', async () => {
+    const me = await createUser();
+    const target = await User.create({
+      username: 'BioUser',
+      usernameNormalized: 'biouser',
+      email: 'bio@example.com',
+      firstName: 'Bio',
+      lastName: 'User',
+      password: await argon2.hash('password123'),
+      bio: 'Hello, this is my bio.',
+    });
+
+    const res = await request(app)
+      .get('/api/users/biouser')
+      .set('Authorization', `Bearer ${tokenFor(me)}`);
+
+    expect(res.body.user.bio).toBe('Hello, this is my bio.');
+    expect(res.body.user._id).toBe(target._id.toString());
+  });
+
+  it('includes respondedAt ("friends since") only once the relationship is accepted', async () => {
+    const me = await createUser();
+    const target = await createUser({ username: 'Accepted' });
+    const respondedAt = new Date();
+    await Relationship.create({
+      requester: me._id, recipient: target._id, status: 'accepted', respondedAt,
+    });
+
+    const res = await request(app)
+      .get('/api/users/accepted')
+      .set('Authorization', `Bearer ${tokenFor(me)}`);
+
+    expect(res.body.relationship.status).toBe('accepted');
+    expect(new Date(res.body.relationship.respondedAt).getTime()).toBe(respondedAt.getTime());
+  });
+
+  it('omits respondedAt for a pending (not yet accepted) relationship', async () => {
+    const me = await createUser();
+    const target = await createUser({ username: 'StillPending' });
+    await Relationship.create({ requester: me._id, recipient: target._id, status: 'pending' });
+
+    const res = await request(app)
+      .get('/api/users/stillpending')
+      .set('Authorization', `Bearer ${tokenFor(me)}`);
+
+    expect(res.body.relationship.respondedAt).toBeUndefined();
+  });
+
+  it('lists groups both users share, excluding groups only one of them is in', async () => {
+    const me = await createUser();
+    const target = await createUser({ username: 'GroupMate' });
+    const stranger = await createUser();
+
+    const sharedGroup = await Room.create({ isGroup: true, title: 'Shared Group', people: [me._id, target._id] });
+    const onlyMineGroup = await Room.create({ isGroup: true, title: 'Only Mine', people: [me._id, stranger._id] });
+
+    await GroupMember.create({ group: sharedGroup._id, user: me._id, role: 'OWNER' });
+    await GroupMember.create({ group: sharedGroup._id, user: target._id, role: 'MEMBER' });
+    await GroupMember.create({ group: onlyMineGroup._id, user: me._id, role: 'OWNER' });
+
+    const res = await request(app)
+      .get('/api/users/groupmate')
+      .set('Authorization', `Bearer ${tokenFor(me)}`);
+
+    expect(res.body.commonGroups).toHaveLength(1);
+    expect(res.body.commonGroups[0]._id).toBe(sharedGroup._id.toString());
+    expect(res.body.commonGroups[0].title).toBe('Shared Group');
+  });
+
+  it('excludes an inactive (removed) shared membership from common groups', async () => {
+    const me = await createUser();
+    const target = await createUser({ username: 'LeftGroup' });
+    const group = await Room.create({ isGroup: true, title: 'Left Group', people: [me._id, target._id] });
+
+    await GroupMember.create({ group: group._id, user: me._id, role: 'OWNER' });
+    await GroupMember.create({
+      group: group._id, user: target._id, role: 'MEMBER', active: false,
+    });
+
+    const res = await request(app)
+      .get('/api/users/leftgroup')
+      .set('Authorization', `Bearer ${tokenFor(me)}`);
+
+    expect(res.body.commonGroups).toHaveLength(0);
+  });
+
+  it('never returns bio/relationship/commonGroups fields for yourself', async () => {
+    const me = await createUser({ username: 'Myself' });
+
+    const res = await request(app)
+      .get('/api/users/myself')
+      .set('Authorization', `Bearer ${tokenFor(me)}`);
+
+    expect(res.body.relationship).toBeNull();
+    expect(res.body.commonGroups).toEqual([]);
+  });
+
+  it('suppresses commonGroups when the relationship is blocked', async () => {
+    const me = await createUser();
+    const target = await createUser({ username: 'BlockedGroupmate' });
+    const group = await Room.create({ isGroup: true, title: 'Blocked Group', people: [me._id, target._id] });
+    await GroupMember.create({ group: group._id, user: me._id, role: 'OWNER' });
+    await GroupMember.create({ group: group._id, user: target._id, role: 'MEMBER' });
+    await Relationship.create({
+      requester: me._id, recipient: target._id, status: 'blocked', blockedBy: me._id,
+    });
+
+    const res = await request(app)
+      .get('/api/users/blockedgroupmate')
+      .set('Authorization', `Bearer ${tokenFor(me)}`);
+
+    expect(res.body.relationship).toEqual({ status: 'blocked', direction: null });
+    expect(res.body.commonGroups).toEqual([]);
   });
 });
 

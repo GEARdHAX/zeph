@@ -3,6 +3,7 @@ const Room = require('../models/Room');
 const store = require('../store');
 const config = require('../../config');
 const logger = require('../logger');
+const groupPolicy = require('../authorization/groupPolicy');
 
 module.exports = async (req, res, next) => {
   const { roomID, messageID, forEveryone } = req.fields;
@@ -22,9 +23,15 @@ module.exports = async (req, res, next) => {
     return res.status(404).json({ error: true });
   }
 
-  const isMember = room.people.some((person) => person.toString() === userID.toString());
-  if (!isMember) {
-    return res.status(403).json({ error: true });
+  let groupMembership = null;
+  if (room.isGroup) {
+    groupMembership = await groupPolicy.getMembershipWithFallback(room._id, userID);
+    if (!groupMembership) return res.status(403).json({ error: true });
+  } else {
+    const isMember = room.people.some((person) => person.toString() === userID.toString());
+    if (!isMember) {
+      return res.status(403).json({ error: true });
+    }
   }
 
   let message;
@@ -42,8 +49,13 @@ module.exports = async (req, res, next) => {
   if (wantsForEveryone) {
     // Only the author can delete for everyone — a room member deleting
     // someone else's message content for the whole room would be a much
-    // bigger authorization hole than IDOR on your own data.
-    if (!message.author || message.author.toString() !== userID.toString()) {
+    // bigger authorization hole than IDOR on your own data. Groups widen
+    // this to author-OR-DELETE_MESSAGE-capability (moderator action) — see
+    // groupPolicy.js, DECISIONS.md D-035. DM behavior is unchanged.
+    const isAuthor = message.author && message.author.toString() === userID.toString();
+    const isModerator = room.isGroup && groupMembership
+      && groupPolicy.hasCapability(groupMembership.role, groupPolicy.Capabilities.DELETE_MESSAGE);
+    if (!isAuthor && !isModerator) {
       return res.status(403).json({ error: true, reason: 'not_author' });
     }
 

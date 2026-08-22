@@ -1,13 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
-import { Lightbox } from 'react-modal-image';
+import {
+  useState, useRef, useEffect, useMemo, lazy, Suspense,
+} from 'react';
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
 import moment from 'moment';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Message from './Message';
-import Config from '../../../config';
 import getMoreMessages from '../../../actions/getMoreMessages';
 import Actions from '../../../constants/Actions';
 import Picture from '../../../components/Picture';
+import Config from '../../../config';
+
+// Lazy-loaded so the media viewer (and its five sub-viewers) never ship in
+// the initial chat bundle — only fetched the first time a user actually
+// opens an image/file attachment. Mirrors ImageEditorModal's lazy pattern.
+const MediaViewerShell = lazy(() => import('./MediaViewerShell'));
 
 const dayLabel = (date) => {
   const m = moment(date);
@@ -49,6 +56,14 @@ function Messages() {
       if (person._id !== user.id) other = person;
     });
   }
+
+  // Derived from the live messages array (not room.images, which is a
+  // join-room-time snapshot capped at 50 images and excludes files) so
+  // Previous/Next in the viewer reflects newly-arrived attachments too.
+  const mediaMessages = useMemo(
+    () => messages.filter((m) => m.type === 'image' || m.type === 'file'),
+    [messages],
+  );
 
   const messagesList = messages.map((message, index) => {
     const previous = messages[index - 1];
@@ -103,13 +118,13 @@ function Messages() {
     >
       <div className="flex flex-col w-full mx-auto px-4 sm:px-6 md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
         {open && (
-          <Lightbox
-            medium={`${Config.url || ''}/api/images/${open.content}/1024`}
-            large={`${Config.url || ''}/api/images/${open.content}/2048`}
-            alt="Lightbox"
-            hideDownload
-            onClose={() => setOpen(null)}
-          />
+          <Suspense fallback={null}>
+            <MediaViewerShell
+              messages={mediaMessages}
+              initialMessage={open}
+              onClose={() => setOpen(null)}
+            />
+          </Suspense>
         )}
 
         {messagesList}
@@ -122,17 +137,26 @@ function Messages() {
         )}
 
         {typing && (
-          <div className="flex w-full items-end gap-2 px-4 sm:px-6 py-0.5">
-            <div className="h-7 w-7 shrink-0">
-              <Picture user={other} />
+          <div className="flex w-full items-end gap-2 px-1 sm:px-2 pt-2 pb-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="shrink-0 pt-0.5">
+              <Avatar className="h-7 w-7 border border-border bg-gradient-to-br from-rose-600 to-primary text-white font-bold">
+                {other.picture && (
+                  <img
+                    src={`${Config.url || ''}/api/images/${other.picture.shieldedID}/256`}
+                    alt=""
+                    className="aspect-square size-full object-cover"
+                  />
+                )}
+                <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">
+                  {`${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
             </div>
             <div className="flex flex-col items-start">
-              <div className="relative rounded-2xl bg-muted px-3 py-2 border border-border/40">
-                <div className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
-                </div>
+              <div className="relative rounded-2xl rounded-bl-xs bg-muted px-4 py-3 border border-border/40 shadow-xs flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-muted-foreground/70 typing-dot" />
+                <span className="h-2 w-2 rounded-full bg-muted-foreground/70 typing-dot" />
+                <span className="h-2 w-2 rounded-full bg-muted-foreground/70 typing-dot" />
               </div>
             </div>
           </div>

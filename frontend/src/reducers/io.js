@@ -78,6 +78,26 @@ const reducer = (state = initialState, action) => {
         ...state,
         messages: state.messages.filter((m) => m._id !== action.messageID),
       };
+    // Delivery/read receipts patch deliveredTo/readBy in place on the
+    // affected message(s) — same $addToSet-idempotent shape the server
+    // already uses, so a duplicate/replayed event is a harmless no-op here
+    // too (Set dedupes, spreading it back to an array is stable).
+    case Actions.MESSAGE_DELIVERED:
+      return {
+        ...state,
+        messages: state.messages.map((m) => (m._id === action.messageID
+          ? { ...m, deliveredTo: [...new Set([...(m.deliveredTo || []), action.readerID])] }
+          : m)),
+      };
+    case Actions.MESSAGE_READ: {
+      const ids = new Set(action.messageIDs);
+      return {
+        ...state,
+        messages: state.messages.map((m) => (ids.has(m._id)
+          ? { ...m, readBy: [...new Set([...(m.readBy || []), action.readerID])] }
+          : m)),
+      };
+    }
     // Hidden/deleted conversations disappear from the normal inbox the same
     // way a delete-for-me message disappears from its room — filtered out of
     // the array this client already has, no server round trip needed since
@@ -90,6 +110,22 @@ const reducer = (state = initialState, action) => {
         ...state,
         rooms: state.rooms.filter((r) => r._id !== action.conversationId),
       };
+    // A conversation partner changed/removed their own profile picture —
+    // patch every room's `people` entry for that user in place (sidebar
+    // list + the currently-open room, if any) instead of refetching
+    // everything. Previously nothing listened for this at all, so a
+    // partner's picture change/removal never reflected on this client
+    // until the conversation was manually reopened.
+    case Actions.USER_PROFILE_UPDATED: {
+      const patchPeople = (people) => (people || []).map((person) => (
+        person._id === action.userId ? { ...person, picture: action.picture } : person
+      ));
+      return {
+        ...state,
+        rooms: state.rooms.map((room) => ({ ...room, people: patchPeople(room.people) })),
+        room: state.room ? { ...state.room, people: patchPeople(state.room.people) } : state.room,
+      };
+    }
     case Actions.ONLINE_USERS:
       return {
         ...state,

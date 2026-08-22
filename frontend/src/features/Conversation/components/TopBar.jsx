@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Phone, Video, ArrowLeft, MoreHorizontal, Star, Info, Sparkles,
-  Search, BellOff, Lock, Trash2, Ban, Flag,
+  Search, BellOff, Lock, Trash2, Ban, Flag, UserCheck,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
@@ -32,6 +32,7 @@ import deleteConversation from '../../../actions/deleteConversation';
 import setupVaultPin from '../../../actions/setupVaultPin';
 import getVaultStatus from '../../../actions/getVaultStatus';
 import blockUser from '../../../actions/blockUser';
+import unblockUser from '../../../actions/unblockUser';
 import Actions from '../../../constants/Actions';
 import Config from '../../../config';
 
@@ -89,8 +90,14 @@ function TopBar({ back, loading, aiEnabled }) {
     });
   }
 
-  if (!other.firstName) {
+  // "Deleted User" only when the other participant genuinely couldn't be
+  // resolved at all (see Panel/Room.jsx for the same fix/reasoning) — a
+  // real account with no firstName/lastName set falls back to @username
+  // instead of being mislabeled as deleted.
+  if (!other._id) {
     other = { ...other, firstName: 'Deleted', lastName: 'User' };
+  } else if (!other.firstName && !other.lastName) {
+    other = { ...other, firstName: `@${other.username || 'user'}`, lastName: '' };
   }
 
   const title = (room.isGroup ? room.title : `${other.firstName} ${other.lastName}`).substr(0, 22);
@@ -119,7 +126,14 @@ function TopBar({ back, loading, aiEnabled }) {
       navigate(`/meeting/${res.data._id}`, { replace: true });
       await postCall({ roomID: room._id, meetingID: res.data._id });
     } catch (e) {
-      errorToast('Server error. Unable to initiate call.');
+      // The pre-flight onlineUsers check above is UX-only ("their app isn't
+      // connected right now") — this is the REAL, server-enforced
+      // authorization gate (meeting/call.js), so a rejection here means the
+      // account is genuinely unavailable/blocked, not just offline.
+      const reason = e.response?.data?.reason;
+      if (reason === 'recipient_unavailable') errorToast("This person's account is no longer available.");
+      else if (reason === 'blocked') errorToast("You can't call this person.");
+      else errorToast('Server error. Unable to initiate call.');
     }
   };
 
@@ -222,8 +236,28 @@ function TopBar({ back, loading, aiEnabled }) {
     }
   };
 
+  const handleUnblock = async () => {
+    if (!other.username) return;
+    try {
+      await unblockUser(other.username);
+      toast.success(`Unblocked ${other.firstName}.`);
+      dispatch({
+        type: Actions.SET_ROOM,
+        room: {
+          ...room,
+          people: room.people.map((person) => (person._id === other._id
+            ? { ...person, blockedByMe: false, blockedMe: false }
+            : person)),
+        },
+      });
+    } catch (e) {
+      errorToast('Could not unblock this user. Please try again.');
+    }
+  };
+
   function Online({ other: peer }) {
     const statusUsers = useSelector((state) => state.io.onlineUsers) || [];
+    const typing = useSelector((state) => state.messages.typing);
     const prevStatusRef = useRef(false);
     const [lastOnline, setLastOnline] = useState(null);
 
@@ -233,6 +267,20 @@ function TopBar({ back, loading, aiEnabled }) {
       }
       prevStatusRef.current = statusUsers.filter((u) => u.id === peer._id).length > 0;
     }, [statusUsers, peer]);
+
+    if (typing) {
+      return (
+        <span className="inline-flex items-center gap-1 font-medium text-primary animate-pulse">
+          typing...
+        </span>
+      );
+    }
+
+    // A blocked relationship (either direction) means presence.js already
+    // withholds real presence for this pair server-side — showing "Last
+    // online: ..." here would just be stale/misleading, not actually hidden.
+    if (peer.blockedByMe) return 'Blocked';
+    if (peer.blockedMe) return "Can't see activity";
 
     if (statusUsers.filter((u) => u.id === peer._id && u.status === 'busy').length > 0) return 'busy';
     if (statusUsers.filter((u) => u.id === peer._id && u.status === 'online').length > 0) return 'online';
@@ -397,19 +445,43 @@ function TopBar({ back, loading, aiEnabled }) {
 
               <div className="my-1 h-px bg-border/60" />
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setMenuOpen(false);
-                  handleBlock();
-                }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-              >
-                <Ban className="h-3.5 w-3.5 text-destructive" />
-                <span>Block</span>
-              </button>
+              {other.blockedByMe ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    handleUnblock();
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Unblock</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={other.blockedMe}
+                  data-disabled={other.blockedMe || undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (other.blockedMe) return;
+                    setMenuOpen(false);
+                    handleBlock();
+                  }}
+                  className={cn(
+                    'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors',
+                    other.blockedMe
+                      ? 'text-muted-foreground opacity-50 cursor-not-allowed'
+                      : 'text-destructive hover:bg-destructive/10 cursor-pointer',
+                  )}
+                >
+                  <Ban className={cn('h-3.5 w-3.5', other.blockedMe ? '' : 'text-destructive')} />
+                  <span data-disabled={other.blockedMe || undefined}>Block</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -474,11 +546,14 @@ function TopBar({ back, loading, aiEnabled }) {
           <DialogHeader>
             <DialogTitle>Delete this conversation?</DialogTitle>
             <DialogDescription>
-              This removes the conversation from your own account only —
+              This removes the conversation from your own view —
               {' '}
               {other.firstName || 'the other participant'}
               {' '}
-              will still see it normally. This can&apos;t be undone from your side.
+              will still see their full history. If either of you sends a new
+              message later, this conversation reappears in your inbox — but
+              only with new messages from that point forward, not what came
+              before.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

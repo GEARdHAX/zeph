@@ -16,6 +16,9 @@ const { AsyncNedb } = require('nedb-async');
 // mediasoup is NOT imported here — it is passed in as a flag from index.js
 // so that Glitch deployments (no native build tools) never attempt to load it.
 const Meeting = require('./models/Meeting');
+const Room = require('./models/Room');
+const GroupMember = require('./models/GroupMember');
+const { broadcastPresence } = require('./presence');
 
 // Wires the Socket.IO connection/auth lifecycle onto store.io. Split out from the default
 // export so tests can boot just the socket layer without also connecting to Mongo / mounting
@@ -58,8 +61,8 @@ const initSocketAuth = (mediasoupEnabled) => {
     store.socketsByUserID[id].push(socket);
     store.userIDsBySocketID[socket.id] = id;
 
-    store.onlineUsers.set(socket, { id, status: 'online' });
-    store.io.emit('onlineUsers', Array.from(store.onlineUsers.values()));
+    store.onlineUsers.set(socket, { id, status: 'online', level: socket.decoded_token.level });
+    broadcastPresence().catch((err) => logger.error({ err }, 'Failed to broadcast presence'));
 
     socket.emit('authenticated');
 
@@ -82,7 +85,7 @@ const initSocketAuth = (mediasoupEnabled) => {
         .then(() => logger.debug({ userId: id }, 'Updated lastOnline'))
         .catch((err) => logger.error({ err, userId: id }, 'Failed to update lastOnline'));
       store.onlineUsers.delete(socket);
-      store.io.emit('onlineUsers', Array.from(store.onlineUsers.values()));
+      broadcastPresence().catch((err) => logger.error({ err }, 'Failed to broadcast presence'));
     });
   };
 
@@ -192,11 +195,18 @@ module.exports = (mediasoupEnabled) => {
   );
   store.app.use('/api/ai', aiLimiter);
   store.app.use(
-    ['/api/search', '/api/users', '/api/friend-requests', '/api/friends', '/api/room/create', '/api/block', '/api/unblock'],
+    [
+      '/api/search', '/api/users', '/api/friend-requests', '/api/friends', '/api/room/create', '/api/block',
+      '/api/unblock', '/api/group/create', '/api/group/members/search', '/api/group/members/add',
+    ],
     discoveryLimiter,
   );
   store.app.use(
-    ['/api/message/delete', '/api/conversation/hide', '/api/conversation/unhide', '/api/conversation/delete'],
+    [
+      '/api/message/delete', '/api/conversation/hide', '/api/conversation/unhide', '/api/conversation/delete',
+      '/api/group/members/remove', '/api/group/leave', '/api/group/delete', '/api/meeting/delete',
+      '/api/users/delete-account',
+    ],
     deleteLimiter,
   );
   store.app.use(['/api/vault/unlock/pin', '/api/vault/webauthn/auth/verify'], vaultUnlockLimiter);
@@ -307,6 +317,30 @@ module.exports = (mediasoupEnabled) => {
             if (results.length) logger.info({ count: results.length }, 'Backfilled usernameNormalized for legacy users');
           })
           .catch((err) => logger.error({ err }, 'Failed to backfill usernameNormalized'));
+
+        // Backfill GroupMember(OWNER/MEMBER) for isGroup:true rooms created
+        // before the Groups feature existed (zero GroupMember rows). people[0]
+        // is treated as owner — the only ordering signal that existed before
+        // roles did. Idempotent — only touches rooms with zero existing
+        // GroupMember rows, safe on every boot. See DECISIONS.md D-035.
+        Room.find({ isGroup: true })
+          .then(async (groups) => {
+            let backfilled = 0;
+            for (const room of groups) {
+              const hasMembers = await GroupMember.exists({ group: room._id });
+              if (hasMembers) continue;
+              const [ownerId, ...rest] = room.people;
+              if (!ownerId) continue;
+              await GroupMember.create({ group: room._id, user: ownerId, role: 'OWNER' });
+              if (rest.length) {
+                await GroupMember.insertMany(rest.map((u) => ({ group: room._id, user: u, role: 'MEMBER' })));
+              }
+              await Room.updateOne({ _id: room._id }, { $set: { ownerId, privacy: room.privacy || 'PRIVATE' } });
+              backfilled += 1;
+            }
+            if (backfilled) logger.info({ count: backfilled }, 'Backfilled GroupMember rows for legacy groups');
+          })
+          .catch((err) => logger.error({ err }, 'Failed to backfill GroupMember for legacy groups'));
 
         logger.info('Connected to DB');
         store.connected = true;

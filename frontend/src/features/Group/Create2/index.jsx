@@ -1,13 +1,23 @@
-import { useRef, useState } from 'react';
+import {
+  useRef, useState, lazy, Suspense,
+} from 'react';
 import { useGlobal } from 'reactn';
-import { Pencil, Users, Check, ArrowRight } from 'lucide-react';
+import {
+  Pencil, Users, Check, ArrowRight,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import TopBar from '../components/TopBar';
 import Config from '../../../config';
 import upload from '../../../actions/uploadImage';
 import createGroup from '../../../actions/createGroup';
+import { validateFile } from '../../../lib/mediaPolicy';
+
+// Lazy-loaded so react-easy-crop is only fetched the first time a user
+// actually picks a group icon, same as the chat composer's editor.
+const ImageEditorModal = lazy(() => import('../../Conversation/components/ImageEditorModal'));
 
 function GroupPicture({ picture, title }) {
   if (picture) {
@@ -34,6 +44,7 @@ function CreateGroupStepTwo() {
   const [error, setError] = useState(false);
   const [groupPicture, setGroupPicture] = useGlobal('groupPicture');
   const [loading, setLoading] = useState(false);
+  const [editingFile, setEditingFile] = useState(null);
 
   const navigate = useNavigate();
 
@@ -44,6 +55,16 @@ function CreateGroupStepTwo() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const selectPicture = (file) => {
+    if (!file) return;
+    const { valid, category, error: validationError } = validateFile(file);
+    if (!valid || category !== 'image') {
+      toast.error(validationError || `${file.name}: unsupported image type.`);
+      return;
+    }
+    setEditingFile(file);
   };
 
   const create = async (e) => {
@@ -77,7 +98,10 @@ function CreateGroupStepTwo() {
             type="file"
             ref={fileInput}
             accept="image/*"
-            onChange={(e) => changePicture(e.target.files[0])}
+            onChange={(e) => {
+              selectPicture(e.target.files[0]);
+              e.target.value = '';
+            }}
           />
 
           {/* Group Picture selector */}
@@ -121,6 +145,20 @@ function CreateGroupStepTwo() {
           <Check className="h-4 w-4" />
         </Button>
       </form>
+
+      {editingFile && (
+        <Suspense fallback={null}>
+          <ImageEditorModal
+            file={editingFile}
+            aspect={1}
+            onCancel={() => setEditingFile(null)}
+            onDone={(editedFile) => {
+              setEditingFile(null);
+              changePicture(editedFile);
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

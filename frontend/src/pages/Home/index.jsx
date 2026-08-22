@@ -88,14 +88,13 @@ function Home() {
         <div
           className={cn(
             'flex flex-1 flex-col bg-background overflow-hidden',
-            location.pathname === '/' || location.pathname === '/search' || location.pathname === '/favorites' || location.pathname === '/meetings'
+            location.pathname === '/' || location.pathname === '/favorites' || location.pathname === '/meetings'
               ? 'hidden md:flex'
               : 'flex',
           )}
         >
           <Routes>
             <Route path="/" element={<Welcome />} />
-            <Route path="/search" element={<Welcome />} />
             <Route path="/favorites" element={<Welcome />} />
             <Route path="/meetings" element={<Welcome />} />
             <Route path="/settings" element={<div className="h-full w-full"><div className="block md:hidden h-full"><Settings /></div><div className="hidden md:block h-full"><Welcome /></div></div>} />

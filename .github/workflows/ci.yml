@@ -122,7 +122,7 @@ jobs:
         with:
           context: ./backend
           push: false
-          tags: chattr-backend:ci
+          tags: chitcx-backend:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -131,6 +131,6 @@ jobs:
         with:
           context: ./frontend
           push: false
-          tags: chattr-frontend:ci
+          tags: chitcx-frontend:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max

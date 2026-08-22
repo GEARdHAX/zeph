@@ -11,7 +11,7 @@ module.exports = (socket, data) => {
     .limit(20)
     .populate({
       path: 'author',
-      select: '-email -password -friends -__v',
+      select: '-email -password -friends -__v -vaultPinHash',
       populate: {
         path: 'picture',
       },

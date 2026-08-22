@@ -182,25 +182,26 @@ function Meeting() {
     }, [localStream]);
 
     return (
-      <div className="z-[1] flex h-[95px] min-h-[95px] w-full max-w-full flex-grow items-center gap-2 border-b border-border/40 bg-card/95 px-2 backdrop-blur-xl max-sm:h-[85px] max-sm:min-h-[85px]">
+      <div className="z-[1000] flex h-[70px] min-h-[70px] w-full max-w-full flex-grow items-center gap-2 border-b border-border/40 bg-card/95 px-3 backdrop-blur-xl max-sm:h-[60px] max-sm:min-h-[60px]">
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
           onClick={() => {
-            setShowPanel(!showPanel);
-            setOver(showPanel);
+            setShowPanel(true);
+            setOver(false);
+            navigate('/');
           }}
-          title={showPanel ? 'Hide sidebar' : 'Show sidebar'}
+          title="Minimize to Picture-in-Picture"
         >
-          {showPanel ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          <ChevronLeft className="h-5 w-5" />
         </Button>
         <LittleStreams streams={streams} />
         <div className="shrink-0">
           <video
             hidden={!video && !isScreen}
-            className="mx-0.5 h-[80px] w-[120px] scale-x-[-1] cursor-pointer rounded-xl border border-border/50 bg-black object-cover shadow-md max-sm:h-[70px] max-sm:w-[100px]"
+            className="mx-0.5 h-[56px] w-[84px] scale-x-[-1] cursor-pointer rounded-xl border border-border/50 bg-black object-cover shadow-md max-sm:h-[48px] max-sm:w-[72px]"
             onLoadedMetadata={() => localVideoRef.current.play()}
             ref={localVideoRef}
             playsInline
@@ -234,14 +235,15 @@ function Meeting() {
           type="button"
           variant="ghost"
           size="icon"
-          className="h-10 w-10 rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-black/60 hover:text-white"
+          className="h-10 w-10 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 hover:text-white"
           onClick={() => {
-            setShowPanel(!showPanel);
-            setOver(showPanel);
+            setShowPanel(true);
+            setOver(false);
+            navigate('/');
           }}
-          title={showPanel ? 'Hide sidebar' : 'Show sidebar'}
+          title="Minimize to Picture-in-Picture"
         >
-          {showPanel ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          <ChevronLeft className="h-5 w-5" />
         </Button>
         {(video || isScreen) && (
           <video
@@ -297,11 +299,8 @@ function Meeting() {
         isScreen={isScreen}
         isMaximized={isMaximized}
       >
-        <div
-          className="absolute z-[1] flex w-full items-center justify-center pb-5 max-sm:pb-3"
-          style={{ bottom: topBar || isGrid ? 0 : 95 }}
-        >
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/50 p-2 shadow-2xl backdrop-blur-xl sm:gap-2.5">
+        <div className="absolute bottom-6 z-[1000] flex w-full items-center justify-center px-4 max-sm:bottom-4">
+          <div className="flex items-center gap-2 rounded-full border border-white/15 bg-black/75 p-2 shadow-2xl backdrop-blur-2xl sm:gap-2.5">
             <ControlButton
               icon={video ? Video : VideoOff}
               active={video}

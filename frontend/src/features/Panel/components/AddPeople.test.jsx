@@ -1,8 +1,8 @@
 import {
-  describe, it, expect, vi, beforeEach, afterEach,
+  describe, it, expect, vi, beforeEach,
 } from 'vitest';
 import {
-  render, screen, act, fireEvent, waitFor,
+  render, screen, act, waitFor,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -46,6 +46,14 @@ function renderAddPeople(onClose = () => {}) {
   );
 }
 
+// Types text then presses Enter to explicitly submit the search — the new
+// contract requires an explicit trigger, typing alone never fires a request.
+const typeAndSubmit = async (userEv, text) => {
+  const input = screen.getByPlaceholderText('Search @username, then press Enter...');
+  await userEv.type(input, text);
+  await userEv.keyboard('{Enter}');
+};
+
 beforeEach(() => {
   search.mockReset();
   resolveUser.mockReset();
@@ -53,47 +61,101 @@ beforeEach(() => {
   createRoom.mockReset();
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-describe('AddPeople search', () => {
-  it('does not search below the minimum query length', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+describe('AddPeople search — explicit trigger only', () => {
+  it('does not search while typing, below or above the minimum length', async () => {
+    const userEv = userEvent.setup();
     renderAddPeople();
 
-    fireEvent.change(screen.getByPlaceholderText('Search @username...'), { target: { value: 'a' } });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
-    });
+    await userEv.type(screen.getByPlaceholderText('Search @username, then press Enter...'), 'alice');
 
     expect(search).not.toHaveBeenCalled();
-    expect(screen.getByText('Keep typing to search…')).toBeInTheDocument();
   });
 
-  it('debounces the search call, only firing once after the user stops typing', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    search.mockResolvedValue({ data: { users: [] } });
+  it('does not search on Enter below the minimum query length', async () => {
+    const userEv = userEvent.setup();
     renderAddPeople();
 
-    const input = screen.getByPlaceholderText('Search @username...');
-    await act(async () => {
-      fireEvent.change(input, { target: { value: 'al' } });
-      fireEvent.change(input, { target: { value: 'ali' } });
-      fireEvent.change(input, { target: { value: 'alic' } });
-    });
+    await typeAndSubmit(userEv, 'al');
 
     expect(search).not.toHaveBeenCalled();
+    expect(screen.getByText(/keep typing/i)).toBeInTheDocument();
+  });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(400);
+  it('fires exactly one request on Enter once the minimum length is met', async () => {
+    search.mockResolvedValue({ data: { users: [] } });
+    const userEv = userEvent.setup();
+    renderAddPeople();
+
+    await typeAndSubmit(userEv, 'alice');
+
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+    expect(search).toHaveBeenCalledWith('alice', undefined, expect.any(AbortSignal));
+  });
+
+  it('fires exactly one request when the Search button is clicked', async () => {
+    search.mockResolvedValue({ data: { users: [] } });
+    const userEv = userEvent.setup();
+    renderAddPeople();
+
+    await userEv.type(screen.getByPlaceholderText('Search @username, then press Enter...'), 'bobby');
+    await userEv.click(screen.getByRole('button', { name: /^search$/i }));
+
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+  });
+
+  it('a fresh cache hit for the same query fires zero additional requests', async () => {
+    search.mockResolvedValue({
+      data: { users: [{ _id: 'u1', username: 'carol', firstName: 'Carol', lastName: '' }] },
     });
+    const userEv = userEvent.setup();
+    renderAddPeople();
+
+    await typeAndSubmit(userEv, 'carol');
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+    await screen.findByText('@carol');
+
+    // Clear and re-submit the exact same query — should serve from cache.
+    await userEv.keyboard('{Enter}');
+
     expect(search).toHaveBeenCalledTimes(1);
-    expect(search).toHaveBeenCalledWith('alic', undefined, expect.any(AbortSignal));
+    expect(screen.getByText('@carol')).toBeInTheDocument();
+  });
+
+  it('a new search aborts the previous in-flight request so the stale response cannot overwrite the newer result', async () => {
+    let resolveFirst;
+    let resolveSecond;
+    search
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+
+    const userEv = userEvent.setup();
+    renderAddPeople();
+
+    const input = screen.getByPlaceholderText('Search @username, then press Enter...');
+    await userEv.type(input, 'alice');
+    await userEv.keyboard('{Enter}');
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+    const firstSignal = search.mock.calls[0][2];
+
+    await userEv.clear(input);
+    await userEv.type(input, 'brian');
+    await userEv.keyboard('{Enter}');
+    await waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+
+    expect(firstSignal.aborted).toBe(true);
+
+    // Late-resolving first ("alice") response must not win over the second.
+    await act(async () => {
+      resolveFirst({ data: { users: [{ _id: 'stale', username: 'alice', firstName: 'A', lastName: '' }] } });
+      resolveSecond({ data: { users: [{ _id: 'fresh', username: 'brian', firstName: 'B', lastName: '' }] } });
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByText('@brian')).toBeInTheDocument();
+    expect(screen.queryByText('@alice')).not.toBeInTheDocument();
   });
 
   it('renders search results and opens a profile preview on click', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     search.mockResolvedValue({
       data: {
         users: [{
@@ -110,14 +172,10 @@ describe('AddPeople search', () => {
       },
     });
 
-    const userEv = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const userEv = userEvent.setup();
     renderAddPeople();
 
-    fireEvent.change(screen.getByPlaceholderText('Search @username...'), { target: { value: 'bob' } });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(350);
-    });
-
+    await typeAndSubmit(userEv, 'bob');
     expect(await screen.findByText('@bob')).toBeInTheDocument();
 
     await userEv.click(screen.getByText('@bob'));
@@ -141,18 +199,6 @@ describe('AddPeople search', () => {
     sendFriendRequest.mockImplementation(() => new Promise((resolve) => {
       resolveSend = resolve;
     }));
-
-    const userEv = userEvent.setup();
-    render(
-      <Provider store={makeStore()}>
-        <MemoryRouter>
-          <AddPeople onClose={() => {}} />
-        </MemoryRouter>
-      </Provider>,
-    );
-
-    // Directly exercise ProfilePreview by triggering search -> click, using real timers
-    // (no debounce assertions needed here — that's covered above).
     search.mockResolvedValue({
       data: {
         users: [{
@@ -160,9 +206,11 @@ describe('AddPeople search', () => {
         }],
       },
     });
-    await userEv.type(screen.getByPlaceholderText('Search @username...'), 'carol');
-    await waitFor(() => expect(search).toHaveBeenCalled(), { timeout: 2000 });
 
+    const userEv = userEvent.setup();
+    renderAddPeople();
+
+    await typeAndSubmit(userEv, 'carol');
     const result = await screen.findByText('@carol');
     await userEv.click(result);
 
@@ -191,8 +239,6 @@ describe('AddPeople search', () => {
       },
     });
     sendFriendRequest.mockRejectedValue(new Error('network down'));
-
-    const userEv = userEvent.setup();
     search.mockResolvedValue({
       data: {
         users: [{
@@ -200,16 +246,11 @@ describe('AddPeople search', () => {
         }],
       },
     });
-    render(
-      <Provider store={makeStore()}>
-        <MemoryRouter>
-          <AddPeople onClose={() => {}} />
-        </MemoryRouter>
-      </Provider>,
-    );
 
-    await userEv.type(screen.getByPlaceholderText('Search @username...'), 'dave');
-    await waitFor(() => expect(search).toHaveBeenCalled(), { timeout: 2000 });
+    const userEv = userEvent.setup();
+    renderAddPeople();
+
+    await typeAndSubmit(userEv, 'dave');
     await userEv.click(await screen.findByText('@dave'));
     await userEv.click(await screen.findByRole('button', { name: /add friend/i }));
 
@@ -229,8 +270,7 @@ describe('AddPeople search result cards — already-mutual friends', () => {
     const userEv = userEvent.setup();
     renderAddPeople();
 
-    await userEv.type(screen.getByPlaceholderText('Search @username...'), 'erin');
-    await waitFor(() => expect(search).toHaveBeenCalled(), { timeout: 2000 });
+    await typeAndSubmit(userEv, 'erin');
 
     expect(await screen.findByText('Friends')).toBeInTheDocument();
   });
@@ -246,8 +286,7 @@ describe('AddPeople search result cards — already-mutual friends', () => {
     const userEv = userEvent.setup();
     renderAddPeople();
 
-    await userEv.type(screen.getByPlaceholderText('Search @username...'), 'frank');
-    await waitFor(() => expect(search).toHaveBeenCalled(), { timeout: 2000 });
+    await typeAndSubmit(userEv, 'frank');
     await screen.findByText('@frank');
 
     expect(screen.queryByText('Friends')).not.toBeInTheDocument();
@@ -266,9 +305,7 @@ describe('AddPeople search result cards — already-mutual friends', () => {
     const userEv = userEvent.setup();
     renderAddPeople();
 
-    await userEv.type(screen.getByPlaceholderText('Search @username...'), 'grace');
-    await waitFor(() => expect(search).toHaveBeenCalled(), { timeout: 2000 });
-
+    await typeAndSubmit(userEv, 'grace');
     await userEv.click(await screen.findByText('@grace'));
 
     await waitFor(() => expect(createRoom).toHaveBeenCalledWith('u6'));
@@ -297,9 +334,7 @@ describe('AddPeople search result cards — already-mutual friends', () => {
     const userEv = userEvent.setup();
     renderAddPeople();
 
-    await userEv.type(screen.getByPlaceholderText('Search @username...'), 'heidi');
-    await waitFor(() => expect(search).toHaveBeenCalled(), { timeout: 2000 });
-
+    await typeAndSubmit(userEv, 'heidi');
     await userEv.click(await screen.findByText('@heidi'));
 
     expect(await screen.findByText('Profile')).toBeInTheDocument();

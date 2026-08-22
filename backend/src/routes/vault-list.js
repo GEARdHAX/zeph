@@ -28,7 +28,7 @@ const handler = async (req, res) => {
     .populate([{ path: 'picture', strictPopulate: false }])
     .populate({
       path: 'people',
-      select: '-email -password -friends -__v',
+      select: '-email -password -friends -__v -vaultPinHash',
       populate: {
         path: 'picture',
       },

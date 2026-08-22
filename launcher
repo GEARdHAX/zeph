@@ -4,7 +4,7 @@ source ~/.profile
 
 # avoid darwin
 if [[ "$OSTYPE" != "linux-gnu" ]]; then
-  echo "The automated installation script does not support your OS (are you on a Mac?). You can most probably install Clover manually."
+  echo "The automated installation script does not support your OS (are you on a Mac?). You can most probably install Chitcx manually."
   exit
 fi
 
@@ -14,7 +14,7 @@ if [[ "$version" != "v18.20.4" ]]; then
 
   # Welcome
   echo ""
-  echo "Initializing Clover installer..."
+  echo "Initializing Chitcx installer..."
 
   # Build Essentials
   sudo apt-get update

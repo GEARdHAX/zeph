@@ -15,7 +15,7 @@ module.exports = (req, res, next) => {
           populate: [
             {
               path: 'people',
-              select: '-email -tagLine -password -friends -__v',
+              select: '-email -tagLine -password -friends -__v -vaultPinHash',
               populate: {
                 path: 'picture',
               },

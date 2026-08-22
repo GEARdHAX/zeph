@@ -1,11 +1,66 @@
-import { useState, useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import {
+  useState, useEffect, useRef, lazy, Suspense,
+} from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { useGlobal } from 'reactn';
-import { Lightbox } from 'react-modal-image';
 import { Users, Image as ImageIcon } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
+import ProfileView from '../../Panel/components/ProfileView';
+import createRoom from '../../../actions/createRoom';
+import Actions from '../../../constants/Actions';
+import getMediaCategory from '../../../lib/mediaType';
+import getFileIcon from '../../../lib/fileIcon';
+import useAuthorizedMediaUrl from '../../../lib/useAuthorizedMediaUrl';
+
+// Lazy-loaded — same viewer used by the chat message list (Messages.jsx),
+// consolidating what used to be a separate react-modal-image lightbox here.
+const MediaViewerShell = lazy(() => import('../../Conversation/components/MediaViewerShell'));
+
+// One grid cell in the Media tab. New-format messages (message.media) are
+// served through the authenticated /api/media/:id route — same
+// blob-resolve pattern as MediaViewerShell, since a plain <img src> can't
+// carry the Authorization header that route requires. Old-format
+// type:'image' messages keep the legacy unauthenticated
+// /api/images/:id/256 URL unchanged. Non-image categories (video/pdf/
+// document/audio/etc.) render an icon card instead of a broken <img> —
+// there's no universal image thumbnail for those, matching FileViewer's
+// existing icon-card convention rather than inventing a new one.
+function MediaGridItem({ message, onOpen }) {
+  const category = getMediaCategory(message);
+  const isNewFormat = !!message.media;
+  const filename = isNewFormat ? message.media.originalName : undefined;
+  const rawUrl = isNewFormat
+    ? `${Config.url || ''}/api/media/${message.media._id}`
+    : `${Config.url || ''}/api/images/${message.content}/256`;
+  const { url: resolvedUrl } = useAuthorizedMediaUrl(rawUrl, { authorized: isNewFormat && category === 'image' });
+
+  if (category !== 'image') {
+    const Icon = getFileIcon(filename);
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen(message)}
+        className="relative flex aspect-square flex-1 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl bg-muted p-2 text-center transition-transform hover:scale-[1.02] cursor-pointer"
+      >
+        <Icon className="h-6 w-6 text-muted-foreground" />
+        {filename && <span className="w-full truncate text-[9px] text-muted-foreground">{filename}</span>}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(message)}
+      className="relative aspect-square flex-1 overflow-hidden rounded-xl bg-muted transition-transform hover:scale-[1.02] cursor-pointer"
+    >
+      {resolvedUrl && <img src={resolvedUrl} alt="" className="h-full w-full object-cover" />}
+    </button>
+  );
+}
 
 const STATUS_COLOR = {
   online: 'bg-emerald-500',
@@ -21,10 +76,24 @@ function Room() {
   const user = useGlobal('user')[0] || {};
 
   const scrollContainer = useRef(null);
-
   const [scrollHeight, setScrollHeight] = useState(0);
   const [open, setOpen] = useState(null);
   const [tab, setTab] = useState('members'); // 'members' | 'media'
+  const [previewUsername, setPreviewUsername] = useState(null);
+
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const openChat = async (targetUserID) => {
+    setPreviewUsername(null);
+    try {
+      const res = await createRoom(targetUserID);
+      dispatch({ type: Actions.ROOM, room: res.data.room });
+      navigate(`/room/${res.data.room._id}`);
+    } catch (err) {
+      console.error('Could not start chat:', err);
+    }
+  };
 
   useEffect(() => {
     if (scrollContainer.current && scrollContainer.current.scrollTop === 0) {
@@ -64,28 +133,17 @@ function Room() {
   });
   if (row.length > 0) rows.push(row);
 
-  const images = rows.map((imageRow, key) => {
-    const rowImages = imageRow.map((message) => (
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-      <img
-        src={`${Config.url || ''}/api/images/${message.content}/256`}
-        alt={`Sent by @${message.author?.username || 'user'}`}
-        onClick={() => setOpen(message)}
-        key={message.content}
-        className="aspect-square h-20 w-20 rounded-xl cursor-pointer object-cover border border-border transition-transform hover:scale-[1.03]"
-      />
-    ));
-    // eslint-disable-next-line react/no-array-index-key
-    return (
-      <div className="flex gap-2 mb-2" key={key}>
-        {rowImages}
-      </div>
-    );
-  });
+  const images = rows.map((r, i) => (
+    <div key={i} className="flex gap-2 mb-2">
+      {r.map((message) => (
+        <MediaGridItem key={message._id} message={message} onOpen={setOpen} />
+      ))}
+    </div>
+  ));
 
   const onScroll = () => {
     if (scrollContainer.current) {
-      setScrollHeight(scrollContainer.current.scrollHeight);
+      setScrollHeight(scrollContainer.current.scrollTop);
     }
   };
 
@@ -102,7 +160,12 @@ function Room() {
     const pInitials = `${(person.firstName || 'U').charAt(0)}${(person.lastName || '').charAt(0)}`.toUpperCase();
 
     return (
-      <div key={person._id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl hover:bg-muted/50 transition-colors">
+      <button
+        type="button"
+        key={person._id}
+        onClick={() => setPreviewUsername(person.username)}
+        className="flex w-full items-center justify-between gap-3 p-2.5 rounded-xl text-left hover:bg-muted/60 transition-colors cursor-pointer"
+      >
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative shrink-0">
             <Avatar className="h-9 w-9 border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-bold">
@@ -128,7 +191,7 @@ function Room() {
             <div className="truncate text-[10px] text-muted-foreground">{`@${person.username}`}</div>
           </div>
         </div>
-      </div>
+      </button>
     );
   });
 
@@ -136,8 +199,17 @@ function Room() {
     <div className="flex h-full w-full flex-col bg-card text-card-foreground overflow-y-auto">
       {/* Top Banner / Avatar Header */}
       <div className="flex flex-col items-center p-6 border-b border-border/60 text-center">
-        <div className="relative mb-3">
-          <Avatar className="h-20 w-20 border-2 border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-extrabold text-2xl shadow-md">
+        <button
+          type="button"
+          disabled={room.isGroup || !other.username}
+          onClick={() => other.username && setPreviewUsername(other.username)}
+          className={cn(
+            'relative mb-3 group',
+            !room.isGroup && other.username && 'cursor-pointer hover:opacity-95 transition-opacity',
+          )}
+          title={!room.isGroup ? 'View Profile' : undefined}
+        >
+          <Avatar className="h-20 w-20 border-2 border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-extrabold text-2xl shadow-md group-hover:scale-105 transition-transform">
             {(room.isGroup ? room.picture : other.picture) && (
               <img
                 src={`${Config.url || ''}/api/images/${(room.isGroup ? room.picture : other.picture).shieldedID}/256`}
@@ -149,7 +221,7 @@ function Room() {
               {initials}
             </AvatarFallback>
           </Avatar>
-        </div>
+        </button>
 
         <h3 className="text-sm font-bold text-foreground truncate max-w-[220px]">
           {title}
@@ -201,13 +273,13 @@ function Room() {
               onScroll={onScroll}
             >
               {open && (
-                <Lightbox
-                  medium={`${Config.url || ''}/api/images/${open.content}/1024`}
-                  large={`${Config.url || ''}/api/images/${open.content}/2048`}
-                  alt="Lightbox"
-                  hideDownload
-                  onClose={() => setOpen(null)}
-                />
+                <Suspense fallback={null}>
+                  <MediaViewerShell
+                    messages={roomImages}
+                    initialMessage={open}
+                    onClose={() => setOpen(null)}
+                  />
+                </Suspense>
               )}
               {images}
               {roomImages.length === 0 && (
@@ -219,6 +291,14 @@ function Room() {
           )}
         </div>
       </div>
+
+      {previewUsername && (
+        <ProfileView
+          username={previewUsername}
+          onClose={() => setPreviewUsername(null)}
+          onOpenChat={openChat}
+        />
+      )}
     </div>
   );
 }

@@ -45,7 +45,7 @@ Follow **[`infra/render.md`](infra/render.md)** — 10 minutes, no card.
 NODE_ENV=production
 MEDIASOUP_ENABLED=false
 PORT=10000
-MONGO_URI=mongodb+srv://chattr:PASS@cluster.mongodb.net/clover?retryWrites=true&w=majority
+MONGO_URI=mongodb+srv://chitcx:PASS@cluster.mongodb.net/chitcx?retryWrites=true&w=majority
 REDIS_URL=rediss://default:TOKEN@HOST.upstash.io:6380
 AUTH_SECRET=<run this locally: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))">
 ROOT_USER_USERNAME=admin
@@ -104,7 +104,7 @@ Serv00 is strictly better (always-on, SSH, can run Mediasoup). Check periodicall
 ## Phase 1 Acceptance Criteria
 - [ ] `docker compose up` locally → all four containers healthy
 - [ ] `https://your-service.onrender.com/healthz` → `{"status":"ok","db":"connected"}`
-- [ ] `https://chattr.pages.dev` → frontend loads
+- [ ] `https://chitcx.pages.dev` → frontend loads
 - [ ] cron-job.org keepalive active (pings `/healthz` every 5 min)
 - [ ] Local WebRTC call works between two browser tabs
 - [ ] GitHub Actions CI passes on every push

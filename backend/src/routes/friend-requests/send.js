@@ -1,16 +1,32 @@
 const User = require('../../models/User');
 const Relationship = require('../../models/Relationship');
 const logger = require('../../logger');
-const { authorizeAction, Actions, Decisions, findRelationship } = require('../../authorization/policy');
+const {
+  authorizeAction, Actions, Decisions, findRelationship, isPrivileged,
+} = require('../../authorization/policy');
 
 module.exports = async (req, res, next) => {
   const { username } = req.fields;
   if (!username || typeof username !== 'string') return res.status(400).json({ error: true });
 
-  const recipient = await User.findOne({ usernameNormalized: username.toLowerCase() }).select('_id discoveryEnabled');
-  if (!recipient || recipient.discoveryEnabled === false) return res.status(404).json({ error: true });
+  const recipient = await User.findOne({ usernameNormalized: username.toLowerCase() })
+    .select('_id discoveryEnabled level');
+  // Admin privacy boundary — same generic 404 as "doesn't exist" / "discovery
+  // off", checked before authorizeAction so a privileged target never even
+  // reaches the relationship lookup. See DECISIONS.md.
+  if (!recipient
+    || recipient.discoveryEnabled === false
+    || (isPrivileged(recipient) && !isPrivileged(req.user))) {
+    return res.status(404).json({ error: true });
+  }
 
-  const authz = await authorizeAction({ actor: req.user.id, target: recipient._id, action: Actions.SEND_FRIEND_REQUEST });
+  const authz = await authorizeAction({
+    actor: req.user.id,
+    target: recipient._id,
+    action: Actions.SEND_FRIEND_REQUEST,
+    actorLevel: req.user.level,
+    targetLevel: recipient.level,
+  });
   if (authz.decision !== Decisions.ALLOW) {
     const status = authz.reason === 'blocked' ? 403 : 400;
     return res.status(status).json({ error: true, reason: authz.reason });

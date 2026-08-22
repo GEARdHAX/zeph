@@ -1,0 +1,70 @@
+import {
+  FileText, FileArchive, FileSpreadsheet, FileCode, FileImage, FileAudio, FileVideo,
+  Presentation, File as FileIcon,
+} from 'lucide-react';
+
+const ICON_BY_EXTENSION = {
+  pdf: FileText,
+  doc: FileText,
+  docx: FileText,
+  txt: FileText,
+  rtf: FileText,
+  odt: FileText,
+  md: FileText,
+  log: FileText,
+  zip: FileArchive,
+  rar: FileArchive,
+  '7z': FileArchive,
+  tar: FileArchive,
+  gz: FileArchive,
+  xls: FileSpreadsheet,
+  xlsx: FileSpreadsheet,
+  csv: FileSpreadsheet,
+  ods: FileSpreadsheet,
+  ppt: Presentation,
+  pptx: Presentation,
+  odp: Presentation,
+  js: FileCode,
+  ts: FileCode,
+  tsx: FileCode,
+  jsx: FileCode,
+  json: FileCode,
+  xml: FileCode,
+  yaml: FileCode,
+  yml: FileCode,
+  sql: FileCode,
+  html: FileCode,
+  htm: FileCode,
+  css: FileCode,
+  py: FileCode,
+  java: FileCode,
+  cpp: FileCode,
+  c: FileCode,
+  h: FileCode,
+  png: FileImage,
+  jpg: FileImage,
+  jpeg: FileImage,
+  gif: FileImage,
+  webp: FileImage,
+  mp3: FileAudio,
+  wav: FileAudio,
+  ogg: FileAudio,
+  m4a: FileAudio,
+  aac: FileAudio,
+  opus: FileAudio,
+  weba: FileAudio,
+  mp4: FileVideo,
+  webm: FileVideo,
+  mov: FileVideo,
+  mkv: FileVideo,
+  avi: FileVideo,
+};
+
+// Extension-based, not mimetype-based — the icon is purely decorative UI,
+// and extension is available even for legacy File records missing `type`.
+const getFileIcon = (filename) => {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  return ICON_BY_EXTENSION[ext] || FileIcon;
+};
+
+export default getFileIcon;

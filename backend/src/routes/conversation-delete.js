@@ -30,11 +30,16 @@ module.exports = async (req, res) => {
   // completely untouched. The other participant's copy, and the shared
   // message records both sides still rely on for ordering/replies, are
   // never affected. Idempotent: re-deleting an already-deleted conversation
-  // just re-writes the same deletedAt, no special-casing needed.
+  // just re-writes the same deletedAt/deletedBefore, no special-casing
+  // needed. deletedBefore is the history cutoff (see model comment) — a
+  // later restore-by-new-activity clears deletedAt but never this, so old
+  // messages stay hidden from this user even once the conversation
+  // reappears in their inbox. See DECISIONS.md.
+  const now = new Date();
   try {
     await ConversationUserState.findOneAndUpdate(
       { conversation: conversationId, user: userID },
-      { $set: { deletedAt: new Date() } },
+      { $set: { deletedAt: now, deletedBefore: now } },
       { upsert: true },
     );
   } catch (err) {

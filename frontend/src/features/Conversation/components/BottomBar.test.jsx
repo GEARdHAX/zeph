@@ -19,12 +19,59 @@ import BottomBar from './BottomBar';
 vi.mock('../../../actions/message', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/getRooms', () => ({ default: vi.fn(() => Promise.resolve({ data: { rooms: [] } })) }));
 vi.mock('../../../actions/typing', () => ({ default: () => () => {} }));
+vi.mock('../../../actions/uploadImage', () => ({ default: vi.fn() }));
+vi.mock('../../../actions/uploadMedia', () => ({ default: vi.fn() }));
 // @emoji-mart/react needs a peer `emoji-mart` package that Vite's browser bundling
 // resolves but Vitest's Node module resolution doesn't — not exercised by this test.
 vi.mock('@emoji-mart/react', () => ({ default: () => null }));
+// The real editor drags in react-easy-crop's canvas/drag internals, which
+// aren't under test here — only BottomBar's queue wiring is. A stub that
+// immediately "finishes" with a renamed File stands in for the modal.
+vi.mock('./ImageEditorModal', () => ({
+  default: ({ file, onDone, onCancel }) => (
+    <div>
+      <span>
+        Editing
+        {' '}
+        {file.name}
+      </span>
+      <button type="button" onClick={() => onDone(new File([file], `edited-${file.name}`, { type: file.type }))}>
+        Done editing
+      </button>
+      <button type="button" onClick={onCancel}>Cancel editing</button>
+    </div>
+  ),
+}));
+// Same isolation rationale as ImageEditorModal above — VideoEditorModal's
+// real MediaRecorder/captureStream flow is covered by its own test file.
+vi.mock('./VideoEditorModal', () => ({
+  default: ({ file, onDone, onCancel }) => (
+    <div>
+      <span>
+        Trimming
+        {' '}
+        {file.name}
+      </span>
+      <button
+        type="button"
+        onClick={() => onDone(
+          new File([file], `trimmed-${file.name}`, { type: 'video/webm' }),
+          new Blob(['poster'], { type: 'image/jpeg' }),
+        )}
+      >
+        Done trimming
+      </button>
+      <button type="button" onClick={onCancel}>Cancel trimming</button>
+    </div>
+  ),
+}));
 
 // eslint-disable-next-line import/first
 import message from '../../../actions/message';
+// eslint-disable-next-line import/first
+import uploadImage from '../../../actions/uploadImage';
+// eslint-disable-next-line import/first
+import uploadMedia from '../../../actions/uploadMedia';
 
 const ROOM = { _id: 'room-1', people: ['user-1', 'user-2'] };
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
@@ -53,6 +100,9 @@ beforeEach(async () => {
     ref: 'ref', user: ME, isPicker: false,
   });
   message.mockReset();
+  message.mockResolvedValue({ data: { message: { _id: 'server-id' } } });
+  uploadImage.mockReset();
+  uploadMedia.mockReset();
 });
 
 afterEach(() => {
@@ -65,13 +115,13 @@ describe('BottomBar offline-retry send flow', () => {
     message.mockResolvedValueOnce({ data: { message: { _id: 'server-id-1' } } });
 
     const store = renderBottomBar();
-    const input = screen.getByPlaceholderText('Type something to send...');
+    const input = screen.getByRole('textbox', { name: 'Type something to send...' });
 
     await userEv.type(input, 'hello there');
     await userEv.click(screen.getByRole('button', { name: 'Send message' }));
 
     // Input clears immediately, independent of the network result.
-    expect(input.value).toBe('');
+    expect(input.textContent).toBe('');
 
     await waitFor(() => {
       expect(store.getState().io.messages[0].status).toBe('sent');
@@ -88,11 +138,12 @@ describe('BottomBar offline-retry send flow', () => {
       resolveRequest = resolve;
     }));
 
+    const userEv = userEvent.setup();
     const store = renderBottomBar();
-    const input = screen.getByPlaceholderText('Type something to send...');
+    const input = screen.getByRole('textbox', { name: 'Type something to send...' });
 
+    await userEv.type(input, 'hold on');
     await act(async () => {
-      fireEvent.change(input, { target: { value: 'hold on' } });
       fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
     });
 
@@ -111,11 +162,12 @@ describe('BottomBar offline-retry send flow', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     message.mockRejectedValue(new Error('network down'));
 
+    const userEv = userEvent.setup({ delay: null });
     const store = renderBottomBar();
-    const input = screen.getByPlaceholderText('Type something to send...');
+    const input = screen.getByRole('textbox', { name: 'Type something to send...' });
 
+    await userEv.type(input, 'will fail');
     await act(async () => {
-      fireEvent.change(input, { target: { value: 'will fail' } });
       fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
     });
 
@@ -137,6 +189,219 @@ describe('BottomBar offline-retry send flow', () => {
     await userEv.click(screen.getByRole('button', { name: 'Send message' }));
 
     expect(store.getState().io.messages).toHaveLength(0);
+    expect(message).not.toHaveBeenCalled();
+  });
+});
+
+describe('BottomBar image editor queue', () => {
+  function getImageInput(container) {
+    return container.querySelector('input[type="file"][accept="image/*"]');
+  }
+
+  it('selecting an image opens the editor and uploads nothing until Done is clicked', async () => {
+    const userEv = userEvent.setup();
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getImageInput(container), file);
+
+    expect(await screen.findByText('Editing photo.png')).toBeInTheDocument();
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(message).not.toHaveBeenCalled();
+  });
+
+  it('Done sends the edited file through the existing upload+message pipeline', async () => {
+    const userEv = userEvent.setup();
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    uploadImage.mockResolvedValue({ data: { image: { _id: 'img-1', shieldedID: 'shielded-1' } } });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getImageInput(container), file);
+    await userEv.click(await screen.findByText('Done editing'));
+
+    await waitFor(() => expect(uploadImage).toHaveBeenCalledTimes(1));
+    expect(uploadImage.mock.calls[0][0].name).toBe('edited-photo.png');
+    await waitFor(() => expect(message).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'image', content: 'shielded-1', imageID: 'img-1',
+    })));
+    expect(screen.queryByText('Editing photo.png')).not.toBeInTheDocument();
+  });
+
+  it('editing multiple images in sequence uploads and sends each one, in order, only after all are done', async () => {
+    const userEv = userEvent.setup();
+    const files = [
+      new File(['a'], 'one.png', { type: 'image/png' }),
+      new File(['b'], 'two.png', { type: 'image/png' }),
+    ];
+    uploadImage
+      .mockResolvedValueOnce({ data: { image: { _id: 'img-1', shieldedID: 'shielded-1' } } })
+      .mockResolvedValueOnce({ data: { image: { _id: 'img-2', shieldedID: 'shielded-2' } } });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getImageInput(container), files);
+    expect(await screen.findByText('Editing one.png')).toBeInTheDocument();
+
+    await userEv.click(screen.getByText('Done editing'));
+    expect(await screen.findByText('Editing two.png')).toBeInTheDocument();
+    expect(uploadImage).not.toHaveBeenCalled();
+
+    await userEv.click(screen.getByText('Done editing'));
+
+    await waitFor(() => expect(uploadImage).toHaveBeenCalledTimes(2));
+    expect(uploadImage.mock.calls[0][0].name).toBe('edited-one.png');
+    expect(uploadImage.mock.calls[1][0].name).toBe('edited-two.png');
+  });
+
+  it('Cancel discards the entire remaining queue — nothing uploads or sends', async () => {
+    const userEv = userEvent.setup();
+    const files = [
+      new File(['a'], 'one.png', { type: 'image/png' }),
+      new File(['b'], 'two.png', { type: 'image/png' }),
+    ];
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getImageInput(container), files);
+    await userEv.click(await screen.findByText('Cancel editing'));
+
+    expect(screen.queryByText(/Editing/)).not.toBeInTheDocument();
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(message).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized file with a toast and never opens the editor', async () => {
+    const userEv = userEvent.setup();
+    const big = new File([new Uint8Array(11 * 1024 * 1024)], 'huge.png', { type: 'image/png' });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getImageInput(container), big);
+
+    expect(screen.queryByText(/Editing/)).not.toBeInTheDocument();
+    expect(uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unsupported file type with a toast and never opens the editor', async () => {
+    const userEv = userEvent.setup();
+    const bad = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getImageInput(container), bad);
+
+    expect(screen.queryByText(/Editing/)).not.toBeInTheDocument();
+    expect(uploadImage).not.toHaveBeenCalled();
+  });
+});
+
+describe('BottomBar general attach — category routing', () => {
+  function getFileInput(container) {
+    return container.querySelector('input[type="file"]:not([accept="image/*"])');
+  }
+
+  it('routes a video through VideoEditorModal, uploading nothing until Done', async () => {
+    const userEv = userEvent.setup();
+    const video = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getFileInput(container), video);
+
+    expect(await screen.findByText('Trimming clip.mp4')).toBeInTheDocument();
+    expect(uploadMedia).not.toHaveBeenCalled();
+    expect(message).not.toHaveBeenCalled();
+  });
+
+  it('Done trimming uploads the trimmed file + poster and sends a message with mediaID', async () => {
+    const userEv = userEvent.setup();
+    const video = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
+    uploadMedia.mockResolvedValue({ data: { media: { _id: 'media-1', category: 'video' } } });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getFileInput(container), video);
+    await userEv.click(await screen.findByText('Done trimming'));
+
+    await waitFor(() => expect(uploadMedia).toHaveBeenCalledTimes(1));
+    const [uploadedFile, , posterBlob] = uploadMedia.mock.calls[0];
+    expect(uploadedFile.name).toBe('trimmed-clip.mp4');
+    expect(posterBlob).toBeInstanceOf(Blob);
+    await waitFor(() => expect(message).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'file', mediaID: 'media-1',
+    })));
+  });
+
+  it('routes a document straight to upload with no editor step', async () => {
+    const userEv = userEvent.setup();
+    const doc = new File(['x'], 'report.pdf', { type: 'application/pdf' });
+    uploadMedia.mockResolvedValue({ data: { media: { _id: 'media-2', category: 'pdf' } } });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getFileInput(container), doc);
+
+    expect(screen.queryByText(/Trimming/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Editing/)).not.toBeInTheDocument();
+    await waitFor(() => expect(uploadMedia).toHaveBeenCalledTimes(1));
+    expect(uploadMedia.mock.calls[0][0].name).toBe('report.pdf');
+    await waitFor(() => expect(message).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'file', mediaID: 'media-2',
+    })));
+  });
+
+  it('a mixed selection routes each file independently (image to editor, document straight to upload)', async () => {
+    const userEv = userEvent.setup();
+    const image = new File(['x'], 'photo.png', { type: 'image/png' });
+    const doc = new File(['x'], 'notes.txt', { type: 'text/plain' });
+    uploadMedia.mockResolvedValue({ data: { media: { _id: 'media-3', category: 'document' } } });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getFileInput(container), [image, doc]);
+
+    expect(await screen.findByText('Editing photo.png')).toBeInTheDocument();
+    await waitFor(() => expect(uploadMedia).toHaveBeenCalledTimes(1));
+    expect(uploadMedia.mock.calls[0][0].name).toBe('notes.txt');
+  });
+
+  it('Cancel on the video editor uploads nothing', async () => {
+    const userEv = userEvent.setup();
+    const video = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getFileInput(container), video);
+    await userEv.click(await screen.findByText('Cancel trimming'));
+
+    expect(screen.queryByText(/Trimming/)).not.toBeInTheDocument();
+    expect(uploadMedia).not.toHaveBeenCalled();
+    expect(message).not.toHaveBeenCalled();
+  });
+
+  it('rejects a blocked/oversized file with a toast and uploads nothing', async () => {
+    const userEv = userEvent.setup();
+    const huge = new File([new Uint8Array(26 * 1024 * 1024)], 'huge.pdf', { type: 'application/pdf' });
+    const { container } = render(
+      <Provider store={makeStore()}><BottomBar /></Provider>,
+    );
+
+    await userEv.upload(getFileInput(container), huge);
+
+    expect(uploadMedia).not.toHaveBeenCalled();
     expect(message).not.toHaveBeenCalled();
   });
 });

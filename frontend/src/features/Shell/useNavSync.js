@@ -9,7 +9,6 @@ import { useLocation } from 'react-router-dom';
 // stays in sync so every existing `nav === 'x'` check keeps working unchanged.
 const ROUTE_TO_NAV = {
   '/': 'rooms',
-  '/search': 'search',
   '/favorites': 'favorites',
   '/meetings': 'meetings',
   '/settings': 'settings',

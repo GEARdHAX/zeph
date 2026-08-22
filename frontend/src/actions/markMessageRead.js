@@ -1,11 +1,11 @@
 import axios from 'axios';
 import Config from '../config';
 
-const markMessageRead = ({ roomID, messageID }) => {
+const markMessageRead = ({ roomID, messageID, messageIDs }) => {
   return axios({
     method: 'post',
     url: `${Config.url || ''}/api/message/read`,
-    data: { roomID, messageID },
+    data: { roomID, messageID, messageIDs },
   });
 };
 

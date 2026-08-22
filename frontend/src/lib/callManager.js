@@ -242,10 +242,16 @@ async function produceScreen(stream) {
 async function stopAudio() {
   try {
     const io = getIO();
+    const { audioStream } = getGlobal();
+    // Closing the mediasoup producer alone doesn't release the underlying
+    // getUserMedia() track — the browser's mic indicator stays lit until
+    // the track itself is stopped (same class of bug as leave(), see
+    // there for the full explanation).
+    if (audioStream) audioStream.getAudioTracks().forEach((track) => track.stop());
     await io.request('remove', { producerID: audioProducer.id, roomID });
     audioProducer.close();
     audioProducer = null;
-    await setGlobal({ audio: false });
+    await setGlobal({ audio: false, audioStream: null });
   } catch (e) {
     console.log(e);
   }
@@ -254,12 +260,13 @@ async function stopAudio() {
 async function stopVideo() {
   try {
     const io = getIO();
-    const { localStream } = getGlobal();
-    if (localStream) localStream.getVideoTracks()[0].stop();
+    const { localStream, videoStream } = getGlobal();
+    if (localStream) localStream.getVideoTracks().forEach((track) => track.stop());
+    if (videoStream) videoStream.getVideoTracks().forEach((track) => track.stop());
     await io.request('remove', { producerID: videoProducer.id, roomID });
     videoProducer.close();
     videoProducer = null;
-    await setGlobal({ video: false });
+    await setGlobal({ video: false, localStream: null, videoStream: null });
   } catch (e) {
     console.log(e);
   }
@@ -268,12 +275,13 @@ async function stopVideo() {
 async function stopScreen() {
   try {
     const io = getIO();
-    const { localStream } = getGlobal();
-    if (localStream) localStream.getVideoTracks()[0].stop();
+    const { localStream, screenStream } = getGlobal();
+    if (localStream) localStream.getVideoTracks().forEach((track) => track.stop());
+    if (screenStream) screenStream.getVideoTracks().forEach((track) => track.stop());
     await io.request('remove', { producerID: screenProducer.id, roomID });
     screenProducer.close();
     screenProducer = null;
-    await setGlobal({ screen: false });
+    await setGlobal({ screen: false, localStream: null, screenStream: null });
   } catch (e) {
     console.log(e);
   }
@@ -292,13 +300,29 @@ async function stopScreen() {
 // invoked it.
 async function leave() {
   const io = getIO();
-  const { localStream } = getGlobal();
+  const {
+    localStream, audioStream, videoStream, screenStream,
+  } = getGlobal();
   const endingRoomID = roomID;
   const { counterpart } = store.getState().rtc;
 
-  try {
-    if (localStream) localStream.getVideoTracks()[0].stop();
-  } catch (e) { /* no active video track */ }
+  // Every getUserMedia()/getDisplayMedia() stream this session could have
+  // acquired — the join-screen preview (Join.jsx sets audioStream/
+  // videoStream before the call even starts) and whatever's currently
+  // live (localStream, screenStream). The browser's camera/mic "in use"
+  // indicator stays lit for as long as ANY track from ANY of these is
+  // still live, regardless of whether the mediasoup producer using it was
+  // closed — stopping only localStream's video track (the previous
+  // behavior) left the mic on unconditionally (audio was never stopped at
+  // all) and left a stale videoStream/audioStream reference behind for a
+  // camera-off call or a screen-share call.
+  const streamsToStop = [localStream, audioStream, videoStream, screenStream];
+  streamsToStop.forEach((stream) => {
+    if (!stream) return;
+    try {
+      stream.getTracks().forEach((track) => track.stop());
+    } catch (e) { /* already stopped */ }
+  });
 
   try {
     if (sendTransport) sendTransport.close();
@@ -337,6 +361,10 @@ async function leave() {
     over: false,
     callStatus: null,
     callDirection: null,
+    localStream: null,
+    audioStream: null,
+    videoStream: null,
+    screenStream: null,
   });
 
   store.dispatch({ type: Actions.RTC_LEAVE });

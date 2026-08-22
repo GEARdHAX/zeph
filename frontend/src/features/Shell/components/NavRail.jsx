@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  MessageCircle, Search, Star, Video, Bell, Settings,
+  MessageCircle, Star, Video, Bell, Settings,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { NavLink } from 'react-router-dom';
@@ -15,7 +15,6 @@ const PRIMARY_ITEMS = [
   {
     to: '/', label: 'Chats', Icon: MessageCircle, end: true,
   },
-  { to: '/search', label: 'Search', Icon: Search },
   { to: '/favorites', label: 'Favorites', Icon: Star },
   { to: '/meetings', label: 'Meetings', Icon: Video },
 ];
@@ -55,7 +54,7 @@ function NavRail() {
         {/* Brand Header */}
         <div className="flex h-16 items-center px-4 overflow-hidden">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-            <img src={logo} alt="Chattr" className="h-7 w-7 object-contain" />
+            <img src={logo} alt="Chitcx" className="h-7 w-7 object-contain" />
           </div>
           <span
             className={cn(
@@ -63,7 +62,7 @@ function NavRail() {
               isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
             )}
           >
-            {Config.brand || 'Chattr'}
+            {Config.brand || 'Chitcx'}
           </span>
         </div>
 

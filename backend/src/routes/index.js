@@ -10,6 +10,9 @@ router.post('/typing', passport.authenticate('jwt', { session: false }, null), r
 router.post('/check-user', require('./checkUser'));
 router.post('/upload', passport.authenticate('jwt', { session: false }, null), require('./upload'));
 router.post('/upload/file', passport.authenticate('jwt', { session: false }, null), require('./upload-file'));
+router.post('/upload/media', passport.authenticate('jwt', { session: false }, null), require('./upload-media'));
+router.get('/media/:id', passport.authenticate('jwt', { session: false }, null), require('./media'));
+router.get('/media/:id/thumbnail', passport.authenticate('jwt', { session: false }, null), require('./media').thumbnail);
 router.post('/register', require('./register'));
 router.post('/user/delete', passport.authenticate('jwt', { session: false }, null), require('./user-delete'));
 router.post('/user/edit', passport.authenticate('jwt', { session: false }, null), require('./user-edit'));
@@ -31,6 +34,31 @@ router.post('/message/delete', passport.authenticate('jwt', { session: false }, 
 router.post('/messages/more', passport.authenticate('jwt', { session: false }, null), require('./more-messages'));
 router.post('/messages/sync', passport.authenticate('jwt', { session: false }, null), require('./sync-messages'));
 router.post('/group/create', passport.authenticate('jwt', { session: false }, null), require('./create-group'));
+router.post('/group/get', passport.authenticate('jwt', { session: false }, null), require('./group/get'));
+router.post('/group/update', passport.authenticate('jwt', { session: false }, null), require('./group/update'));
+router.post('/group/members', passport.authenticate('jwt', { session: false }, null), require('./group/members-list'));
+router.post(
+  '/group/members/search',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./group/members-search'),
+);
+router.post(
+  '/group/members/add',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./group/members-add'),
+);
+router.post(
+  '/group/members/remove',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./group/members-remove'),
+);
+router.post(
+  '/group/members/role',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./group/members-role'),
+);
+router.post('/group/leave', passport.authenticate('jwt', { session: false }, null), require('./group/leave'));
+router.post('/group/delete', passport.authenticate('jwt', { session: false }, null), require('./group/delete'));
 
 router.post('/conversation/hide', passport.authenticate('jwt', { session: false }, null), require('./conversation-hide'));
 router.post('/conversation/unhide', passport.authenticate('jwt', { session: false }, null), require('./conversation-unhide'));
@@ -71,6 +99,7 @@ router.post('/meeting/add', passport.authenticate('jwt', { session: false }, nul
 router.post('/meeting/answer', passport.authenticate('jwt', { session: false }, null), require('./meeting/answer'));
 router.post('/meeting/close', passport.authenticate('jwt', { session: false }, null), require('./meeting/close'));
 router.post('/meeting/list', passport.authenticate('jwt', { session: false }, null), require('./meeting/list'));
+router.post('/meeting/delete', passport.authenticate('jwt', { session: false }, null), require('./meeting/delete'));
 
 router.post('/auth/change', require('./auth/change'));
 router.post('/auth/code', require('./auth/code'));
@@ -80,6 +109,21 @@ router.post(
   '/users/change-password',
   passport.authenticate('jwt', { session: false }, null),
   require('./users/change-password'),
+);
+router.post(
+  '/users/change-username',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./users/change-username'),
+);
+router.post(
+  '/users/update-bio',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./users/update-bio'),
+);
+router.post(
+  '/users/delete-account',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./users/delete-account'),
 );
 
 router.post('/ai/summarize', passport.authenticate('jwt', { session: false }, null), require('./ai/summarize'));

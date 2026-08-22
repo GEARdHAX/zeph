@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Relationship = require('../models/Relationship');
+const { isPrivileged } = require('../authorization/policy');
 Config = require('../../config');
 
 const MAX_LIMIT = 50;
@@ -17,6 +18,29 @@ module.exports = (req, res, next) => {
 
   const safeSearch = escapeRegex(search);
 
+  // Admin privacy boundary: a standard caller's search can never surface a
+  // privileged account, at the query level (not filtered after the fact) —
+  // see DECISIONS.md. A privileged caller (the admin console reuses this
+  // same route, per that decision) gets the unfiltered query so admins can
+  // still find/manage everyone, including each other.
+  const matchConditions = [
+    {
+      $or: [
+        { fullName: { $regex: safeSearch, $options: 'i' } },
+        { email: { $regex: safeSearch, $options: 'i' } },
+        { username: { $regex: safeSearch, $options: 'i' } },
+        { firstName: { $regex: safeSearch, $options: 'i' } },
+        { lastName: { $regex: safeSearch, $options: 'i' } },
+      ],
+    },
+    {
+      email: { $ne: req.user.email },
+    },
+  ];
+  if (!isPrivileged(req.user)) {
+    matchConditions.push({ level: 'standard' });
+  }
+
   User.aggregate()
     .project({
       fullName: { $concat: ['$firstName', ' ', '$lastName'] },
@@ -26,23 +50,9 @@ module.exports = (req, res, next) => {
       email: 1,
       picture: 1,
       tagLine: 1,
+      level: 1,
     })
-    .match({
-      $and: [
-        {
-          $or: [
-            { fullName: { $regex: safeSearch, $options: 'i' } },
-            { email: { $regex: safeSearch, $options: 'i' } },
-            { username: { $regex: safeSearch, $options: 'i' } },
-            { firstName: { $regex: safeSearch, $options: 'i' } },
-            { lastName: { $regex: safeSearch, $options: 'i' } },
-          ],
-        },
-        {
-          email: { $ne: req.user.email },
-        },
-      ],
-    })
+    .match({ $and: matchConditions })
     .sort({ _id: -1 })
     .limit(limit)
     .exec(async (err, users) => {
@@ -67,14 +77,19 @@ module.exports = (req, res, next) => {
           const rel = relationships.find(
             (r) => r.requester.toString() === u._id.toString() || r.recipient.toString() === u._id.toString(),
           );
-          if (!rel || rel.status === 'blocked') {
-            return { ...u, relationshipStatus: null };
-          }
-          return {
-            ...u,
-            relationshipStatus: rel.status,
-            relationshipDirection: rel.requester.toString() === req.user.id.toString() ? 'outgoing' : 'incoming',
-          };
+          const withRelationship = (!rel || rel.status === 'blocked')
+            ? { ...u, relationshipStatus: null }
+            : {
+              ...u,
+              relationshipStatus: rel.status,
+              relationshipDirection: rel.requester.toString() === req.user.id.toString() ? 'outgoing' : 'incoming',
+            };
+
+          // `level` was only projected through for the boundary/console use
+          // above — never send it to a non-privileged caller as a side
+          // channel, even though the query already excludes privileged rows.
+          if (!isPrivileged(req.user)) delete withRelationship.level;
+          return withRelationship;
         });
 
         res.status(200).json({ limit, search, users: annotated });

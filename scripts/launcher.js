@@ -18,15 +18,15 @@ const backendOutput = {
     ROOT_USER_FIRST_NAME: 'Admin',
     ROOT_USER_LAST_NAME: 'User',
     MONGO_URI: 'mongodb://localhost:27017',
-    MONGO_DATABASE: 'clover',
+    MONGO_DATABASE: 'chitcx',
     MAILER_ENABLED: false,
 };
 
 let frontendOutput = {
-    VITE_SITE_TITLE: 'Clover',
+    VITE_SITE_TITLE: 'Chitcx',
     VITE_BACKEND_URL: 'http://localhost',
     VITE_DEMO: false,
-    VITE_SITE_BRAND: 'Honeyside',
+    VITE_SITE_BRAND: 'Chitcx',
     VITE_SHOW_CREDITS: true,
 };
 
@@ -36,8 +36,7 @@ let frontendOutput = {
     console.log(`received command: ${arg}`.cyan);
 
     console.log("");
-    console.log("Honeyside".yellow);
-    console.log(`Clover v${pkg.version} Installer`.yellow);
+    console.log(`Chitcx v${pkg.version} Installer`.yellow);
     console.log("");
 
     if (!['setup', 'rebuild', 'start', 'stop', 'restart'].includes(arg)) {
@@ -51,7 +50,7 @@ let frontendOutput = {
 
     if (arg === 'setup') {
 
-        console.log('Clover needs to know the public ip address of your machine.'.cyan);
+        console.log('Chitcx needs to know the public ip address of your machine.'.cyan);
         console.log('This is required for the meeting system to work, as traffic will be routed via UDP or TCP through such ip address.');
         console.log('If you don\'t know your ip address, run "ping elderberry.example.com" (replace with your domain) from a local terminal.');
 
@@ -78,7 +77,7 @@ let frontendOutput = {
         backendOutput['MAPPED_IP'] = response.value;
 
         console.log('');
-        console.log('Clover requires a domain, such as elderberry.example.com.'.cyan);
+        console.log('Chitcx requires a domain, such as elderberry.example.com.'.cyan);
         console.log('Make sure your DNS configuration gets properly propagated before moving forward.');
         console.log('You can use https://dnschecker.org/');
 
@@ -229,14 +228,14 @@ let frontendOutput = {
 
         if (!os.includes('Ubuntu')) {
             console.log('Current OS is not Ubuntu. Aborting.'.red);
-            console.log('If you are running this on Ubuntu, please contact Honeyside Support.');
+            console.log('If you are running this on Ubuntu, please check your OS detection or file an issue.');
             return process.exit(0);
         }
 
         if (!version.includes('22.04') && !version.includes('20.04') && !version.includes('18.04')) {
             console.log('This is not a supported Ubuntu version.'.red);
             console.log('The only supported versions are 22.04 LTS, 20.04 LTS and 18.04 LTS');
-            console.log('If you are running this on a correct version, please contact Honeyside Support.');
+            console.log('If you are running this on a correct version, please file an issue.');
             return process.exit(0);
         }
 
@@ -274,47 +273,47 @@ let frontendOutput = {
 
         console.log('');
 
-        console.log(`${arg === 'setup' ? 'installing' : 'rebuilding'} Clover backend...`.yellow);
+        console.log(`${arg === 'setup' ? 'installing' : 'rebuilding'} Chitcx backend...`.yellow);
         console.log('installing backend node modules...');
         console.log('this might take a while, depending on your machine cpu, ram and connection speed');
         console.log('(might be even 10-15 minutes, please keep calm and wait patiently)');
         exec('cd ../backend && yarn --prod --frozen-lockfile');
         console.log('starting backend...');
         try {
-            exec('pm2 delete --silent Clover', {stdio : 'pipe'});
+            exec('pm2 delete --silent Chitcx', {stdio : 'pipe'});
         } catch (e) {}
-        exec('cd ../backend && pm2 start index.js --name Clover');
+        exec('cd ../backend && pm2 start index.js --name Chitcx');
         exec('pm2 save');
         exec('pm2 startup');
-        console.log('Clover backend started'.green);
+        console.log('Chitcx backend started'.green);
 
         console.log('');
 
-        console.log(`${arg === 'setup' ? 'installing' : 'rebuilding'} Clover frontend...`.yellow);
+        console.log(`${arg === 'setup' ? 'installing' : 'rebuilding'} Chitcx frontend...`.yellow);
         console.log('installing frontend node modules...');
         console.log('this might take a while');
         exec('cd ../frontend && yarn --prod --frozen-lockfile');
         console.log('building frontend...');
         console.log('this might take a while');
         exec('cd ../frontend && yarn build');
-        console.log('Clover frontend ok'.green);
+        console.log('Chitcx frontend ok'.green);
     }
 
     if (arg === 'start') {
         try {
-            exec('cd ../backend && pm2 start index.js --name Clover');
+            exec('cd ../backend && pm2 start index.js --name Chitcx');
         } catch (e) {}
     }
 
     if (arg === 'restart') {
         try {
-            exec('pm2 restart Clover', {stdio : 'pipe'});
+            exec('pm2 restart Chitcx', {stdio : 'pipe'});
         } catch (e) {}
     }
 
     if (arg === 'stop') {
         try {
-            exec('pm2 stop Clover', {stdio : 'pipe'});
+            exec('pm2 stop Chitcx', {stdio : 'pipe'});
         } catch (e) {}
     }
 
@@ -354,13 +353,13 @@ let frontendOutput = {
 
     if (arg === 'stop') {
         console.log("");
-        console.log(`Clover has been stopped.`.green);
+        console.log(`Chitcx has been stopped.`.green);
         console.log("");
     } else {
         console.log("");
-        console.log(`Clover v${pkg.version} ${arg === 'setup' ? 'setup' : 'restart'} complete!`.green);
+        console.log(`Chitcx v${pkg.version} ${arg === 'setup' ? 'setup' : 'restart'} complete!`.green);
         if (arg === 'setup') {
-            console.log(`You should now be able to access Clover at ${domain}`);
+            console.log(`You should now be able to access Chitcx at ${domain}`);
         }
         console.log("");
     }

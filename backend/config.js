@@ -43,6 +43,10 @@ module.exports = {
     }
   })(),
   vaultRpName: 'Chitcx',
+  // Socket.IO Redis adapter (cross-process group room delivery) and the
+  // group-deletion cleanup queue — both best-effort. Unset/unreachable
+  // means single-process mode, never a boot crash. See DECISIONS.md D-035.
+  redisUrl: process.env.REDIS_URL || null,
   mongo: {
     uri: process.env.MONGO_URI,
     srv: (process.env.MONGO_SRV || '').toString() === 'true',

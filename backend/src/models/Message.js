@@ -6,12 +6,23 @@ const MessageSchema = new Schema({
   content: String,
   type: String,
   file: { type: Schema.ObjectId, ref: 'files' },
+  // Generalized attachment ref, used by every NEW media message going
+  // forward (image/video/audio/pdf/document/archive/text, all uploaded via
+  // upload-media.js into the unified Media collection) — `file` above stays
+  // exactly as-is for existing/legacy file messages. Additive, not a
+  // migration; a message never has both set. See mediaPolicy.js.
+  media: { type: Schema.ObjectId, ref: 'media' },
   room: { type: Schema.ObjectId, ref: 'rooms' },
   date: {
     type: Date,
     default: Date.now,
   },
   readBy: [{ type: Schema.ObjectId, ref: 'users' }],
+  // Sent (row exists) -> delivered (recipient's client acked receipt) -> read
+  // (readBy above). Same array-of-ObjectId shape as readBy, reused rather
+  // than a new watermark model — at this conversation scale a per-message
+  // array is simpler than tracking a separate high-water-mark field per room.
+  deliveredTo: [{ type: Schema.ObjectId, ref: 'users' }],
   // "Delete for everyone" is a tombstone, not a physical delete — the row
   // (and its ordering/pagination/reply position) stays put; only the content
   // is hidden. Kept separate from `deletedFor` below: deletedForEveryone is
@@ -38,6 +49,7 @@ MessageSchema.set('toJSON', {
     if (ret.deletedForEveryone) {
       ret.content = null;
       ret.file = null;
+      ret.media = null;
     }
     return ret;
   },

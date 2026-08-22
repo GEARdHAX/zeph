@@ -5,6 +5,299 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-036: Every 1:1/group participant showed as "Deleted User" — Mongoose cast bug, not an account-deletion bug — 2026-08-21
+
+**Problem:** Immediately after D-035 shipped, a report came in that a
+brand-new, definitely-not-deleted account ("Adarsh Arya") still displayed
+as "Deleted User" in the chat header. Direct reproduction (`POST
+/api/room/join`, `POST /api/room/get`, `POST /api/rooms/list` against a
+real, freshly-created two-person room) showed the HTTP response's
+`room.people` array contained bare ObjectId strings — `["68f...", "68f..."]`
+— instead of populated `{_id, firstName, ...}` objects, for **every** 1:1
+DM and group, independent of account status entirely. The `!other._id`
+frontend check (already fixed earlier for a narrower case) was working
+exactly as designed — it just had genuinely broken data to work with.
+
+**Root cause:** four routes (`get-room.js`, `list-rooms.js`,
+`list-favorites.js`, and originally `join-room.js` before this fix) shared
+the same pattern:
+```js
+room.people = room.people.map((person) => {
+  const obj = person.toObject ? person.toObject() : person;
+  delete obj.level;
+  return obj;
+});
+```
+`room` here is a live Mongoose document, and `Room.people`'s schema path is
+typed `[{type: Schema.ObjectId, ref: 'users'}]`. Assigning a plain-object
+array back onto that path causes Mongoose to **cast it back down to bare
+ObjectIds** per the schema type — the populated data was correctly fetched
+and correctly stripped of `level`, then silently discarded the moment it
+was written back onto the document, before serialization. Verified
+empirically: the exact same `.populate()` query run standalone (no route
+wrapper) returned full objects; the same query through the actual route
+returned bare id strings. `create-group.js` and `meeting/call.js` never
+had this bug because they build a separate plain object rather than
+reassigning onto the Mongoose document.
+
+**Decision:** every affected route now builds a fresh plain object
+(`{...room.toObject(), people: [...]}`) rather than mutating the live
+document's schema-typed field. Fixed in `get-room.js`, `list-rooms.js`,
+`list-favorites.js`, and `join-room.js` (which additionally needed this for
+its `findMessagesAndEmit` helper's input, not just the final response).
+
+**Why this went undetected:** every existing test asserting on these
+routes checked message content, membership, or DB state — none asserted on
+the shape of `people` in the actual HTTP response body. New
+`backend/test/room-people-population.test.js` closes this gap directly:
+each of the four routes gets a test asserting `people[i]._id`/`firstName`
+are real values on the wire, not just correct in the in-memory object
+before the bug's cast-back-to-ObjectId step silently ran.
+
+**Testing:** 250/250 backend tests passing (4 new), zero regressions.
+
+---
+
+## D-035: DM delete/restore is non-self-reversing; call authorization moves server-side — 2026-08-21
+
+**Problem:** A user reported that after deleting a 1:1 DM, reopening it
+still showed the full old history, the other party's account looked
+"deleted" even though it wasn't, calling them showed a misleading
+"offline" error, and yet new messages still sent/delivered fine. Full audit
+traced this to a real defect and a real gap, not what it first looked like:
+- `conversation-delete.js` only ever set `ConversationUserState.deletedAt`
+  on the deleter's own row (per-user inbox-hide tombstone, Room/Messages
+  untouched — this part was already correct/deliberate, see
+  `requireVisibleConversation.js`'s own comment). The actual bug:
+  `message.js`'s "WhatsApp-like reappearance" logic unconditionally cleared
+  `deletedAt` for **every** room member — including the deleter — on any
+  new send/receive, silently undoing the delete and resurrecting the full
+  pre-delete history the moment either party sent another message.
+- `meeting/call.js` had room-membership + admin-boundary checks but **zero**
+  block/existence/account-status check — any call could be placed to a
+  blocked, deactivated, or hard-deleted account with no server enforcement
+  at all; the only thing standing in the way was a client-side
+  `onlineUsers` array lookup (pure UX, not authorization).
+- No caching bug existed anywhere (confirmed by exhaustive grep — no
+  localStorage use for messages/conversations, no message-pagination
+  cache, `Conversation/index.jsx` always fetches fresh on open).
+
+**Decision:**
+- `ConversationUserState` gets a second timestamp, `deletedBefore` —
+  distinct from `deletedAt`. Delete sets both to "now"; a subsequent
+  restore-by-new-activity clears `deletedAt` (conversation reappears in the
+  inbox) but **never** `deletedBefore` (old messages stay hidden from that
+  user specifically, forever, until their next delete advances the cursor
+  again). `join-room.js`/`more-messages.js`/`sync-messages.js` all filter
+  returned messages against the caller's own `deletedBefore`, mirroring the
+  existing per-message `deletedFor` filter already in these exact files.
+- `User` gets a reserved `accountStatus` enum (`ACTIVE`/`DEACTIVATED`/
+  `DELETED`), default `ACTIVE`. Only `ACTIVE` is meaningfully used today (no
+  self-service deactivation feature exists yet — `DEACTIVATED` is
+  schema-only groundwork so that future feature won't need a second
+  migration). `message.js`'s existing 1:1 send-authorization block now also
+  404s with `reason:'recipient_unavailable'` for a nonexistent/hard-deleted
+  recipient, or 403s the same reason for a `DEACTIVATED` one — both mapped
+  to one generic reason, same anti-enumeration posture as `admin_boundary`.
+- `meeting/call.js` gets the equivalent server-side gate, reusing
+  `authorizeAction(..., Actions.SEND_MESSAGE)` rather than inventing a
+  separate `PLACE_CALL` rule for an identical "can these two people
+  communicate" policy. **Implementation note:** the check reads the
+  other-participant id from the room's raw (unpopulated) `people` array,
+  not the already-`.populate()`d one already in scope — verified
+  empirically that Mongoose's populate silently *drops* an array entry
+  whose reference no longer resolves (does not leave a dangling
+  unpopulated ObjectId), so looking for "other" in the populated array
+  would never find a hard-deleted recipient and silently skip the gate.
+- Frontend: `TopBar.jsx`'s client-side `onlineUsers` pre-flight check is
+  kept as-is (legitimately UX — skips a round-trip when presence already
+  shows they're not connected) but is no longer the only gate; the `call()`
+  catch block now reads the server's `reason` and shows a precise message
+  ("This person's account is no longer available" / "You can't call this
+  person") instead of a generic error. Delete-confirmation dialog copy
+  updated to describe the real (now correct) behavior instead of implying
+  nothing changes structurally.
+
+**Trade-offs:** `deletedBefore` only ever grows forward — there is no
+explicit "restore full history" action a user can take (not requested;
+matches every mainstream messenger's actual behavior, where deleting a
+chat and having it reappear never resurrects the deleted portion either).
+`accountStatus` transitions to `DEACTIVATED` are unreachable today (no
+route sets it) — intentional, reserved for a future feature, not
+speculative code left unexercised in a load-bearing path.
+
+**Testing:** `backend/test/conversation-delete-lifecycle.test.js` (delete
+sets both timestamps; new message clears only `deletedAt`; restored
+conversation shows only post-cutoff messages for the deleter, full history
+for the other participant; `list-rooms.js` exclude/re-include cycle;
+repeated delete advances the cursor), `backend/test/message-recipient-unavailable.test.js`,
+`backend/test/meeting-call-authorization.test.js` (hard-deleted/deactivated/
+blocked/admin-boundary/normal-call regression), plus new
+`frontend/src/features/Conversation/components/TopBar.test.jsx` cases for
+the reason-mapped call-error toasts. Full suite: 246/246 backend, 62/62
+frontend, zero regressions.
+
+---
+
+## D-034: Admin privacy boundary — normal users get zero discovery/interaction with privileged accounts — 2026-08-17
+
+**Problem:** Chitcx had no privacy boundary between normal users and
+privileged (admin/root) accounts. `User.level` (`'standard'` default,
+`'root'` seeded for the operator account, `'admin'` anticipated by the
+frontend Admin badge but never actually assigned by the backend) was
+checked in exactly two places — `user-delete.js` and `user-edit.js`, both
+mutation-only admin-self-service routes. Every discovery/interaction
+surface (search, profile lookup, friend requests, room/group creation,
+messaging, calls, presence, Socket.IO) was completely level-blind: a
+standard user could find, message, friend-request, group-add, or call an
+admin exactly like any other user, and the presence layer broadcast every
+connected user's online status — admins included — to every socket with no
+filtering.
+
+**Threat model:**
+- **IDOR / direct API access.** A user who somehow learns an admin's
+  `_id`/username (leaked elsewhere, guessed, or previously discovered
+  before this fix) must not be able to reach them through `room/create`,
+  `friend-requests`, `users/:username`, `messages/*`, `meeting/*`, or a
+  raw Socket.IO event — verified with tests that hit these routes with a
+  real admin id *without* discovering it via search first.
+- **Account enumeration.** Every denial for "target is privileged" returns
+  the exact same response shape/status as the route's own existing
+  "doesn't exist" / "discovery off" case — never a distinguishable 403 or a
+  `reason` field that leaks *why* — so a client can never tell "no such
+  user" apart from "that user exists and is an admin." A real bug was
+  caught by the test suite during implementation: an early version of
+  `create-room.js`/`message.js` correctly returned 404 but still included
+  `reason: 'admin_boundary'` in the JSON body — a working side channel that
+  would have let an attacker binary-search which ids are admins. Fixed by
+  stripping the reason for this specific denial path everywhere it occurs.
+- **Group membership leakage.** Deliberately scoped: the boundary applies
+  to 1:1 DMs only, not groups (confirmed product decision). Group
+  membership is a shared space, not a discovery surface — a standard user
+  legitimately sharing a group with an admin does not lose the group. What
+  *is* still enforced: that admin never becomes discoverable through
+  search/profile-lookup/friend-request/a *new* 1:1 DM just because they're
+  visible as a group participant. Tested explicitly as two paired
+  assertions (group access survives; general discoverability doesn't leak
+  from it).
+- **Notification/presence leakage.** `store.onlineUsers`'s four write sites
+  (`init.js` connect/disconnect, `mediasoup/index.js` busy/online
+  transitions, `events/status.js`) previously ended in one global
+  `store.io.emit('onlineUsers', [...])` — literally every connected socket
+  received every other user's live presence, admins included. Replaced
+  with `backend/src/presence.js`'s `broadcastPresence()`, which computes a
+  caller-scoped view per currently-connected socket (privileged callers see
+  everyone including each other, standard callers never see a privileged
+  entry) and never sends the `level` field itself to any client. Message
+  delivery notifications (`message.js`'s `message-in` emit loop) already
+  follow room membership, which the new `roomHasBoundaryViolation` gate
+  covers.
+- **Reconnect/resync bypass.** `sync-messages.js` (the reconnect gap-fill
+  path) independently re-checks the boundary rather than assuming
+  `join-room.js` already enforced it once — a vault token or a boundary
+  check performed at initial join must not be trusted to still hold
+  minutes later on a long-lived connection; every read route re-derives it
+  per request, matching the existing `requireVisibleConversation` pattern
+  this feature extends.
+
+**Decision — `level !== 'standard'` (not an allowlist), caller-scoped
+queries (not a separate admin route):**
+- **Privileged = `level !== 'standard'`.** Covers `'root'` today and any
+  future `'admin'`/other role automatically — deny-by-default, no code
+  change needed when a new role is introduced. Implemented as
+  `isPrivileged()` in `backend/src/authorization/policy.js`, the same
+  choke-point `authorizeAction()` already used by `message.js`,
+  `create-room.js`, `friend-requests/send.js` for block/relationship
+  checks — extended with optional `actorLevel`/`targetLevel` params so
+  existing call sites that don't pass them are completely unaffected until
+  explicitly wired in, and the boundary check runs *before* the
+  relationship/block lookup since it must win unconditionally.
+- **No new admin-only listing endpoint.** `search.js` (and `user-list.js`)
+  build their query conditionally on the *caller's own* level — a
+  privileged caller gets the unfiltered query (admins see everyone,
+  including each other; this is what keeps the existing Admin console
+  working with zero frontend changes, since it already free-rides on
+  `/api/search`), a standard caller's query excludes `level !== 'standard'`
+  rows at the database level, not via a post-hoc filter.
+- **1:1 room boundary via a new shared helper**,
+  `backend/src/utils/roomHasBoundaryViolation.js` (same shape/spirit as the
+  existing `requireVisibleConversation.js` vault-hide gate) — returns
+  `false` immediately for `room.isGroup`, otherwise checks whether the
+  other 1:1 party is privileged while the caller isn't.
+  `join-room.js`/`get-room.js`/`more-messages.js`/`sync-messages.js`/
+  `message.js`/`meeting/call.js`/`list-favorites.js` all call it
+  independently — no route assumes a sibling route already enforced it.
+  `list-rooms.js` and the Socket.IO `more-rooms` event apply the same rule
+  as a batched `$nin` exclusion at query time.
+
+**Pre-existing bugs found and fixed while implementing this** (each was a
+real gap independent of the admin boundary, but left unfixed would have
+undermined it):
+- `checkUser.js` had **no auth middleware at all** and returned the full
+  raw `User` document — password hash, email, `vaultPinHash` included — to
+  anyone who sent a user's `_id`. This route is called at app boot
+  (`frontend/src/init.js`) before a valid `Authorization` header exists, so
+  it can't simply be wrapped in `passport.authenticate`; fixed by having it
+  verify the actual JWT server-side (signature, expiry, session revocation
+  — mirroring what the passport-jwt strategy does) instead of trusting a
+  client-supplied raw `id`, and returning only `{valid: true}`, never the
+  document. Frontend updated to send the token itself instead of the
+  locally-decoded (unverified) `id`.
+- `create-room.js` and `create-group.js` both populated the newly-created
+  room's `people` with **no field exclusion at all** on first response
+  (every other populate call site in these files excluded
+  email/password/friends) — a brand-new room or group's first API response
+  included the full raw `User` document, password hash included, for every
+  member. Fixed alongside the `level`-stripping already needed for the
+  boundary itself.
+- `create-group.js` had zero validation of any kind — no check that
+  `people` resolves to real users. Fixed to validate existence (not
+  privilege — groups are exempt from the boundary by design).
+- `meeting/add.js`, `meeting/answer.js` trusted a raw client-supplied
+  `userID` with no existence check, letting any user "call-add" or "answer
+  for" an arbitrary id. Both now resolve and validate the target, silently
+  no-op-ing (still 200, no distinguishable failure) on a boundary
+  violation, matching the fire-and-forget shape the rest of the
+  call-signaling routes already use.
+- `user-list.js` built a regex directly from unescaped user input
+  (`` `.*${search}.*` ``) — a ReDoS/regex-injection risk — and had a dead
+  self-exclusion filter (`email: {$ne: 'TODO my email'}`, a hardcoded
+  literal that never matched anything). Fixed alongside adding the same
+  boundary/escaping treatment `search.js` already had.
+- `more-messages.js` (HTTP) had no room-membership check at all before
+  this — any authenticated user could page through any room's message
+  history by id. Fixed in passing since the boundary check needed the room
+  fetched anyway.
+
+**Not changed:** `relationships/block.js`/`unblock.js` (blocking an admin
+is not a discovery/interaction the boundary needs to prevent — arguably the
+opposite), `meeting/close.js` (a "call ended" signal reveals nothing new
+and blocking it would just leave a stuck UI with no privacy benefit),
+`conversation-hide.js`/`conversation-unhide.js`/`conversation-delete.js`/
+`vault-*.js`/`message-read.js`/`message-delete.js` (all keyed by the
+caller's own state on a room they're already a member of — no target-user
+lookup exists in any of them to gate).
+
+**Follow-ups intentionally not fixed in this pass** (flagged, not silently
+dropped): `create-group.js` still has no blocked-user or discovery-opt-out
+check for invitees (broader hardening than the admin boundary itself
+required); the Socket.IO `more-messages`/`more-images` events (as opposed
+to their HTTP twins, which are now gated) still have no room-membership
+check at all; `meeting/*` routes don't verify the actor is an actual
+participant of the target meeting beyond room membership.
+
+**Testing:** `backend/test/admin-boundary.test.js`, 48 new tests — one
+`describe` per critical path named in the task (search, profile lookup,
+friend request, DM creation, existing-DM post-hoc denial across all four
+read routes plus reconnect/resync specifically, group exemption with its
+two-paired-assertion nuance, calls, favorites, presence via a real
+multi-socket harness, direct-ID enumeration, the `checkUser.js` fix), each
+paired with a normal-user-to-normal-user regression assertion in the same
+block rather than a separate pass. Backend 192/192 total, zero regressions
+in the pre-existing 144.
+
+---
+
 ## D-033: In-call UI brought up to the shadcn/Tailwind design system — 2026-08-17
 
 **Problem:** `Meeting/index.jsx`'s in-call screen (control bar, top bars) and

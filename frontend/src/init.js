@@ -32,7 +32,7 @@ const init = async () => {
         const res = await axios({
           method: 'post',
           url: `${Config.url || ''}/api/check-user`,
-          data: { id: decoded.id },
+          data: { token },
         });
         result = res.data;
       } catch (e) {

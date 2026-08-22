@@ -47,7 +47,7 @@ module.exports = async (req, res) => {
     name: file.name,
     author: req.user.id,
     size: file.size,
-    file: file.type,
+    type: file.type,
     shield,
   });
 

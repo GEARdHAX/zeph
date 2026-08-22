@@ -18,6 +18,7 @@ function Conversation() {
   const [aiEnabled, setAiEnabled] = useState(false);
   const setOver = useGlobal('over')[1];
   const vaultToken = useGlobal('vaultToken')[0];
+  const user = useGlobal('user')[0] || {};
   const { id } = useParams();
 
   const navigate = useNavigate();
@@ -33,27 +34,63 @@ function Conversation() {
   }, []);
 
   useEffect(() => {
+    // Guards against two real bugs, both invisible until you navigate
+    // quickly between rooms/routes:
+    // (1) Stale-response race — if room A's fetch is still in flight when
+    //     you navigate to room B, A's effect hasn't unmounted yet (its
+    //     .then() is still queued) and can resolve AFTER B's own effect
+    //     already set the correct room, silently overwriting B's fresh
+    //     data with A's stale response. `cancelled` makes every dispatch
+    //     in this effect a no-op once a newer run (or unmount) has started.
+    // (2) Stale state after leaving the page entirely — nothing else in
+    //     the app ever reset state.io.room/messages on navigating away
+    //     from a room, so going room -> "/" (or any other route) left the
+    //     previous room's data sitting in Redux indefinitely; anything
+    //     that reads it later (Details panel, this same effect's own
+    //     "not looking at that room" checks elsewhere) saw leftover data
+    //     from a page you're no longer on instead of a clean slate.
+    let cancelled = false;
+
     setLoading(true);
     getRoom(id, vaultToken)
       .then((res) => {
+        if (cancelled) return;
         dispatch({ type: Actions.SET_ROOM, room: res.data.room });
         dispatch({ type: Actions.SET_MESSAGES, messages: res.data.room.messages });
         setLoading(false);
         setError(false);
         dispatch({ type: Actions.MESSAGES_REMOVE_ROOM_UNREAD, roomID: id });
 
+        // Mark the whole unread backlog read, not just the newest message —
+        // otherwise opening a room with several unread messages left #1
+        // through #(n-1) permanently unread (readBy never touched), even
+        // though the user just saw all of them.
         const { messages } = res.data.room;
-        if (messages?.length) {
-          const lastMessage = messages[messages.length - 1];
-          markMessageRead({ roomID: id, messageID: lastMessage._id }).catch((err) => console.log(err));
+        const myId = String(user?.id || user?._id || '');
+        const unreadIDs = (messages || [])
+          .filter((m) => {
+            const authorId = String(m.author?._id || m.author?.id || '');
+            const readBy = (m.readBy || []).map((r) => String(r?._id || r));
+            return authorId !== myId && !readBy.includes(myId);
+          })
+          .map((m) => m._id);
+        if (unreadIDs.length) {
+          markMessageRead({ roomID: id, messageIDs: unreadIDs }).catch((err) => console.log(err));
         }
       })
       .catch((err) => {
+        if (cancelled) return;
         dispatch({ type: Actions.SET_ROOM, room: null });
         dispatch({ type: Actions.SET_MESSAGES, messages: [] });
         setLoading(false);
         if (!err.response || err.response.status !== 404) setError(true);
       });
+
+    return () => {
+      cancelled = true;
+      dispatch({ type: Actions.SET_ROOM, room: null });
+      dispatch({ type: Actions.SET_MESSAGES, messages: [] });
+    };
   }, [setLoading, id, vaultToken]);
 
   return (

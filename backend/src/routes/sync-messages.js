@@ -1,7 +1,9 @@
 const Message = require('../models/Message');
 const Room = require('../models/Room');
+const ConversationUserState = require('../models/ConversationUserState');
 const sanitizeDeletedMessage = require('../utils/sanitizeDeletedMessage');
 const requireVisibleConversation = require('../utils/requireVisibleConversation');
+const roomHasBoundaryViolation = require('../utils/roomHasBoundaryViolation');
 const { hasValidVaultToken } = require('../vault/vaultToken');
 
 // Reconnect resync: returns messages added to a room after lastMessageID, newest-cursor-first
@@ -39,18 +41,35 @@ module.exports = async (req, res, next) => {
     return res.status(visibility.status).json({ error: true, reason: visibility.reason });
   }
 
+  // Admin privacy boundary — reconnect/resync must not be a side door back
+  // into an admin DM. See DECISIONS.md.
+  const boundaryViolation = await roomHasBoundaryViolation({
+    room, callerID: req.user.id, callerLevel: req.user.level,
+  });
+  if (boundaryViolation) {
+    return res.status(404).json({ error: true });
+  }
+
   const query = lastMessageID ? { room: roomID, _id: { $gt: lastMessageID } } : { room: roomID };
+
+  // Delete-history cutoff — see more-messages.js/ConversationUserState's
+  // model comment. Reconnect/resync must not resurrect pre-delete history
+  // either, same as a fresh open.
+  const state = await ConversationUserState.findOne({ conversation: roomID, user: req.user.id }).select('deletedBefore');
+  const deletedBefore = state && state.deletedBefore;
 
   Message.find(query)
     .sort({ _id: 1 })
     .limit(200)
     .populate({
       path: 'author',
-      select: '-email -password -friends -__v',
+      select: '-email -password -friends -__v -vaultPinHash',
       populate: {
         path: 'picture',
       },
     })
+    .populate([{ path: 'file', strictPopulate: false }])
+    .populate([{ path: 'media', strictPopulate: false }])
     .lean()
     .then((messages) => {
       res.status(200).json({
@@ -59,6 +78,7 @@ module.exports = async (req, res, next) => {
           // connection — a message this user deleted for themselves stays
           // gone from their own view regardless of which device/session asks.
           .filter((e) => !(e.deletedFor || []).some((id) => id.toString() === req.user.id.toString()))
+          .filter((e) => !deletedBefore || new Date(e.date) > deletedBefore)
           .map((e) => {
             const message = sanitizeDeletedMessage(e);
             if (message.author) {

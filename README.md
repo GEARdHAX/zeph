@@ -313,7 +313,7 @@ Meeting (Video Call)
 *   `MAPPED_IP` (Default: `false`): If using NAT mapping (AWS, Google Cloud), set to `true`.
 *   `AUTH_SECRET`: Secret key for signing JWT authorization headers.
 *   `ROOT_USER_EMAIL` / `ROOT_USER_PASSWORD`: Default credentials created on startup.
-*   `MONGO_URI`: Complete MongoDB connection URI (e.g. `mongodb://localhost:27017/clover`).
+*   `MONGO_URI`: Complete MongoDB connection URI (e.g. `mongodb://localhost:27017/chitcx`).
 *   `MAILER_ENABLED` (Default: `false`): Enables email delivery cron tasks.
 
 ### Frontend Configuration (`frontend/.env`)

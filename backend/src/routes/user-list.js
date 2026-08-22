@@ -1,9 +1,38 @@
 const User = require('../models/User');
+const { isPrivileged } = require('../authorization/policy');
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 module.exports = (req, res, next) => {
-  let { search, limit, more } = req.fields;
+  let { search, limit } = req.fields;
 
   !limit && (limit = 25);
+
+  search = typeof search === 'string' ? search.slice(0, 100) : '';
+  const safeSearch = escapeRegex(search);
+
+  // Same admin-privacy-boundary and self-exclusion treatment as search.js —
+  // see DECISIONS.md. Also fixes two pre-existing bugs found while touching
+  // this file: `search` was interpolated straight into a regex (ReDoS /
+  // regex-injection risk), and the self-exclusion filter was a dead
+  // hardcoded literal ('TODO my email') that never matched anything.
+  const matchConditions = [
+    {
+      $or: [
+        { fullName: { $regex: safeSearch, $options: 'i' } },
+        { email: { $regex: safeSearch, $options: 'i' } },
+        { username: { $regex: safeSearch, $options: 'i' } },
+        { firstName: { $regex: safeSearch, $options: 'i' } },
+        { lastName: { $regex: safeSearch, $options: 'i' } },
+      ],
+    },
+    {
+      email: { $ne: req.user.email },
+    },
+  ];
+  if (!isPrivileged(req.user)) {
+    matchConditions.push({ level: 'standard' });
+  }
 
   User.aggregate()
     .project({
@@ -15,22 +44,7 @@ module.exports = (req, res, next) => {
       picture: 1,
       tagLine: 1,
     })
-    .match({
-      $and: [
-        {
-          $or: [
-            { fullName: { $regex: `.*${search}.*`, $options: 'i' } },
-            { email: { $regex: `.*${search}.*`, $options: 'i' } },
-            { username: { $regex: `.*${search}.*`, $options: 'i' } },
-            { firstName: { $regex: `.*${search}.*`, $options: 'i' } },
-            { lastName: { $regex: `.*${search}.*`, $options: 'i' } },
-          ],
-        },
-        {
-          email: { $ne: 'TODO my email' },
-        },
-      ],
-    })
+    .match({ $and: matchConditions })
     .sort({ _id: -1 })
     .limit(limit)
     .exec((err, users) => {

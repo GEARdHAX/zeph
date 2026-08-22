@@ -13,6 +13,13 @@ const ConversationUserStateSchema = new Schema({
   isHidden: { type: Boolean, default: false },
   hiddenAt: { type: Date, default: null },
   deletedAt: { type: Date, default: null },
+  // Cursor marking WHEN this user last deleted this conversation. Messages
+  // with `date <= deletedBefore` are hidden from this user's view even
+  // after the conversation is restored by new activity (which clears
+  // deletedAt but NOT this) — this is what makes "Delete DM" non-self-
+  // reversing in content, not just in list-visibility. See message.js's
+  // reappearance logic and DECISIONS.md.
+  deletedBefore: { type: Date, default: null },
 });
 
 ConversationUserStateSchema.index({ conversation: 1, user: 1 }, { unique: true });

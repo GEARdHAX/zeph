@@ -1,23 +1,34 @@
-import { useState, useRef, useEffect } from 'react';
+import {
+  useState, useRef, useEffect, lazy, Suspense,
+} from 'react';
 import moment from 'moment';
 import emojiRegex from 'emoji-regex';
 import { useGlobal } from 'reactn';
 import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import ReactImageAppear from 'react-image-appear';
 import {
-  DownloadCloud, Check, Clock, AlertCircle, MoreVertical, Trash2, Ban,
+  DownloadCloud, Check, CheckCheck, Clock, AlertCircle, MoreVertical, Trash2, Ban, Copy,
 } from 'lucide-react';
-import striptags from 'striptags';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import BioText from '../../../components/BioText';
+import parseBio, { tokensToHtml } from '../../../lib/parseBio';
 import deleteMessage from '../../../actions/deleteMessage';
+import createRoom from '../../../actions/createRoom';
 import Actions from '../../../constants/Actions';
 import Config from '../../../config';
+import formatFileSize from '../../../lib/formatFileSize';
+
+// Lazy-loaded so the profile viewer never ships in the initial chat bundle —
+// only fetched the first time a user actually clicks a message author's
+// avatar. Mirrors ImageEditorModal/MediaViewerShell's established pattern.
+const ProfileView = lazy(() => import('../../Panel/components/ProfileView'));
 
 function Message({
   message, previous, next, onOpen, roomID,
@@ -27,9 +38,11 @@ function Message({
 
   const user = useGlobal('user')[0] || {};
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [confirmDeleteForEveryone, setConfirmDeleteForEveryone] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [previewUsername, setPreviewUsername] = useState(null);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -55,6 +68,18 @@ function Message({
   const myId = String(user?.id || user?._id || '');
   const authorId = String(author?._id || author?.id || '');
   const isMine = !!myId && !!authorId && myId === authorId;
+
+  // Tick state for my own messages: sending (optimistic, no _id yet) ->
+  // sent (persisted, status defaults to 'sent' for historical messages
+  // that predate the optimistic-status field) -> delivered (someone else's
+  // client acked receipt) -> read (someone else's readBy includes them).
+  // Only meaningful for 1:1 rooms — a group has multiple recipients with
+  // independent delivery/read state, so this single tri-state icon only
+  // reflects "at least one other member" until per-member receipts matter.
+  const otherHasIt = (list) => (list || []).some((id) => String(id?._id || id) !== authorId);
+  const tickStatus = status === 'failed' || status === 'sending'
+    ? status
+    : (otherHasIt(message.readBy) ? 'read' : (otherHasIt(message.deliveredTo) ? 'delivered' : 'sent'));
 
   let attachPrevious = false;
   let attachNext = false;
@@ -83,29 +108,41 @@ function Message({
   function PictureOrSpacer() {
     if (isMine) return null;
     if (attachPrevious) return <div className="h-7 w-7 shrink-0" />;
+    if (!author.username) {
+      // Deleted/unknown author — nothing to preview, render the avatar inert.
+      return (
+        <Avatar className="h-7 w-7 shrink-0 border border-border bg-gradient-to-br from-rose-600 to-primary text-white font-bold">
+          <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+      );
+    }
     return (
-      <Avatar className="h-7 w-7 shrink-0 border border-border bg-gradient-to-br from-rose-600 to-primary text-white font-bold">
-        {author.picture && (
-          <img
-            src={`${Config.url || ''}/api/images/${author.picture.shieldedID}/256`}
-            alt=""
-            className="aspect-square size-full object-cover"
-          />
-        )}
-        <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">
-          {initials}
-        </AvatarFallback>
-      </Avatar>
+      <button
+        type="button"
+        onClick={() => setPreviewUsername(author.username)}
+        className="cursor-pointer"
+        title={`View ${author.firstName || 'profile'}`}
+      >
+        <Avatar className="h-7 w-7 shrink-0 border border-border bg-gradient-to-br from-rose-600 to-primary text-white font-bold transition-opacity hover:opacity-85">
+          {author.picture && (
+            <img
+              src={`${Config.url || ''}/api/images/${author.picture.shieldedID}/256`}
+              alt=""
+              className="aspect-square size-full object-cover"
+            />
+          )}
+          <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+      </button>
     );
   }
 
   const noEmoji = content ? content.replace(emojiRegex(), '') : '';
   const isOnlyEmoji = content && !noEmoji.replace(/[\s\n]/gm, '');
-
-  const convertUrls = (text) => {
-    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gi;
-    return text.replace(urlRegex, (url) => `<a href="${url}" target="_blank" class="underline hover:opacity-80">${url}</a>`);
-  };
 
   const isDeleted = !!message.deletedForEveryone;
 
@@ -128,38 +165,89 @@ function Message({
             onClick={() => onOpen(message)}
           />
         );
-      case 'file':
+      case 'file': {
+        // New-format messages (upload-media.js) carry their attachment on
+        // message.media; old-format ones carry it on message.file — never
+        // both. Fall back to message.file so existing messages keep
+        // rendering exactly as before.
+        const attachment = message.media || message.file;
         return (
-          <a
-            href={`${Config.url || ''}/api/files/${message.content}`}
-            download={message.file ? message.file.name : 'File'}
-            className="flex items-center gap-2.5 p-0.5 text-inherit"
+          <button
+            type="button"
+            onClick={() => onOpen(message)}
+            className="flex items-center gap-2.5 p-0.5 text-inherit cursor-pointer text-left"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/15 dark:bg-white/15">
               <DownloadCloud className="h-4 w-4" />
             </div>
             <div className="min-w-0 pr-1">
-              <div className="font-semibold text-xs truncate max-w-[200px]">{message.file ? message.file.name : 'Attachment'}</div>
+              <div className="font-semibold text-xs truncate max-w-[200px]">
+                {attachment ? (attachment.originalName || attachment.name) : 'Attachment'}
+              </div>
               <div className="text-[10px] opacity-80 mt-0.5">
-                {message.file ? `${Math.round((message.file.size / 1024 / 1024) * 10) / 10} MB` : '0 MB'}
+                {attachment ? formatFileSize(attachment.size) : 'Unknown size'}
               </div>
             </div>
-          </a>
+          </button>
         );
+      }
       default:
         return (
-          <div
-            className="text-xs leading-relaxed break-words"
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{
-              __html: convertUrls(striptags(content || '', ['a', 'strong', 'b', 'i', 'em', 'u', 'br'])),
-            }}
+          <BioText
+            text={content}
+            onMentionClick={setPreviewUsername}
+            className="block text-xs leading-relaxed break-words"
           />
         );
     }
   }
 
   const isImage = message.type === 'image';
+
+  const openChatWith = async (targetUserID) => {
+    setPreviewUsername(null);
+    try {
+      const res = await createRoom(targetUserID);
+      dispatch({ type: Actions.SET_ROOM, room: res.data.room });
+      dispatch({ type: Actions.SET_MESSAGES, messages: res.data.room.messages });
+      navigate(`/room/${res.data.room._id}`);
+    } catch (err) {
+      toast.error('Could not start chat.');
+    }
+  };
+
+  // Copies the message exactly as it renders: text/plain gets the raw
+  // content (the app's own **bold**/@mention/etc. markdown-like syntax,
+  // the same thing that's actually stored — the most faithful "plain text"
+  // representation now that content is never HTML), and text/html gets the
+  // same tokens the bubble itself renders (via parseBio + BioText)
+  // serialized to real HTML tags, so pasting into a rich-text target
+  // (email, doc, another chat) keeps bold/italic/links intact instead of
+  // showing the raw ** markers.
+  const handleCopy = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setMenuOpen(false);
+    const plain = content || '';
+    try {
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        const html = tokensToHtml(parseBio(plain));
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': new Blob([plain], { type: 'text/plain' }),
+            'text/html': new Blob([html], { type: 'text/html' }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plain);
+      }
+      toast.success('Message copied.');
+    } catch (err) {
+      toast.error('Could not copy message.');
+    }
+  };
 
   const handleDeleteForMe = async (e) => {
     if (e) {
@@ -281,6 +369,16 @@ function Message({
                       isMine ? 'right-0' : 'left-0',
                     )}
                   >
+                    {!isImage && message.type !== 'file' && content && (
+                      <button
+                        type="button"
+                        onClick={handleCopy}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      >
+                        <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>Copy</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleDeleteForMe}
@@ -316,9 +414,11 @@ function Message({
           {!attachNext && (
             <div className={cn('flex items-center gap-1.5 px-1 pt-1 text-[10px] text-muted-foreground', isMine && 'justify-end')}>
               <span>{moment(date).format('MMM DD - h:mm A')}</span>
-              {isMine && status === 'sending' && <Clock className="h-3 w-3 animate-spin text-muted-foreground" />}
-              {isMine && status === 'sent' && <Check className="h-3 w-3 text-primary" />}
-              {isMine && status === 'failed' && <AlertCircle className="h-3 w-3 text-destructive" />}
+              {isMine && tickStatus === 'sending' && <Clock className="h-3 w-3 animate-spin text-muted-foreground" />}
+              {isMine && tickStatus === 'failed' && <AlertCircle className="h-3 w-3 text-destructive" />}
+              {isMine && tickStatus === 'sent' && <Check className="h-3 w-3 text-primary" />}
+              {isMine && tickStatus === 'delivered' && <CheckCheck className="h-3 w-3 text-primary" />}
+              {isMine && tickStatus === 'read' && <CheckCheck className="h-3 w-3 text-sky-500" />}
             </div>
           )}
         </div>
@@ -354,6 +454,16 @@ function Message({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {previewUsername && (
+        <Suspense fallback={null}>
+          <ProfileView
+            username={previewUsername}
+            onClose={() => setPreviewUsername(null)}
+            onOpenChat={openChatWith}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

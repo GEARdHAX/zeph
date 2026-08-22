@@ -31,6 +31,36 @@ function Streams({
     actualPeers.push({ ...actualPeer, isScreen });
   });
 
+  const counterpart = useSelector((state) => state.rtc.counterpart);
+
+  if (actualPeers.length === 0 && counterpart) {
+    const fallbackPeer = {
+      user: counterpart,
+      video: streams.find((s) => s.isVideo) || null,
+      audio: streams.find((s) => !s.isVideo) || null,
+      isScreen: false,
+    };
+    return (
+      <div className="relative flex h-full w-full flex-1 flex-col items-center justify-center overflow-hidden bg-background p-3 sm:p-4">
+        <div className="absolute inset-0 bg-radial from-primary/5 via-transparent to-black/80 pointer-events-none" />
+        <div className="relative z-10 flex h-full w-full flex-1 flex-col">
+          <div className="relative flex flex-1 flex-row">
+            <div className="relative flex-1">
+              <Interface
+                isMaximized={isMaximized}
+                video={fallbackPeer.video}
+                audio={fallbackPeer.audio}
+                peer={fallbackPeer.user}
+                isScreen={fallbackPeer.isScreen}
+              />
+            </div>
+          </div>
+        </div>
+        {children}
+      </div>
+    );
+  }
+
   if (!isGrid && !mainStream && actualPeers.length > 0) {
     setMainStream(actualPeers[actualPeers.length - 1]);
   }

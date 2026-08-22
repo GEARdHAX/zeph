@@ -15,4 +15,8 @@ module.exports = [
     tag: 'status',
     callback: require('./status'),
   },
+  {
+    tag: 'message-delivered',
+    callback: require('./message-delivered'),
+  },
 ];

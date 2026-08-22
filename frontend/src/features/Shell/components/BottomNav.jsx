@@ -1,5 +1,5 @@
 import {
-  MessageCircle, Search, Star, Video, Bell, Settings,
+  MessageCircle, Star, Video, Bell, Settings,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -10,7 +10,6 @@ const ITEMS = [
   {
     to: '/', label: 'Chats', Icon: MessageCircle, end: true,
   },
-  { to: '/search', label: 'Search', Icon: Search },
   { to: '/favorites', label: 'Favorites', Icon: Star },
   { to: '/meetings', label: 'Meetings', Icon: Video },
   { to: '/notifications', label: 'Alerts', Icon: Bell },
