@@ -4,14 +4,18 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useGlobal } from 'reactn';
-import { Users, Image as ImageIcon, Link2 } from 'lucide-react';
+import {
+  Users, Image as ImageIcon, Link2, Shield,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
 import ProfileView from '../../Panel/components/ProfileView';
 import InviteGroup from '../../Group/components/InviteGroup';
+import GroupAdminPanel from '../../Group/components/GroupAdminPanel';
 import createRoom from '../../../actions/createRoom';
+import { getGroup } from '../../../actions/groupAdmin';
 import Actions from '../../../constants/Actions';
 import getMediaCategory from '../../../lib/mediaType';
 import getFileIcon from '../../../lib/fileIcon';
@@ -83,6 +87,8 @@ function Room() {
   const [tab, setTab] = useState('members'); // 'members' | 'media'
   const [previewUsername, setPreviewUsername] = useState(null);
   const [showInviteGroup, setShowInviteGroup] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [groupInfo, setGroupInfo] = useState(null);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -97,6 +103,20 @@ function Room() {
       console.error('Could not start chat:', err);
     }
   };
+
+  // myRole/settings aren't part of the Redux room state (join-room.js/
+  // get-room.js don't return them) — fetched separately, only for groups,
+  // only to decide whether to show the Manage Group entry point. The
+  // GroupAdminPanel itself re-fetches its own member/request data when opened.
+  useEffect(() => {
+    if (!room.isGroup || !room._id) {
+      setGroupInfo(null);
+      return;
+    }
+    getGroup(room._id).then((res) => setGroupInfo(res.data.group)).catch(() => setGroupInfo(null));
+  }, [room.isGroup, room._id]);
+
+  const canManageGroup = groupInfo && (groupInfo.myRole === 'OWNER' || groupInfo.myRole === 'ADMIN');
 
   useEffect(() => {
     if (scrollContainer.current && scrollContainer.current.scrollTop === 0) {
@@ -275,6 +295,16 @@ function Room() {
                   Invite Members
                 </Button>
               )}
+              {canManageGroup && (
+                <Button
+                  variant="secondary"
+                  className="mb-1.5 justify-start gap-2 text-xs"
+                  onClick={() => setShowAdminPanel(true)}
+                >
+                  <Shield className="h-3.5 w-3.5" />
+                  Manage Group
+                </Button>
+              )}
               {members}
             </div>
           )}
@@ -318,6 +348,16 @@ function Room() {
           groupId={room._id}
           groupName={room.title}
           onClose={() => setShowInviteGroup(false)}
+        />
+      )}
+
+      {showAdminPanel && groupInfo && (
+        <GroupAdminPanel
+          groupId={room._id}
+          myRole={groupInfo.myRole}
+          currentSettings={groupInfo.settings}
+          onClose={() => setShowAdminPanel(false)}
+          onSettingsChanged={(patch) => setGroupInfo((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }))}
         />
       )}
     </div>
