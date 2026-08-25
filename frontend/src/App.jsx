@@ -9,6 +9,8 @@ import jwtDecode from 'jwt-decode';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
+import FriendInvitePreview from './pages/InvitePreview/FriendInvitePreview';
+import GroupInvitePreview from './pages/InvitePreview/GroupInvitePreview';
 import setAuthToken from './actions/setAuthToken';
 import initIO from './actions/initIO';
 import PictureInPicture from './features/PictureInPicture';
@@ -136,6 +138,11 @@ function App() {
         <Routes>
           <Route path="/forgot-password" element={token ? <Navigate to="/" /> : <ForgotPassword />} />
           <Route path="/login" element={token ? <Navigate to="/" /> : <Login />} />
+          {/* Public — reachable logged-out so a shared link/QR scan can preview
+              before requiring login (entryPath already carries the visitor
+              back here post-login, see init.js/Login/index.jsx). */}
+          <Route path="/invite/f/:token" element={<FriendInvitePreview />} />
+          <Route path="/invite/g/:token" element={<GroupInvitePreview />} />
           <Route path="/*" element={!token ? <Navigate to="/login" /> : <Home />} />
         </Routes>
         {/* Sibling to <Routes>, not inside any Route — never unmounted by

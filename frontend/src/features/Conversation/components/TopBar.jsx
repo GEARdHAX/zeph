@@ -317,9 +317,9 @@ function TopBar({ back, loading, aiEnabled }) {
           >
             <div className="relative shrink-0">
               <Avatar className="h-10 w-10 border border-border bg-gradient-to-br from-rose-600 to-primary text-white font-bold group-hover:scale-105 transition-transform">
-                {other.picture && (
+                {(room.isGroup ? room.picture : other.picture) && (
                   <img
-                    src={`${Config.url || ''}/api/images/${other.picture.shieldedID}/256`}
+                    src={`${Config.url || ''}/api/images/${(room.isGroup ? room.picture : other.picture).shieldedID}/256`}
                     alt=""
                     className="aspect-square size-full object-cover"
                   />

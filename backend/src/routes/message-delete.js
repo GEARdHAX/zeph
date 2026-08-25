@@ -1,5 +1,6 @@
 const Message = require('../models/Message');
 const Room = require('../models/Room');
+const GroupAuditLog = require('../models/GroupAuditLog');
 const store = require('../store');
 const config = require('../../config');
 const logger = require('../logger');
@@ -81,6 +82,14 @@ module.exports = async (req, res, next) => {
       }
 
       logger.info({ userId: userID, messageId: messageID, roomId: roomID }, 'Message deleted for everyone');
+
+      // Audit-logged only on the moderator-override path — an author
+      // deleting their own message isn't a moderation action.
+      if (room.isGroup && isModerator && !isAuthor) {
+        await GroupAuditLog.create({
+          group: room._id, actor: userID, action: 'message_deleted_by_admin', metadata: { messageId: messageID },
+        });
+      }
 
       room.people.forEach((person) => {
         const personUserID = person.toString();

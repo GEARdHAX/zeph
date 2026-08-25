@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Settings, Plus, Cpu, UserPlus, Users, Lock,
+  Settings, Plus, Cpu, UserPlus, Users, Lock, Link2,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
 import AddPeople from './AddPeople';
+import InviteFriend from './InviteFriend';
 
 function TopBar() {
   const setPanel = useGlobal('panel')[1];
@@ -16,6 +17,7 @@ function TopBar() {
   const [user] = useGlobal('user');
   const [nav, setNav] = useGlobal('nav');
   const [showAddPeople, setShowAddPeople] = useState(false);
+  const [showInviteFriend, setShowInviteFriend] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const menuRef = useRef(null);
@@ -54,6 +56,13 @@ function TopBar() {
     e.stopPropagation();
     setIsMenuOpen(false);
     setShowAddPeople(true);
+  };
+
+  const handleInviteFriend = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsMenuOpen(false);
+    setShowInviteFriend(true);
   };
 
   return (
@@ -121,6 +130,14 @@ function TopBar() {
               <button
                 type="button"
                 className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted focus:bg-muted transition-colors text-left"
+                onClick={handleInviteFriend}
+              >
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                <span>Invite Friend</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted focus:bg-muted transition-colors text-left"
                 onClick={handleCreateGroup}
               >
                 <Users className="h-4 w-4 text-muted-foreground" />
@@ -158,6 +175,7 @@ function TopBar() {
       </div>
 
       {showAddPeople && <AddPeople onClose={() => setShowAddPeople(false)} />}
+      {showInviteFriend && <InviteFriend onClose={() => setShowInviteFriend(false)} />}
     </div>
   );
 }

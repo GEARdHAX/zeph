@@ -5,6 +5,95 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-037: Group architecture 80/20 completion — join requests, ban, slow mode, ownership transfer, audit log — 2026-08-25
+
+**Problem:** A spec for "Chitcx Group Architecture" (roles, membership
+lifecycle, join/request system, moderation, slow mode, audit log) described
+building a Group+Conversation+Membership system essentially from scratch.
+Auditing first (per the spec's own instruction) found the architecture
+already ~70% built under D-035 ("Group IS-A Room"): `Room`(isGroup:true) is
+the group model, `GroupMember` already has OWNER/ADMIN/MEMBER roles and a
+capability table nearly matching the spec verbatim, and a full invite-link
+system (`GroupInvite`) shipped earlier the same session. Building the spec
+literally would have duplicated all of that under new names. This entry
+covers only the genuine gaps found.
+
+**Genuine gaps closed:**
+- `GroupMember.status` enum (PENDING/ACTIVE/LEFT/REMOVED/BANNED), additive
+  alongside the existing `active` boolean rather than replacing it — every
+  one of the ~8 pre-existing routes filtering on `active:true` needed zero
+  changes. New/touched routes set both fields together so they never
+  disagree (see GroupMember.js's model comment).
+- Join-request flow (`group/join-requests/{create,list,approve,deny}.js`) —
+  the no-invite discovery path for a PRIVATE group whose id the caller
+  already knows. Deliberately distinct from `group/invites/join.js`: an
+  invite link IS the approval; a join-request creates a PENDING row an
+  ADMIN/OWNER must act on. `GroupMember`'s unique `{group,user}` index means
+  a prior LEFT/REMOVED row from the same user must be *upserted over*, not
+  treated as a duplicate — only a genuinely non-terminal existing row (a
+  real duplicate PENDING request) refuses.
+- Ban (`group/members-ban.js`, `Capabilities.BAN_MEMBER`) — distinct from
+  remove: `groupPolicy.isBanned()` blocks rejoin via both the join-request
+  path and the existing invite-link join. **Found and fixed a real gap
+  while wiring this in**: `group/invites/join.js`'s existing atomic upsert
+  set `active:true` but never `status`, meaning a BANNED or REMOVED row's
+  `status` field would go stale (still `BANNED`) while `active` flipped
+  true — same bug existed in `members-add.js`. Both now set `status`
+  explicitly alongside `active` in the same write. `members-add.js`'s
+  behavior is intentionally left as "an admin's direct add IS allowed to
+  override a ban" (a deliberate override, unlike an invite link which never
+  overrides one) — the fix is only that `status` now stays consistent with
+  `active` afterward, not a behavior change to who can be re-added.
+- Ownership transfer (`group/ownership-transfer.js`) — CAS on the actor
+  still holding OWNER (a losing racer 409s rather than double-transferring).
+  Old owner becomes ADMIN, not demoted further — a deliberate handoff, not
+  a removal. `Room.ownerId` (a denormalized cache per Room.js's own comment)
+  kept in sync.
+- Slow mode — lives in `Room.settings.slowModeSeconds` (the existing Mixed
+  field, previously entirely unused), configurable to
+  off/5s/10s/30s/1m/5m via `group/update.js`. Enforced in `message.js`
+  right after the existing membership/capability check; OWNER/ADMIN bypass
+  (a moderator shouldn't be able to lock themselves out mid-incident).
+  Frontend: `retryWithBackoff.js` was unconditionally retrying every error
+  including a 429 up to 4 times with exponential backoff — harmless for a
+  transient network failure, actively wrong for slow mode (guaranteed to
+  fail identically on every retry, burning ~7s before the user sees
+  anything). Fixed to stop retrying on any 4xx.
+- `GroupAuditLog` — new collection, additive to (not a replacement for) the
+  existing pino `logger.info`/`logger.warn` calls already in these routes.
+  Written inline/synchronously (`.create()`, same fire-and-forget shape as
+  the existing logger calls) rather than queued — no BullMQ/Redis exists
+  anywhere in this codebase yet (confirmed by grep), and introducing either
+  just for this would violate both this spec's and CLAUDE.md's "no new
+  infrastructure" constraints. `message-delete.js`'s existing
+  author-OR-moderator delete branch (built pre-D-037, this pass didn't know
+  it existed until reading the file) now audit-logs only the
+  moderator-override path — a user deleting their own message isn't a
+  moderation action.
+
+**What was NOT built, deliberately:** a frontend admin console (member
+management screen, pending-requests approval queue, ban list, audit log
+viewer). No such screen exists for the *existing* group features either
+(role change, remove, group settings are all API-only today) — building a
+full console for only the newest features while everything else stays
+API-only would be an inconsistent, premature frontend investment. Frontend
+this pass: the `requestToJoinGroup` action + a slow-mode-aware error toast
+in the composer, matching the "backend-complete, minimal frontend hooks"
+scope chosen with the user.
+
+**Testing:** `group-join-requests.test.js` (create/approve/deny, duplicate-
+request race, banned-user block, non-admin approval rejection, re-request
+after LEFT/denial), `group-ban.test.js` (ban blocks both invite-link and
+join-request rejoin, role hierarchy, audit log), `group-ownership-
+transfer.test.js` (role swap, Room.ownerId sync, non-owner/self/non-member
+rejection), `group-slow-mode.test.js` (rapid-send 429, OWNER/ADMIN bypass,
+disabled/unset never blocks), `group-audit-log.test.js` (spot-check
+settings_changed and message_deleted_by_admin, confirming self-delete is
+NOT logged). Full backend suite: 441/441 (29 new), zero regressions.
+Frontend: 278/278, zero regressions. Production build passes.
+
+---
+
 ## D-036: Every 1:1/group participant showed as "Deleted User" — Mongoose cast bug, not an account-deletion bug — 2026-08-21
 
 **Problem:** Immediately after D-035 shipped, a report came in that a

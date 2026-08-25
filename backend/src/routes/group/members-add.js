@@ -34,14 +34,21 @@ module.exports = async (req, res) => {
 
   // Atomic upsert — the actual concurrency-safety mechanism for duplicate/
   // concurrent add requests, backed by GroupMember's unique {group,user}
-  // index. Re-adding an already-active member is an idempotent no-op.
+  // index. Re-adding an already-active member is an idempotent no-op. A
+  // direct add by an admin is a deliberate override of any prior BANNED/
+  // REMOVED/LEFT status (unlike an invite-link join, which never overrides
+  // a ban — see group/invites/join.js) — status is set to ACTIVE alongside
+  // active so the two fields never disagree afterward, see GroupMember.js.
   let membership;
   let wasNew = false;
   try {
     const before = await GroupMember.findOne({ group: room._id, user: target._id });
     membership = await GroupMember.findOneAndUpdate(
       { group: room._id, user: target._id },
-      { $setOnInsert: { role: 'MEMBER', joinedAt: new Date() }, $set: { active: true, updatedAt: new Date() } },
+      {
+        $setOnInsert: { role: 'MEMBER', joinedAt: new Date() },
+        $set: { active: true, status: 'ACTIVE', updatedAt: new Date() },
+      },
       { upsert: true, new: true },
     );
     wasNew = !before || !before.active;

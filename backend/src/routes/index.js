@@ -1,6 +1,12 @@
 const router = require('express').Router();
 const passport = require('passport');
 const Config = require('../../config');
+const inviteRateLimit = require('../lib/inviteRateLimit');
+
+const jwtAuth = passport.authenticate('jwt', { session: false }, null);
+const inviteCreateLimit = inviteRateLimit({ max: 20, windowMs: 60 * 60 * 1000, keyPrefix: 'invite:create' });
+const invitePreviewLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'invite:preview' });
+const inviteAcceptLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'invite:accept' });
 
 router.get('/images/:id', require('./images'));
 router.get('/files/:id', require('./files'));
@@ -59,6 +65,17 @@ router.post(
 );
 router.post('/group/leave', passport.authenticate('jwt', { session: false }, null), require('./group/leave'));
 router.post('/group/delete', passport.authenticate('jwt', { session: false }, null), require('./group/delete'));
+router.post('/group/members/ban', passport.authenticate('jwt', { session: false }, null), require('./group/members-ban'));
+router.post(
+  '/group/ownership/transfer',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./group/ownership-transfer'),
+);
+
+router.post('/group/join-requests', jwtAuth, require('./group/join-requests/create'));
+router.post('/group/join-requests/list', jwtAuth, require('./group/join-requests/list'));
+router.post('/group/join-requests/:userId/approve', jwtAuth, require('./group/join-requests/approve'));
+router.post('/group/join-requests/:userId/deny', jwtAuth, require('./group/join-requests/deny'));
 
 router.post('/conversation/hide', passport.authenticate('jwt', { session: false }, null), require('./conversation-hide'));
 router.post('/conversation/unhide', passport.authenticate('jwt', { session: false }, null), require('./conversation-unhide'));
@@ -163,5 +180,14 @@ router.post('/block', passport.authenticate('jwt', { session: false }, null), re
 router.post('/unblock', passport.authenticate('jwt', { session: false }, null), require('./relationships/unblock'));
 
 router.use('/info', require('./info'));
+
+router.post('/friends/invites', jwtAuth, inviteCreateLimit, require('./friends/invites/create'));
+router.get('/friends/invites/:token', invitePreviewLimit, require('./friends/invites/preview'));
+router.post('/friends/invites/:token/accept', jwtAuth, inviteAcceptLimit, require('./friends/invites/accept'));
+
+router.post('/group/invites/create', jwtAuth, inviteCreateLimit, require('./group/invites/create'));
+router.get('/group/invites/:token', invitePreviewLimit, require('./group/invites/preview'));
+router.post('/group/invites/:token/join', jwtAuth, inviteAcceptLimit, require('./group/invites/join'));
+router.post('/group/invites/:token/revoke', jwtAuth, require('./group/invites/revoke'));
 
 module.exports = router;

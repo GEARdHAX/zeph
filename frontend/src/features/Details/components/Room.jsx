@@ -4,11 +4,13 @@ import {
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useGlobal } from 'reactn';
-import { Users, Image as ImageIcon } from 'lucide-react';
+import { Users, Image as ImageIcon, Link2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
 import ProfileView from '../../Panel/components/ProfileView';
+import InviteGroup from '../../Group/components/InviteGroup';
 import createRoom from '../../../actions/createRoom';
 import Actions from '../../../constants/Actions';
 import getMediaCategory from '../../../lib/mediaType';
@@ -80,6 +82,7 @@ function Room() {
   const [open, setOpen] = useState(null);
   const [tab, setTab] = useState('members'); // 'members' | 'media'
   const [previewUsername, setPreviewUsername] = useState(null);
+  const [showInviteGroup, setShowInviteGroup] = useState(false);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -262,6 +265,16 @@ function Room() {
         <div className="mt-3">
           {tab === 'members' && (
             <div className="flex flex-col gap-0.5">
+              {room.isGroup && (
+                <Button
+                  variant="secondary"
+                  className="mb-1.5 justify-start gap-2 text-xs"
+                  onClick={() => setShowInviteGroup(true)}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Invite Members
+                </Button>
+              )}
               {members}
             </div>
           )}
@@ -297,6 +310,14 @@ function Room() {
           username={previewUsername}
           onClose={() => setPreviewUsername(null)}
           onOpenChat={openChat}
+        />
+      )}
+
+      {showInviteGroup && (
+        <InviteGroup
+          groupId={room._id}
+          groupName={room.title}
+          onClose={() => setShowInviteGroup(false)}
         />
       )}
     </div>

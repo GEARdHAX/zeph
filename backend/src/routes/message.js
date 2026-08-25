@@ -35,6 +35,22 @@ module.exports = async (req, res, next) => {
     if (!membership || !groupPolicy.hasCapability(membership.role, groupPolicy.Capabilities.SEND_MESSAGE)) {
       return res.status(403).json({ error: true });
     }
+
+    // Slow mode — OWNER/ADMIN bypass (a moderator shouldn't be able to lock
+    // themselves out mid-incident, matches every mainstream chat app's
+    // convention). settings is Mixed/unset for every group that hasn't
+    // configured slow mode, so the falsy check covers both "never set" and
+    // explicitly disabled (0).
+    const slowModeSeconds = room.settings && room.settings.slowModeSeconds;
+    const isModerator = membership.role === groupPolicy.Roles.OWNER || membership.role === groupPolicy.Roles.ADMIN;
+    if (slowModeSeconds && !isModerator) {
+      const lastMessage = await Message.findOne({ room: room._id, author: authorID })
+        .sort({ _id: -1 })
+        .select('date');
+      if (lastMessage && Date.now() - new Date(lastMessage.date).getTime() < slowModeSeconds * 1000) {
+        return res.status(429).json({ error: true, reason: 'SLOW_MODE' });
+      }
+    }
   } else {
     const isMember = room.people.some((person) => person.toString() === authorID.toString());
     if (!isMember) {

@@ -128,6 +128,9 @@ function BottomBar({ aiEnabled }) {
       })
       .catch((err) => {
         console.log(err);
+        if (err.response?.data?.reason === 'SLOW_MODE') {
+          toast.error('Slow mode is on — wait a moment before sending another message.');
+        }
         dispatch({ type: Actions.MESSAGE_UPDATE, clientID, patch: { status: 'failed' } });
       });
   };

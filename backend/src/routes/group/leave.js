@@ -21,7 +21,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: true, reason: 'owner_must_use_delete_endpoint' });
   }
 
-  await GroupMember.updateOne({ _id: membership._id }, { $set: { active: false, updatedAt: new Date() } });
+  await GroupMember.updateOne({ _id: membership._id }, { $set: { active: false, status: 'LEFT', updatedAt: new Date() } });
   await Room.updateOne({ _id: room._id }, { $pull: { people: userId } });
 
   forceLeaveGroupRoom(userId.toString(), room._id.toString());
