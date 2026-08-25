@@ -308,6 +308,72 @@ describe('Member add/remove concurrency', () => {
   });
 });
 
+// ADD_MEMBER is deliberately open to every role — "anyone can invite their
+// friend" is the product intent (same trust level CREATE_INVITE already
+// had), not just OWNER/ADMIN. See groupPolicy.js ROLE_CAPABILITIES.
+describe('A plain MEMBER can add a friend directly (ADD_MEMBER is not admin-only)', () => {
+  it('a MEMBER can call members/add and it succeeds', async () => {
+    const owner = await createUser();
+    const member = await createUser();
+    const friend = await createUser();
+    const created = await createGroup(owner, [member._id]);
+    const groupId = created.body._id;
+
+    const res = await request(app).post('/api/group/members/add')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({ id: groupId, userId: friend._id.toString() });
+    expect(res.status).toBe(200);
+
+    const membership = await GroupMember.findOne({ group: groupId, user: friend._id });
+    expect(membership.active).toBe(true);
+    expect(membership.role).toBe('MEMBER');
+  });
+
+  it('a non-member is still rejected — ADD_MEMBER being open to MEMBER does not mean open to everyone', async () => {
+    const owner = await createUser();
+    const outsider = await createUser();
+    const friend = await createUser();
+    const created = await createGroup(owner);
+
+    const res = await request(app).post('/api/group/members/add')
+      .set('Authorization', `Bearer ${tokenFor(outsider)}`)
+      .send({ id: created.body._id, userId: friend._id.toString() });
+    expect(res.status).toBe(404);
+  });
+
+  // Regression: a user who deleted this group from their inbox, was
+  // removed, then got directly re-added stayed permanently invisible in
+  // rooms/list — nothing cleared the stale ConversationUserState.deletedAt
+  // tombstone on re-add. See unhideConversationForUser.js.
+  it('reappears in the target\'s inbox after being deleted, removed, then re-added', async () => {
+    const owner = await createUser();
+    const target = await createUser();
+    const created = await createGroup(owner, [target._id]);
+    const groupId = created.body._id;
+
+    await request(app).post('/api/group/members/remove')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, userId: target._id.toString() });
+
+    await request(app).post('/api/conversation/delete')
+      .set('Authorization', `Bearer ${tokenFor(target)}`)
+      .send({ conversationId: groupId });
+
+    const listBefore = await request(app).post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(target)}`).send({});
+    expect(listBefore.body.rooms.map((r) => r._id)).not.toContain(groupId);
+
+    const readd = await request(app).post('/api/group/members/add')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, userId: target._id.toString() });
+    expect(readd.status).toBe(200);
+
+    const listAfter = await request(app).post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(target)}`).send({});
+    expect(listAfter.body.rooms.map((r) => r._id)).toContain(groupId);
+  });
+});
+
 describe('Admin privacy boundary inside groups', () => {
   it('a standard user cannot add a privileged user to a group', async () => {
     const owner = await createUser();
@@ -519,5 +585,64 @@ describe('Cursor pagination / member list limits', () => {
     const requestedTooMany = await request(app).post('/api/group/members')
       .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, limit: 99999 });
     expect(requestedTooMany.body.limit).toBeLessThanOrEqual(100);
+  });
+});
+
+// D-037's status field was added after real GroupMember rows already
+// existed in production/dev databases — those rows have active:true but no
+// status field ever persisted to disk (Mongoose's schema default masked
+// this in memory, showing status:'ACTIVE' on read even though nothing was
+// written). getMembership() must still treat those as valid ACTIVE
+// memberships, not 404 them. Reproduced here via a raw collection write
+// (bypassing Mongoose's schema, same as how a genuinely pre-D-037 row
+// looks), not GroupMember.create(), since create() would apply the
+// default and persist status normally — defeating the point of this test.
+describe('Legacy GroupMember rows with no status field (pre-D-037)', () => {
+  it('a legacy ACTIVE row (active:true, no status) is still treated as a valid member', async () => {
+    const owner = await createUser();
+    const legacyMember = await createUser();
+    const created = await createGroup(owner);
+    const groupId = created.body._id;
+
+    await GroupMember.collection.insertOne({
+      group: new mongoose.Types.ObjectId(groupId),
+      user: legacyMember._id,
+      role: 'MEMBER',
+      active: true,
+      joinedAt: new Date(),
+      updatedAt: new Date(),
+      // status intentionally omitted — simulates a pre-D-037 row.
+    });
+    await Room.updateOne({ _id: groupId }, { $addToSet: { people: legacyMember._id } });
+
+    const getRes = await request(app).post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(legacyMember)}`).send({ id: groupId });
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.group.myRole).toBe('MEMBER');
+
+    const msgRes = await request(app).post('/api/message')
+      .set('Authorization', `Bearer ${tokenFor(legacyMember)}`)
+      .send({ roomID: groupId, content: 'hi from a legacy member', type: 'text' });
+    expect(msgRes.status).toBe(200);
+  });
+
+  it('a legacy REMOVED row (active:false, no status) is still treated as not a member', async () => {
+    const owner = await createUser();
+    const formerMember = await createUser();
+    const created = await createGroup(owner);
+    const groupId = created.body._id;
+
+    await GroupMember.collection.insertOne({
+      group: new mongoose.Types.ObjectId(groupId),
+      user: formerMember._id,
+      role: 'MEMBER',
+      active: false,
+      joinedAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const getRes = await request(app).post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(formerMember)}`).send({ id: groupId });
+    expect(getRes.status).toBe(404);
   });
 });

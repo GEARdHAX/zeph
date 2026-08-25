@@ -22,7 +22,7 @@ module.exports = async (req, res, next) => {
     return res.status(404).json({ error: true });
   }
 
-  if (!room) {
+  if (!room || room.disabledAt) {
     return res.status(404).json({ error: true });
   }
 

@@ -26,12 +26,17 @@ const makeMessage = (overrides = {}) => ({
   ...overrides,
 });
 
-function renderMessages(msgs) {
+function renderMessages(msgs, roomOverrides = {}) {
   const rootReducer = combineReducers({
     emoji, io, messages, rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
-  store.dispatch({ type: Actions.SET_ROOM, room: { _id: 'room-1', people: [{ _id: 'user-1' }, { _id: 'user-2' }] } });
+  store.dispatch({
+    type: Actions.SET_ROOM,
+    room: {
+      _id: 'room-1', people: [{ _id: 'user-1' }, { _id: 'user-2' }], ...roomOverrides,
+    },
+  });
   store.dispatch({ type: Actions.SET_MESSAGES, messages: msgs });
 
   render(
@@ -85,5 +90,75 @@ describe('Messages day separators', () => {
     ]);
 
     expect(screen.getAllByText('Today')).toHaveLength(1);
+  });
+});
+
+describe('type:system messages (moderation events)', () => {
+  it('renders the system message content as a centered pill, not a chat bubble', () => {
+    renderMessages([
+      makeMessage({
+        type: 'system', content: 'Tom Target was removed by Alice Owner', author: null,
+      }),
+    ]);
+
+    expect(screen.getByText('Tom Target was removed by Alice Owner')).toBeInTheDocument();
+  });
+
+  it('does not show an author name header or avatar for a system message', () => {
+    renderMessages([
+      makeMessage({
+        type: 'system', content: 'Jane Bad was banned by Bob Owner', author: null,
+      }),
+    ]);
+
+    expect(screen.queryByText('Deleted')).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/View/)).not.toBeInTheDocument();
+  });
+
+  it('renders normally alongside a real message in the same list', () => {
+    renderMessages([
+      makeMessage({ content: 'hey', date: moment().hour(9).toISOString() }),
+      makeMessage({
+        type: 'system', content: 'Tom Target was removed by Alice Owner', author: null, date: moment().hour(9).minute(5).toISOString(),
+      }),
+    ]);
+
+    expect(screen.getByText('hey')).toBeInTheDocument();
+    expect(screen.getByText('Tom Target was removed by Alice Owner')).toBeInTheDocument();
+  });
+});
+
+describe('Empty-state message reflects how the member joined (myJoinInfo)', () => {
+  it('shows "You joined via invite link" with the inviter name for INVITE_LINK', () => {
+    renderMessages([], { myJoinInfo: { method: 'INVITE_LINK', inviterName: 'Alice Owner' } });
+
+    expect(screen.getByText('You joined via invite link')).toBeInTheDocument();
+    expect(screen.getByText(/Invited by Alice Owner/)).toBeInTheDocument();
+    expect(screen.queryByText('No messages here yet')).not.toBeInTheDocument();
+  });
+
+  it('shows "You were added to this group" for ADDED', () => {
+    renderMessages([], { myJoinInfo: { method: 'ADDED', inviterName: 'Bob Admin' } });
+
+    expect(screen.getByText('You were added to this group')).toBeInTheDocument();
+  });
+
+  it('shows "Your request to join was approved" for JOIN_REQUEST', () => {
+    renderMessages([], { myJoinInfo: { method: 'JOIN_REQUEST', inviterName: 'Carol Owner' } });
+
+    expect(screen.getByText('Your request to join was approved')).toBeInTheDocument();
+  });
+
+  it('omits the "Invited by" clause when inviterName is null (the group creator)', () => {
+    renderMessages([], { myJoinInfo: { method: 'CREATED', inviterName: null } });
+
+    expect(screen.queryByText(/Invited by/)).not.toBeInTheDocument();
+    expect(screen.getByText('Send a message to start the conversation!')).toBeInTheDocument();
+  });
+
+  it('falls back to the generic empty state when myJoinInfo is absent (e.g. a DM)', () => {
+    renderMessages([]);
+
+    expect(screen.getByText('No messages here yet')).toBeInTheDocument();
   });
 });

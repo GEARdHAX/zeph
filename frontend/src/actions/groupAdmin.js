@@ -60,3 +60,15 @@ export const updateGroupSettings = (id, updates) => axios({
   url: `${Config.url || ''}/api/group/update`,
   data: { id, ...updates },
 });
+
+export const leaveGroup = (id) => axios({
+  method: 'post',
+  url: `${Config.url || ''}/api/group/leave`,
+  data: { id },
+});
+
+export const deleteGroup = (id) => axios({
+  method: 'post',
+  url: `${Config.url || ''}/api/group/delete`,
+  data: { id },
+});

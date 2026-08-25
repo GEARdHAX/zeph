@@ -5,6 +5,7 @@ const sanitizeDeletedMessage = require('../utils/sanitizeDeletedMessage');
 const requireVisibleConversation = require('../utils/requireVisibleConversation');
 const roomHasBoundaryViolation = require('../utils/roomHasBoundaryViolation');
 const { hasValidVaultToken } = require('../vault/vaultToken');
+const groupPolicy = require('../authorization/groupPolicy');
 
 module.exports = async (req, res, next) => {
   let { roomID, firstMessageID } = req.fields;
@@ -13,11 +14,13 @@ module.exports = async (req, res, next) => {
   // roomID with no membership check at all. Fetching the room here is also
   // what roomHasBoundaryViolation needs, so both checks share the one query.
   const room = await Room.findOne({ _id: roomID });
-  if (!room) {
+  if (!room || room.disabledAt) {
     return res.status(404).json({ error: true });
   }
-  const isMember = room.people.some((person) => person.toString() === req.user.id.toString());
-  if (!isMember) {
+  // A former group member (removed/banned/left) can still page through
+  // history they already had access to — see canReadRoomHistory.
+  const canRead = await groupPolicy.canReadRoomHistory(room, req.user.id);
+  if (!canRead) {
     return res.status(403).json({ error: true });
   }
 

@@ -1,9 +1,13 @@
-import { useEffect, useState, useCallback } from 'react';
+import {
+  useEffect, useState, useCallback, useMemo,
+} from 'react';
 import { toast } from 'react-toastify';
 import {
-  Shield, UserX, Ban, Crown, Clock, Check, X, UserPlus2,
+  Shield, UserX, Ban, Crown, Clock, Check, X, UserPlus2, LogOut, Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '@/components/ui/sheet';
@@ -16,10 +20,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import Config from '../../../config';
+import ProfileView from '../../Panel/components/ProfileView';
+import createRoom from '../../../actions/createRoom';
+import Actions from '../../../constants/Actions';
 import {
   listGroupMembers, listJoinRequests, approveJoinRequest, denyJoinRequest,
   removeMember, banMember, changeMemberRole, transferOwnership, updateGroupSettings,
+  leaveGroup, deleteGroup,
 } from '../../../actions/groupAdmin';
 
 const SLOW_MODE_OPTIONS = [
@@ -30,6 +40,7 @@ const SLOW_MODE_OPTIONS = [
   { value: 60, label: '1 minute' },
   { value: 300, label: '5 minutes' },
 ];
+const PRESET_SLOW_MODE_VALUES = new Set(SLOW_MODE_OPTIONS.map((o) => o.value));
 
 const ROLE_RANK = { OWNER: 3, ADMIN: 2, MEMBER: 1 };
 
@@ -60,7 +71,27 @@ function GroupAdminPanel({
   const [members, setMembers] = useState(null);
   const [requests, setRequests] = useState(null);
   const [busyUserId, setBusyUserId] = useState(null);
-  const [confirmAction, setConfirmAction] = useState(null); // { type: 'ban'|'remove'|'transfer', person }
+  // { type: 'ban'|'remove'|'transfer'|'leave'|'delete', person? }
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [previewUsername, setPreviewUsername] = useState(null);
+  const [showLeaveChoice, setShowLeaveChoice] = useState(false);
+  const [showCustomSlowMode, setShowCustomSlowMode] = useState(false);
+  const [customSlowModeInput, setCustomSlowModeInput] = useState('');
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const io = useSelector((state) => state.io.io);
+
+  const openChat = async (targetUserID) => {
+    setPreviewUsername(null);
+    onClose?.();
+    try {
+      const res = await createRoom(targetUserID);
+      dispatch({ type: Actions.SET_ROOM, room: res.data.room });
+      navigate(`/room/${res.data.room._id}`);
+    } catch (err) {
+      console.error('Could not start chat:', err);
+    }
+  };
 
   const isOwner = myRole === 'OWNER';
   const canManageAdmins = isOwner;
@@ -80,6 +111,75 @@ function GroupAdminPanel({
     loadRequests();
   }, [loadMembers, loadRequests]);
 
+  // Live updates while the panel is open — other admins acting on this same
+  // group (approve/deny/ban/remove/role-change/ownership-transfer) update
+  // this view without a manual reopen. Every socket already listens on its
+  // own personal room (auto-joined at connect, see backend init.js) — the
+  // backend delivers every group:* event by iterating the member list and
+  // emitting to each person directly (utils/broadcastToGroup.js), not via a
+  // Socket.IO room, so no join/leave-room handshake is needed here. Targeted
+  // local state updates, not a full refetch, per the "avoid full refetch
+  // after mutations" guidance — the one exception is member-added, where the
+  // panel doesn't have the new member's populated user object and a
+  // single-member fetch would be more code than the list already refetches.
+  useEffect(() => {
+    if (!io || !groupId) return undefined;
+
+    const onMemberAdded = () => loadMembers();
+    const onMemberRemoved = (payload) => {
+      if (payload.groupId !== groupId) return;
+      setMembers((prev) => (prev ? prev.filter((m) => m.user._id !== payload.userId) : prev));
+      if (payload.self) {
+        toast.info('You are no longer a member of this group.');
+        onClose?.();
+      }
+    };
+    const onMemberBanned = (payload) => {
+      if (payload.groupId !== groupId) return;
+      setMembers((prev) => (prev ? prev.filter((m) => m.user._id !== payload.userId) : prev));
+    };
+    const onRoleUpdated = (payload) => {
+      if (payload.groupId !== groupId) return;
+      setMembers((prev) => (prev
+        ? prev.map((m) => (m.user._id === payload.userId ? { ...m, role: payload.role } : m))
+        : prev));
+    };
+    const onOwnershipTransferred = () => loadMembers();
+    const onJoinRequestCreated = (payload) => {
+      if (payload.groupId !== groupId || !canModerate) return;
+      loadRequests();
+    };
+    const onJoinRequestDenied = (payload) => {
+      if (payload.groupId !== groupId) return;
+      setRequests((prev) => (prev ? prev.filter((r) => r.user._id !== payload.userId) : prev));
+    };
+    const onSettingsUpdated = (payload) => {
+      if (payload.groupId !== groupId || payload['settings.slowModeSeconds'] === undefined) return;
+      onSettingsChanged?.({ slowModeSeconds: payload['settings.slowModeSeconds'] });
+    };
+
+    io.on('group:member:added', onMemberAdded);
+    io.on('group:member:removed', onMemberRemoved);
+    io.on('group:member:banned', onMemberBanned);
+    io.on('group:member:role-updated', onRoleUpdated);
+    io.on('group:ownership:transferred', onOwnershipTransferred);
+    io.on('group:join-request:created', onJoinRequestCreated);
+    io.on('group:join-request:denied', onJoinRequestDenied);
+    io.on('group:updated', onSettingsUpdated);
+
+    return () => {
+      io.off('group:member:added', onMemberAdded);
+      io.off('group:member:removed', onMemberRemoved);
+      io.off('group:member:banned', onMemberBanned);
+      io.off('group:member:role-updated', onRoleUpdated);
+      io.off('group:ownership:transferred', onOwnershipTransferred);
+      io.off('group:join-request:created', onJoinRequestCreated);
+      io.off('group:join-request:denied', onJoinRequestDenied);
+      io.off('group:updated', onSettingsUpdated);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [io, groupId, canModerate, loadMembers, loadRequests]);
+
   const withBusy = async (userId, fn) => {
     setBusyUserId(userId);
     try {
@@ -93,52 +193,118 @@ function GroupAdminPanel({
 
   const onApprove = (userId) => withBusy(userId, async () => {
     await approveJoinRequest(groupId, userId);
-    toast.success('Request approved.');
-    loadRequests();
+    toast.success('Join request approved.');
+    setRequests((prev) => (prev ? prev.filter((r) => r.user._id !== userId) : prev));
     loadMembers();
   });
 
   const onDeny = (userId) => withBusy(userId, async () => {
     await denyJoinRequest(groupId, userId);
-    toast.success('Request denied.');
-    loadRequests();
+    toast.success('Join request denied.');
+    setRequests((prev) => (prev ? prev.filter((r) => r.user._id !== userId) : prev));
   });
 
   const onRoleChange = (userId, role) => withBusy(userId, async () => {
     await changeMemberRole(groupId, userId, role);
-    toast.success('Role updated.');
-    loadMembers();
+    toast.success(role === 'ADMIN' ? 'User was promoted to admin.' : 'User was demoted to member.');
+    setMembers((prev) => (prev ? prev.map((m) => (m.user._id === userId ? { ...m, role } : m)) : prev));
   });
 
   const onConfirmedAction = async () => {
     const { type, person } = confirmAction;
     setConfirmAction(null);
+
+    if (type === 'delete') {
+      setBusyUserId('__group__');
+      try {
+        await deleteGroup(groupId);
+        toast.success('Group deleted.');
+        onClose?.();
+        navigate('/');
+      } catch (err) {
+        toast.error('Could not delete group.');
+      } finally {
+        setBusyUserId(null);
+      }
+      return;
+    }
+
+    if (type === 'leave') {
+      setBusyUserId('__group__');
+      try {
+        await leaveGroup(groupId);
+        toast.success('You left the group.');
+        onClose?.();
+        navigate('/');
+      } catch (err) {
+        toast.error('Could not leave group.');
+      } finally {
+        setBusyUserId(null);
+      }
+      return;
+    }
+
     await withBusy(person.user._id, async () => {
       if (type === 'ban') {
         await banMember(groupId, person.user._id);
-        toast.success(`${person.user.firstName} was banned.`);
+        toast.success('User was banned from the group.');
+        setMembers((prev) => (prev ? prev.filter((m) => m.user._id !== person.user._id) : prev));
       } else if (type === 'remove') {
         await removeMember(groupId, person.user._id);
-        toast.success(`${person.user.firstName} was removed.`);
+        toast.success('User was removed from the group.');
+        setMembers((prev) => (prev ? prev.filter((m) => m.user._id !== person.user._id) : prev));
       } else if (type === 'transfer') {
         await transferOwnership(groupId, person.user._id);
-        toast.success(`Ownership transferred to ${person.user.firstName}.`);
+        toast.success('Ownership transferred successfully.');
+        loadMembers();
       }
-      loadMembers();
     });
   };
 
-  const onSlowModeChange = async (value) => {
-    try {
-      await updateGroupSettings(groupId, { slowModeSeconds: Number(value) });
-      toast.success('Slow mode updated.');
-      onSettingsChanged?.({ slowModeSeconds: Number(value) });
-    } catch (err) {
-      toast.error('Could not update slow mode.');
+  const onLeaveClick = () => {
+    if (isOwner) {
+      setShowLeaveChoice(true);
+    } else {
+      setConfirmAction({ type: 'leave' });
     }
   };
 
+  const applySlowMode = async (seconds) => {
+    try {
+      await updateGroupSettings(groupId, { slowModeSeconds: seconds });
+      toast.success('Slow mode updated.');
+      onSettingsChanged?.({ slowModeSeconds: seconds });
+    } catch (err) {
+      toast.error(err.response?.data?.reason === 'INVALID_SLOW_MODE' ? 'Invalid slow-mode value.' : 'Could not update slow mode.');
+    }
+  };
+
+  const onSlowModeChange = (value) => {
+    if (value === 'custom') {
+      setCustomSlowModeInput(currentSettings?.slowModeSeconds ? String(currentSettings.slowModeSeconds) : '');
+      setShowCustomSlowMode(true);
+      return;
+    }
+    applySlowMode(Number(value));
+  };
+
+  const onCustomSlowModeSubmit = (e) => {
+    e.preventDefault();
+    const parsed = Number(customSlowModeInput);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      toast.error('Enter a whole number of seconds.');
+      return;
+    }
+    setShowCustomSlowMode(false);
+    applySlowMode(parsed);
+  };
+
   const currentSlowMode = currentSettings?.slowModeSeconds ?? 0;
+  const isCustomSlowMode = !PRESET_SLOW_MODE_VALUES.has(currentSlowMode);
+  const slowModeLabel = useMemo(() => {
+    if (isCustomSlowMode) return `Custom (${currentSlowMode}s)`;
+    return SLOW_MODE_OPTIONS.find((o) => o.value === currentSlowMode)?.label || 'Off';
+  }, [currentSlowMode, isCustomSlowMode]);
 
   return (
     <>
@@ -156,19 +322,20 @@ function GroupAdminPanel({
                   <Clock className="h-3.5 w-3.5" />
                   Slow Mode
                 </div>
-                <DropdownMenu>
+                <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <Button variant="secondary" size="sm" className="w-full justify-between text-xs">
-                      {SLOW_MODE_OPTIONS.find((o) => o.value === currentSlowMode)?.label || 'Off'}
+                      {slowModeLabel}
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                    <DropdownMenuRadioGroup value={String(currentSlowMode)} onValueChange={onSlowModeChange}>
+                  <DropdownMenuContent className="z-[99999] w-[--radix-dropdown-menu-trigger-width]">
+                    <DropdownMenuRadioGroup value={isCustomSlowMode ? 'custom' : String(currentSlowMode)} onValueChange={onSlowModeChange}>
                       {SLOW_MODE_OPTIONS.map((opt) => (
                         <DropdownMenuRadioItem key={opt.value} value={String(opt.value)}>
                           {opt.label}
                         </DropdownMenuRadioItem>
                       ))}
+                      <DropdownMenuRadioItem value="custom">Custom…</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -184,7 +351,7 @@ function GroupAdminPanel({
                 <div className="flex flex-col gap-1">
                   {requests.map((r) => (
                     <div key={r._id} className="flex items-center justify-between gap-2 rounded-xl p-2 hover:bg-muted/60">
-                      <div className="flex min-w-0 items-center gap-2.5">
+                      <button type="button" onClick={() => setPreviewUsername(r.user.username)} className="flex min-w-0 items-center gap-2.5 text-left cursor-pointer hover:opacity-80 transition-opacity">
                         <MemberAvatar person={r.user} className="h-8 w-8" />
                         <div className="min-w-0">
                           <div className="truncate text-xs font-semibold text-foreground">
@@ -194,7 +361,7 @@ function GroupAdminPanel({
                           </div>
                           <div className="truncate text-[10px] text-muted-foreground">{`@${r.user.username}`}</div>
                         </div>
-                      </div>
+                      </button>
                       <div className="flex shrink-0 gap-1">
                         <Button
                           size="icon"
@@ -232,7 +399,7 @@ function GroupAdminPanel({
                   const canActOnTarget = canModerate && ROLE_RANK[myRole] > ROLE_RANK[m.role];
                   return (
                     <div key={m._id} className="flex items-center justify-between gap-2 rounded-xl p-2 hover:bg-muted/60">
-                      <div className="flex min-w-0 items-center gap-2.5">
+                      <button type="button" onClick={() => setPreviewUsername(m.user.username)} className="flex min-w-0 items-center gap-2.5 text-left cursor-pointer hover:opacity-80 transition-opacity">
                         <MemberAvatar person={m.user} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
@@ -251,10 +418,10 @@ function GroupAdminPanel({
                           </div>
                           <div className="truncate text-[10px] text-muted-foreground">{`@${m.user.username}`}</div>
                         </div>
-                      </div>
+                      </button>
 
                       {canActOnTarget && (
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button
                               size="icon"
@@ -265,7 +432,7 @@ function GroupAdminPanel({
                               <Shield className="h-3.5 w-3.5" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="z-[99999]">
                             {canManageAdmins && m.role !== 'ADMIN' && (
                               <DropdownMenuItem onClick={() => onRoleChange(m.user._id, 'ADMIN')}>
                                 <Shield className="h-4 w-4" />
@@ -304,33 +471,128 @@ function GroupAdminPanel({
                 )}
               </div>
             </div>
+
+            <Button
+              variant="outline"
+              className="justify-start gap-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={busyUserId === '__group__'}
+              onClick={onLeaveClick}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Leave Group
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={showLeaveChoice} onOpenChange={setShowLeaveChoice}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>You&apos;re the owner of this group</DialogTitle>
+            <DialogDescription>
+              A group can&apos;t be left ownerless. Transfer ownership to another member first, or delete the
+              group entirely.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              variant="secondary"
+              className="w-full justify-start gap-2"
+              onClick={() => {
+                setShowLeaveChoice(false);
+                toast.info('Pick a member from the list and choose "Transfer Ownership".');
+              }}
+            >
+              <Crown className="h-4 w-4" />
+              Transfer Ownership
+            </Button>
+            <Button
+              variant="destructive"
+              className="w-full justify-start gap-2"
+              onClick={() => {
+                setShowLeaveChoice(false);
+                setConfirmAction({ type: 'delete' });
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Group
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => setShowLeaveChoice(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCustomSlowMode} onOpenChange={setShowCustomSlowMode}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Custom slow mode</DialogTitle>
+            <DialogDescription>Enter an interval in seconds between messages per member.</DialogDescription>
+          </DialogHeader>
+          <form className="flex flex-col gap-3" onSubmit={onCustomSlowModeSubmit}>
+            <div className="grid gap-1.5">
+              <Label htmlFor="custom-slow-mode-seconds">Seconds</Label>
+              <Input
+                id="custom-slow-mode-seconds"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="e.g. 15"
+                value={customSlowModeInput}
+                onChange={(e) => setCustomSlowModeInput(e.target.value)}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setShowCustomSlowMode(false)}>Cancel</Button>
+              <Button type="submit">Apply</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {confirmAction && (
         <Dialog open onOpenChange={(next) => !next && setConfirmAction(null)}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>
-                {confirmAction.type === 'ban' && 'Ban this member?'}
-                {confirmAction.type === 'remove' && 'Remove this member?'}
-                {confirmAction.type === 'transfer' && 'Transfer ownership?'}
+                {confirmAction.type === 'ban' && 'Ban this user from the group?'}
+                {confirmAction.type === 'remove' && 'Remove this user from the group?'}
+                {confirmAction.type === 'transfer' && 'Transfer ownership to this user?'}
+                {confirmAction.type === 'leave' && 'Leave this group?'}
+                {confirmAction.type === 'delete' && 'Delete this group permanently?'}
               </DialogTitle>
               <DialogDescription>
-                {confirmAction.type === 'ban' && `${confirmAction.person.user.firstName} will be removed and unable to rejoin via invite link or join request.`}
-                {confirmAction.type === 'remove' && `${confirmAction.person.user.firstName} will be removed from the group. They can rejoin with a new invite.`}
-                {confirmAction.type === 'transfer' && `${confirmAction.person.user.firstName} becomes the new OWNER. You become an ADMIN. This can't be undone by you alone.`}
+                {confirmAction.type === 'ban' && 'They will not be able to rejoin.'}
+                {confirmAction.type === 'remove' && 'They can rejoin later with a new invite or join request.'}
+                {confirmAction.type === 'transfer' && "They become the new OWNER. You become an ADMIN. This can't be undone by you alone."}
+                {confirmAction.type === 'leave' && 'You will lose access to this group. You can rejoin later if invited.'}
+                {confirmAction.type === 'delete' && 'This cannot be undone. All members will lose access.'}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="secondary" onClick={() => setConfirmAction(null)}>Cancel</Button>
-              <Button variant={confirmAction.type === 'transfer' ? 'default' : 'destructive'} onClick={onConfirmedAction}>
+              <Button variant="secondary" onClick={() => setConfirmAction(null)} disabled={busyUserId !== null}>
+                Cancel
+              </Button>
+              <Button
+                variant={confirmAction.type === 'transfer' ? 'default' : 'destructive'}
+                onClick={onConfirmedAction}
+                disabled={busyUserId !== null}
+              >
                 Confirm
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {previewUsername && (
+        <ProfileView
+          username={previewUsername}
+          onClose={() => setPreviewUsername(null)}
+          onOpenChat={openChat}
+        />
       )}
     </>
   );

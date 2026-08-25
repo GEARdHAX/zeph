@@ -1,5 +1,6 @@
 const GroupMember = require('../models/GroupMember');
 const Room = require('../models/Room');
+const User = require('../models/User');
 const { isPrivileged } = require('./policy');
 
 // Group-internal role/capability authorization — a different axis from
@@ -35,17 +36,30 @@ const ROLE_CAPABILITIES = {
     Capabilities.DELETE_MESSAGE, Capabilities.PIN_MESSAGE, Capabilities.CREATE_INVITE,
     Capabilities.APPROVE_REQUESTS, Capabilities.BAN_MEMBER,
   ],
-  MEMBER: [Capabilities.SEND_MESSAGE, Capabilities.CREATE_INVITE],
+  // ADD_MEMBER is deliberately open to every role (not just ADMIN/OWNER) —
+  // "anyone can invite their friend" is the product intent, same trust
+  // level as CREATE_INVITE already had. members-add.js's other checks
+  // (target exists, admin-boundary, not banned) are unaffected by this.
+  MEMBER: [Capabilities.SEND_MESSAGE, Capabilities.CREATE_INVITE, Capabilities.ADD_MEMBER],
 };
 
 // Single lookup every group route needs first. Returns null for a
 // non-member, a soft-removed row, or a PENDING/LEFT/REMOVED/BANNED row —
 // callers treat null as "404, not a distinguishable 403" to avoid leaking
 // group existence to non-members. active and status are checked together
-// (belt-and-suspenders — they always agree by construction, see
-// GroupMember.js) rather than either one alone.
+// (belt-and-suspenders — they always agree by construction for every row
+// written since D-037) rather than either one alone.
+//
+// status is matched as ACTIVE-or-unset ($in with null covers both a
+// genuinely absent field and an explicit null), NOT status:'ACTIVE' alone —
+// every GroupMember row written before D-037 (this field's introduction)
+// has active:true but no status field persisted at all; a strict equality
+// filter here 404s every one of those real, valid memberships. See
+// scripts/backfillGroupMemberStatus.js (run once to fix existing data) and
+// DECISIONS.md. This tolerance is defense-in-depth for any environment
+// where that backfill hasn't been run — not a substitute for running it.
 const getMembership = (groupId, userId) => GroupMember.findOne({
-  group: groupId, user: userId, active: true, status: 'ACTIVE',
+  group: groupId, user: userId, active: true, status: { $in: ['ACTIVE', null] },
 });
 
 // Falls back to Room.people for a group that has zero GroupMember rows at
@@ -105,6 +119,75 @@ const isBanned = async (groupId, userId) => {
   return !!row;
 };
 
+// Any GroupMember row at all (regardless of status) — used to let a
+// removed/banned/left former member still locally hide the now-
+// inaccessible conversation from their own inbox (conversation-delete.js),
+// which getMembership() alone can't authorize since it excludes exactly
+// those statuses by design.
+const wasEverMember = async (groupId, userId) => {
+  const row = await GroupMember.findOne({ group: groupId, user: userId }).select('_id');
+  return !!row;
+};
+
+// Read access to a group's message history: current Room.people membership
+// (the normal case, and the only case for a 1:1 DM — `room` is passed in so
+// callers don't re-fetch it) OR a former member (REMOVED/BANNED/LEFT) —
+// matches WhatsApp/Telegram letting a removed member keep their existing
+// scrollback instead of the conversation vanishing outright on next refresh.
+// Sending is still blocked separately (BottomBar's accessRevoked gate on the
+// frontend; these read routes never accept a POST). See DECISIONS.md.
+const canReadRoomHistory = async (room, userId) => {
+  const isCurrentMember = room.people.some((p) => p.toString() === userId.toString());
+  if (isCurrentMember) return true;
+  if (!room.isGroup) return false;
+  return wasEverMember(room._id, userId);
+};
+
+// Reconstructs the same {reason, actorName} shape BottomBar.jsx expects
+// from the live 'group:member:removed' socket event (see io.js's
+// ROOM_ACCESS_REVOKED case) — used by every route that returns a room to a
+// possibly-former member (get-room.js, join-room.js) so the composer stays
+// gated after a fresh page load, not only while the live socket event is
+// still in memory. Returns undefined when there's nothing to report (a
+// current member, a 1:1 room, or a LEFT/never-removed row).
+const getAccessRevokedInfo = async (room, userId, isCurrentMember) => {
+  if (!room.isGroup || isCurrentMember) return undefined;
+  const formerMembership = await GroupMember.findOne({ group: room._id, user: userId })
+    .select('status removedBy').lean();
+  if (!formerMembership || !['REMOVED', 'BANNED'].includes(formerMembership.status)) return undefined;
+
+  const remover = formerMembership.removedBy
+    ? await User.findById(formerMembership.removedBy).select('firstName lastName username').lean()
+    : null;
+  const actorName = remover
+    ? `${remover.firstName || ''} ${remover.lastName || ''}`.trim() || remover.username
+    : null;
+  return { reason: formerMembership.status === 'BANNED' ? 'banned' : 'removed', actorName };
+};
+
+// { method, inviterName } for the CURRENT caller's own membership — lets the
+// frontend show "You joined via invite link, invited by Y" as the empty-
+// state message when this member's visible history is empty (their own
+// join system-message can fall before their own ConversationUserState.
+// deletedBefore cutoff after a delete-then-rejoin cycle — see
+// unhideConversationForUser.js — hiding it along with everything else).
+// Returns undefined for a 1:1 room or a member with no GroupMember row at
+// all (legacy/fallback membership, see getMembershipWithFallback).
+const getJoinInfo = async (room, userId) => {
+  if (!room.isGroup) return undefined;
+  const membership = await GroupMember.findOne({ group: room._id, user: userId })
+    .select('joinedVia invitedBy').lean();
+  if (!membership) return undefined;
+
+  const inviter = membership.invitedBy
+    ? await User.findById(membership.invitedBy).select('firstName lastName username').lean()
+    : null;
+  const inviterName = inviter
+    ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.username
+    : null;
+  return { method: membership.joinedVia || 'ADDED', inviterName };
+};
+
 module.exports = {
   Roles,
   ROLE_RANK,
@@ -116,5 +199,9 @@ module.exports = {
   canChangeRole,
   canRemoveMember,
   isBanned,
+  wasEverMember,
+  canReadRoomHistory,
+  getAccessRevokedInfo,
+  getJoinInfo,
   isPrivileged,
 };

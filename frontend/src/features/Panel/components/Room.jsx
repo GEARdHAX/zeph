@@ -3,13 +3,14 @@ import { useGlobal } from 'reactn';
 import moment from 'moment';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { Unlock, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import unhideConversation from '../../../actions/unhideConversation';
 import deleteConversation from '../../../actions/deleteConversation';
+import Actions from '../../../constants/Actions';
 import Config from '../../../config';
 
 // inVault + vaultToken: renders Unhide/Delete row actions instead of the
@@ -24,6 +25,7 @@ function Room({ room, inVault, vaultToken }) {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
 
   let other = {};
 
@@ -48,7 +50,11 @@ function Room({ room, inVault, vaultToken }) {
   let { lastMessage } = room;
   let text = '';
 
-  if (!lastMessage && room.isGroup) text = 'New group created.';
+  // "New group created." only fits a genuinely brand-new group — a rejoined
+  // member with no visible lastMessage (list-rooms.js nulls it out past
+  // their own deletedBefore cutoff, see DECISIONS.md) would see the same
+  // stale/wrong line otherwise.
+  if (!lastMessage && room.isGroup) text = 'No messages here yet.';
   if (!lastMessage && !room.isGroup) text = `No messages with ${other.firstName} yet.`;
 
   if (!lastMessage) lastMessage = {};
@@ -115,8 +121,32 @@ function Room({ room, inVault, vaultToken }) {
     }
   };
 
+  // Normal (non-vault) inbox row — the only other delete entry point is
+  // BottomBar's "Delete Group DM" button, which only renders once a room is
+  // actually open. A group the owner already deleted (Room.disabledAt) 404s
+  // on open ("Room Not Found"), so a remaining member/the owner themselves
+  // had no way at all to clear it from their own sidebar — conversation/
+  // delete.js itself doesn't gate on disabledAt (a per-user tombstone, not a
+  // room mutation), only the open-room read routes do. Dispatches the same
+  // CONVERSATION_DELETED action the live socket event uses, so this row
+  // disappears immediately without waiting for a round trip.
+  const onDelete = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      await deleteConversation(room._id);
+      dispatch({ type: Actions.CONVERSATION_DELETED, conversationId: room._id });
+      toast.success('Conversation removed from your inbox.');
+    } catch (err) {
+      toast.error('Could not remove this conversation.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="px-3 py-1">
+    <div className="group/row relative px-3 py-1">
       <button
         type="button"
         onClick={inVault ? undefined : onSelect}
@@ -162,11 +192,32 @@ function Room({ room, inVault, vaultToken }) {
           </div>
         </div>
 
-        {/* Unread dot */}
+        {/* Unread dot — hidden on row hover so it never overlaps the
+            hover-revealed delete button below, which sits in the same
+            top-right corner. */}
         {!inVault && hasUnread && (
-          <span className="absolute right-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-card" />
+          <span className="absolute right-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-card transition-opacity group-hover/row:opacity-0" />
         )}
       </button>
+
+      {/* Remove-from-inbox — hover-revealed so it doesn't compete with the
+          unread dot/timestamp for space on every row at rest. The only
+          other delete entry point (BottomBar's "Delete Group DM") requires
+          the room to open successfully first, which a group the owner
+          already deleted never does (404s as "Room Not Found") — leaving no
+          way to clear it from the sidebar without this. */}
+      {!inVault && (
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={busy}
+          aria-label="Remove conversation"
+          title="Remove from inbox"
+          className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover/row:opacity-100 disabled:opacity-50 cursor-pointer"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
 
       {inVault && (
         <div className="flex items-center justify-end gap-1.5 px-3 pb-1 pt-1.5">

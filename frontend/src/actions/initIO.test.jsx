@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { previewText, NewMessageToast, IncomingCallToast } from './initIO';
+import {
+  previewText, NewMessageToast, IncomingCallToast, AddedToGroupToast, RemovedFromGroupToast,
+} from './initIO';
 
 describe('previewText — message toast preview text', () => {
   it('shows the real text content for a text message, not a generic label', () => {
@@ -94,5 +96,49 @@ describe('IncomingCallToast', () => {
   it('degrades gracefully to a generic "Someone" label when caller info is missing (malformed payload), never throws', () => {
     expect(() => render(<IncomingCallToast meetingID="m1" caller={undefined} added={false} />)).not.toThrow();
     expect(screen.getByText('Someone')).toBeInTheDocument();
+  });
+});
+
+describe('AddedToGroupToast', () => {
+  it('shows the group title and an explanatory message', () => {
+    const room = { _id: 'g1', title: 'Weekend Trip' };
+    render(<AddedToGroupToast room={room} />);
+
+    expect(screen.getByText('Weekend Trip')).toBeInTheDocument();
+    expect(screen.getByText('You were added to this group')).toBeInTheDocument();
+  });
+
+  it('falls back to a generic "Group" label when the title is missing', () => {
+    const room = { _id: 'g2' };
+    render(<AddedToGroupToast room={room} />);
+
+    expect(screen.getByText('Group')).toBeInTheDocument();
+  });
+});
+
+describe('RemovedFromGroupToast', () => {
+  it('shows "removed" wording with the actor name', () => {
+    render(<RemovedFromGroupToast groupName="Weekend Trip" reason="removed" actorName="Alice Owner" />);
+
+    expect(screen.getByText('Weekend Trip')).toBeInTheDocument();
+    expect(screen.getByText('You were removed from this group by Alice Owner')).toBeInTheDocument();
+  });
+
+  it('shows "banned" wording distinctly from "removed"', () => {
+    render(<RemovedFromGroupToast groupName="Weekend Trip" reason="banned" actorName="Bob Admin" />);
+
+    expect(screen.getByText('You were banned from this group by Bob Admin')).toBeInTheDocument();
+  });
+
+  it('omits the actor clause when actorName is missing', () => {
+    render(<RemovedFromGroupToast groupName="Weekend Trip" reason="removed" actorName={null} />);
+
+    expect(screen.getByText('You were removed from this group')).toBeInTheDocument();
+  });
+
+  it('falls back to a generic "Group" label when the name is missing', () => {
+    render(<RemovedFromGroupToast groupName={null} reason="removed" actorName={null} />);
+
+    expect(screen.getByText('Group')).toBeInTheDocument();
   });
 });

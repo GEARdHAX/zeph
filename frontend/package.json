@@ -99,6 +99,6 @@
     "@types/react": "^18.3.31"
   },
   "engines": {
-    "node": "18.x.x"
+    "node": "22.x.x"
   }
 }

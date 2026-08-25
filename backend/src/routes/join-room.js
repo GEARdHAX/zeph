@@ -7,6 +7,7 @@ const requireVisibleConversation = require('../utils/requireVisibleConversation'
 const roomHasBoundaryViolation = require('../utils/roomHasBoundaryViolation');
 const attachBlockState = require('../utils/attachBlockState');
 const { hasValidVaultToken } = require('../vault/vaultToken');
+const groupPolicy = require('../authorization/groupPolicy');
 
 module.exports = async (req, res, next) => {
   let { id } = req.fields;
@@ -26,7 +27,7 @@ module.exports = async (req, res, next) => {
   const conversationState = await ConversationUserState.findOne({ conversation: id, user: req.user.id }).select('deletedBefore');
   const deletedBefore = conversationState && conversationState.deletedBefore;
 
-  const findMessagesAndEmit = (room) => {
+  const findMessagesAndEmit = (room, accessRevoked, joinInfo) => {
     Message.find({ room: room._id })
       .sort({ _id: -1 })
       .limit(50)
@@ -88,6 +89,8 @@ module.exports = async (req, res, next) => {
                 ownerId: room.ownerId,
                 description: room.description,
                 privacy: room.privacy,
+                ...(accessRevoked ? { accessRevoked } : {}),
+                ...(joinInfo ? { myJoinInfo: joinInfo } : {}),
                 messages: messages
                   // Own "delete for me" state stays hidden on every fresh load too.
                   .filter((e) => !(e.deletedFor || []).some((uid) => uid.toString() === req.user.id.toString()))
@@ -125,11 +128,19 @@ module.exports = async (req, res, next) => {
       ],
     })
     .exec(async (err, room) => {
-      if (err || !room) {
+      if (err || !room || room.disabledAt) {
         if (err) logger.error({ err, roomId: id }, 'Failed to look up room for join-room');
         return res.status(404).json({ error: true });
       }
-      if (room.people.filter((person) => req.user.id.toString() === person._id.toString()).length === 0) {
+      // A former group member (removed/banned/left) keeps read access to
+      // history they already have — matches get-room.js's canReadRoomHistory.
+      // The join-room.js response never surfaces GroupMember rows, so
+      // isCurrentMember alone (not a fallback membership row) decides
+      // whether to reconstruct accessRevoked below.
+      const isCurrentMember = room.people.some((person) => req.user.id.toString() === person._id.toString());
+      const canRead = isCurrentMember
+        || (room.isGroup && await groupPolicy.wasEverMember(room._id, req.user.id));
+      if (!canRead) {
         return res.status(404).json({ error: true });
       }
 
@@ -164,6 +175,18 @@ module.exports = async (req, res, next) => {
       });
       const peopleWithBlockState = await attachBlockState(sanitizedPeople, req.user.id);
 
-      findMessagesAndEmit({ ...room.toObject(), people: peopleWithBlockState });
+      // Mirrors get-room.js so a former member reopening this room after a
+      // fresh page load still sees the composer gated — this is the route
+      // the frontend's getRoom() action actually calls (/room/join), not
+      // /room/get.
+      const accessRevoked = await groupPolicy.getAccessRevokedInfo(room, req.user.id, isCurrentMember);
+      // Lets Messages.jsx show "You joined via X, invited by Y" instead of a
+      // generic empty state when this member's own history is empty (see
+      // getJoinInfo's comment for why that can happen even for an active
+      // member). Only meaningful for a current member — a former member gets
+      // the accessRevoked banner instead, not this.
+      const joinInfo = isCurrentMember ? await groupPolicy.getJoinInfo(room, req.user.id) : undefined;
+
+      findMessagesAndEmit({ ...room.toObject(), people: peopleWithBlockState }, accessRevoked, joinInfo);
     });
 };

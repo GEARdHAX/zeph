@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import moment from 'moment';
 import {
@@ -45,6 +45,15 @@ const STATUS_COLOR = {
 function TopBar({ back, loading, aiEnabled }) {
   const onlineUsers = useSelector((state) => state.io.onlineUsers) || [];
   const room = useSelector((state) => state.io.room) || {};
+  // Falls back to the URL's room id when Conversation/index.jsx's fetch
+  // 404'd (a group the owner already deleted — Room.disabledAt — is the
+  // main case, but any failed/removed-conversation fetch has the same
+  // shape): state.io.room is null then, so `room._id` above is undefined.
+  // "Delete DM" below needs a real id to send regardless of whether the
+  // room object itself ever loaded — otherwise deleteConversation(undefined)
+  // silently drops conversationId from the JSON body (JSON.stringify omits
+  // undefined values) and the server 400s with no visible explanation.
+  const { id: routeRoomId } = useParams();
   const user = useGlobal('user')[0] || {};
   const [summary, setSummary] = useState(null);
   const [summarizing, setSummarizing] = useState(false);
@@ -212,9 +221,14 @@ function TopBar({ back, loading, aiEnabled }) {
   };
 
   const handleDeleteDM = async () => {
+    const targetRoomId = room._id || routeRoomId;
+    if (!targetRoomId) {
+      errorToast('Could not delete this conversation. Please try again.');
+      return;
+    }
     setVaultBusy(true);
     try {
-      await deleteConversation(room._id);
+      await deleteConversation(targetRoomId);
       setConfirmDeleteDM(false);
       toast.success('Conversation deleted.');
       navigate('/', { replace: true });

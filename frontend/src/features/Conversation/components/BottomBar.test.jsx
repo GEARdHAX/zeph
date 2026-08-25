@@ -6,6 +6,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
 import { setGlobal } from 'reactn';
@@ -21,6 +22,7 @@ vi.mock('../../../actions/getRooms', () => ({ default: vi.fn(() => Promise.resol
 vi.mock('../../../actions/typing', () => ({ default: () => () => {} }));
 vi.mock('../../../actions/uploadImage', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/uploadMedia', () => ({ default: vi.fn() }));
+vi.mock('../../../actions/deleteConversation', () => ({ default: vi.fn() }));
 // @emoji-mart/react needs a peer `emoji-mart` package that Vite's browser bundling
 // resolves but Vitest's Node module resolution doesn't — not exercised by this test.
 vi.mock('@emoji-mart/react', () => ({ default: () => null }));
@@ -72,6 +74,8 @@ import message from '../../../actions/message';
 import uploadImage from '../../../actions/uploadImage';
 // eslint-disable-next-line import/first
 import uploadMedia from '../../../actions/uploadMedia';
+// eslint-disable-next-line import/first
+import deleteConversation from '../../../actions/deleteConversation';
 
 const ROOM = { _id: 'room-1', people: ['user-1', 'user-2'] };
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
@@ -89,7 +93,9 @@ function renderBottomBar() {
   const store = makeStore();
   render(
     <Provider store={store}>
-      <BottomBar />
+      <MemoryRouter>
+        <BottomBar />
+      </MemoryRouter>
     </Provider>,
   );
   return store;
@@ -202,7 +208,7 @@ describe('BottomBar image editor queue', () => {
     const userEv = userEvent.setup();
     const file = new File(['x'], 'photo.png', { type: 'image/png' });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getImageInput(container), file);
@@ -217,7 +223,7 @@ describe('BottomBar image editor queue', () => {
     const file = new File(['x'], 'photo.png', { type: 'image/png' });
     uploadImage.mockResolvedValue({ data: { image: { _id: 'img-1', shieldedID: 'shielded-1' } } });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getImageInput(container), file);
@@ -241,7 +247,7 @@ describe('BottomBar image editor queue', () => {
       .mockResolvedValueOnce({ data: { image: { _id: 'img-1', shieldedID: 'shielded-1' } } })
       .mockResolvedValueOnce({ data: { image: { _id: 'img-2', shieldedID: 'shielded-2' } } });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getImageInput(container), files);
@@ -265,7 +271,7 @@ describe('BottomBar image editor queue', () => {
       new File(['b'], 'two.png', { type: 'image/png' }),
     ];
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getImageInput(container), files);
@@ -280,7 +286,7 @@ describe('BottomBar image editor queue', () => {
     const userEv = userEvent.setup();
     const big = new File([new Uint8Array(11 * 1024 * 1024)], 'huge.png', { type: 'image/png' });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getImageInput(container), big);
@@ -293,7 +299,7 @@ describe('BottomBar image editor queue', () => {
     const userEv = userEvent.setup();
     const bad = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getImageInput(container), bad);
@@ -312,7 +318,7 @@ describe('BottomBar general attach — category routing', () => {
     const userEv = userEvent.setup();
     const video = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getFileInput(container), video);
@@ -327,7 +333,7 @@ describe('BottomBar general attach — category routing', () => {
     const video = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
     uploadMedia.mockResolvedValue({ data: { media: { _id: 'media-1', category: 'video' } } });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getFileInput(container), video);
@@ -347,7 +353,7 @@ describe('BottomBar general attach — category routing', () => {
     const doc = new File(['x'], 'report.pdf', { type: 'application/pdf' });
     uploadMedia.mockResolvedValue({ data: { media: { _id: 'media-2', category: 'pdf' } } });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getFileInput(container), doc);
@@ -367,7 +373,7 @@ describe('BottomBar general attach — category routing', () => {
     const doc = new File(['x'], 'notes.txt', { type: 'text/plain' });
     uploadMedia.mockResolvedValue({ data: { media: { _id: 'media-3', category: 'document' } } });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getFileInput(container), [image, doc]);
@@ -381,7 +387,7 @@ describe('BottomBar general attach — category routing', () => {
     const userEv = userEvent.setup();
     const video = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getFileInput(container), video);
@@ -396,12 +402,73 @@ describe('BottomBar general attach — category routing', () => {
     const userEv = userEvent.setup();
     const huge = new File([new Uint8Array(26 * 1024 * 1024)], 'huge.pdf', { type: 'application/pdf' });
     const { container } = render(
-      <Provider store={makeStore()}><BottomBar /></Provider>,
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
     );
 
     await userEv.upload(getFileInput(container), huge);
 
     expect(uploadMedia).not.toHaveBeenCalled();
     expect(message).not.toHaveBeenCalled();
+  });
+});
+
+describe('BottomBar — access revoked (removed/banned from the open group)', () => {
+  function makeRevokedStore(accessRevoked) {
+    const rootReducer = combineReducers({
+      emoji, io, messages, rtc,
+    });
+    const store = createStore(rootReducer, applyMiddleware(thunk));
+    store.dispatch({ type: Actions.SET_ROOM, room: { ...ROOM, accessRevoked } });
+    return store;
+  }
+
+  beforeEach(() => {
+    deleteConversation.mockReset();
+  });
+
+  it('hides the composer entirely and shows who removed the user', async () => {
+    render(
+      <Provider store={makeRevokedStore({ reason: 'removed', actorName: 'Alice Owner' })}>
+        <MemoryRouter><BottomBar /></MemoryRouter>
+      </Provider>,
+    );
+
+    expect(screen.getByText('You were removed from this group by Alice Owner')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Type something to send...' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send message' })).not.toBeInTheDocument();
+  });
+
+  it('shows "banned" wording distinctly from "removed"', async () => {
+    render(
+      <Provider store={makeRevokedStore({ reason: 'banned', actorName: 'Bob Admin' })}>
+        <MemoryRouter><BottomBar /></MemoryRouter>
+      </Provider>,
+    );
+
+    expect(screen.getByText('You were banned from this group by Bob Admin')).toBeInTheDocument();
+  });
+
+  it('omits the actor clause when actorName is unknown', async () => {
+    render(
+      <Provider store={makeRevokedStore({ reason: 'removed', actorName: null })}>
+        <MemoryRouter><BottomBar /></MemoryRouter>
+      </Provider>,
+    );
+
+    expect(screen.getByText('You were removed from this group')).toBeInTheDocument();
+  });
+
+  it('Delete Group DM calls deleteConversation with the room id', async () => {
+    deleteConversation.mockResolvedValue({ data: { status: 'success' } });
+    const userEv = userEvent.setup();
+    render(
+      <Provider store={makeRevokedStore({ reason: 'banned', actorName: 'Bob Admin' })}>
+        <MemoryRouter><BottomBar /></MemoryRouter>
+      </Provider>,
+    );
+
+    await userEv.click(screen.getByRole('button', { name: /delete group dm/i }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith(ROOM._id));
   });
 });

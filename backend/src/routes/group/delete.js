@@ -1,8 +1,8 @@
 const Room = require('../../models/Room');
 const groupPolicy = require('../../authorization/groupPolicy');
 const forceLeaveGroupRoom = require('../../utils/forceLeaveGroupRoom');
+const broadcastToGroup = require('../../utils/broadcastToGroup');
 const logger = require('../../logger');
-const store = require('../../store');
 
 // Owner-only deletion lifecycle: mark disabled (immediate access revocation
 // for every route, since every group route already 404s on room.disabledAt)
@@ -24,8 +24,12 @@ module.exports = async (req, res) => {
 
   await Room.updateOne({ _id: room._id }, { $set: { disabledAt: new Date() } });
 
-  room.people.forEach((personId) => forceLeaveGroupRoom(personId.toString(), room._id.toString()));
-  store.io.to(`group:${room._id}`).emit('group:updated', { groupId: room._id, disabled: true });
+  room.people
+    .filter((personId) => personId.toString() !== actorId.toString())
+    .forEach((personId) => forceLeaveGroupRoom(personId.toString(), room._id.toString(), {
+      reason: 'deleted', groupName: room.title,
+    }));
+  broadcastToGroup(room.people, 'group:updated', { groupId: room._id, disabled: true }, { excludeUserId: actorId });
 
   logger.info({ groupId: room._id, ownerId: actorId }, 'group_delete_requested');
 

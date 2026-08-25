@@ -2,8 +2,9 @@ const Room = require('../../models/Room');
 const User = require('../../models/User');
 const GroupMember = require('../../models/GroupMember');
 const groupPolicy = require('../../authorization/groupPolicy');
+const broadcastToGroup = require('../../utils/broadcastToGroup');
+const unhideConversationForUser = require('../../utils/unhideConversationForUser');
 const logger = require('../../logger');
-const store = require('../../store');
 
 // Invite/add flow: authenticate -> verify actor membership+capability ->
 // target exists -> admin-boundary gate (invite-time only, see
@@ -32,13 +33,17 @@ module.exports = async (req, res) => {
     return res.status(404).json({ error: true });
   }
 
+  // A ban must never be bypassable, including by a direct add — same rule
+  // as group/invites/join.js and join-requests/create.js. See DECISIONS.md.
+  if (await groupPolicy.isBanned(room._id, target._id)) {
+    return res.status(403).json({ error: true, reason: 'BANNED' });
+  }
+
   // Atomic upsert — the actual concurrency-safety mechanism for duplicate/
   // concurrent add requests, backed by GroupMember's unique {group,user}
-  // index. Re-adding an already-active member is an idempotent no-op. A
-  // direct add by an admin is a deliberate override of any prior BANNED/
-  // REMOVED/LEFT status (unlike an invite-link join, which never overrides
-  // a ban — see group/invites/join.js) — status is set to ACTIVE alongside
-  // active so the two fields never disagree afterward, see GroupMember.js.
+  // index. Re-adding an already-active member is an idempotent no-op.
+  // status is set to ACTIVE alongside active so the two fields never
+  // disagree afterward, see GroupMember.js.
   let membership;
   let wasNew = false;
   try {
@@ -46,7 +51,9 @@ module.exports = async (req, res) => {
     membership = await GroupMember.findOneAndUpdate(
       { group: room._id, user: target._id },
       {
-        $setOnInsert: { role: 'MEMBER', joinedAt: new Date() },
+        $setOnInsert: {
+          role: 'MEMBER', joinedAt: new Date(), joinedVia: 'ADDED', invitedBy: actorId,
+        },
         $set: { active: true, status: 'ACTIVE', updatedAt: new Date() },
       },
       { upsert: true, new: true },
@@ -63,10 +70,13 @@ module.exports = async (req, res) => {
 
   if (wasNew) {
     await Room.updateOne({ _id: room._id }, { $addToSet: { people: target._id } });
+    await unhideConversationForUser(room._id, target._id);
     logger.info({ groupId: room._id, actorId, targetId: target._id }, 'group_member_added');
-    store.io.to(`group:${room._id}`).emit('group:member:added', {
+    // room.people is the pre-add list — the newly-added user is included
+    // explicitly since they aren't in it yet.
+    broadcastToGroup([...room.people, target._id], 'group:member:added', {
       groupId: room._id, userId: target._id, role: membership.role,
-    });
+    }, { excludeUserId: actorId });
   }
 
   res.status(200).json({ status: 'success', member: { user: target._id, role: membership.role } });

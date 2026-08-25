@@ -112,11 +112,43 @@ describe('Slow mode', () => {
     expect(second.status).toBe(200);
   });
 
-  it('rejects an invalid slow-mode interval', async () => {
+  it('accepts a custom whole-second interval outside the presets', async () => {
+    const owner = await createUser();
+    const member = await createUser();
+    const group = await createGroup(owner, [member._id]);
+
+    const res = await setSlowMode(owner, group.body._id, 7);
+    expect(res.status).toBe(200);
+
+    const first = await send(member, group.body._id, 'first');
+    expect(first.status).toBe(200);
+    const second = await send(member, group.body._id, 'second');
+    expect(second.status).toBe(429);
+  });
+
+  it('rejects a negative slow-mode value', async () => {
     const owner = await createUser();
     const group = await createGroup(owner);
 
-    const res = await setSlowMode(owner, group.body._id, 7);
+    const res = await setSlowMode(owner, group.body._id, -5);
+    expect(res.status).toBe(400);
+    expect(res.body.reason).toBe('INVALID_SLOW_MODE');
+  });
+
+  it('rejects a non-integer slow-mode value', async () => {
+    const owner = await createUser();
+    const group = await createGroup(owner);
+
+    const res = await setSlowMode(owner, group.body._id, 12.5);
+    expect(res.status).toBe(400);
+    expect(res.body.reason).toBe('INVALID_SLOW_MODE');
+  });
+
+  it('rejects a slow-mode value beyond the sanity ceiling', async () => {
+    const owner = await createUser();
+    const group = await createGroup(owner);
+
+    const res = await setSlowMode(owner, group.body._id, 100000);
     expect(res.status).toBe(400);
     expect(res.body.reason).toBe('INVALID_SLOW_MODE');
   });

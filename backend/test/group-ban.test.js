@@ -112,4 +112,18 @@ describe('Member ban', () => {
       .send({ groupId: group.body._id });
     expect(res.status).toBe(404);
   });
+
+  it('blocks a banned user from being directly re-added by an admin', async () => {
+    const owner = await createUser();
+    const target = await createUser();
+    const group = await createGroup(owner, [target._id]);
+    await banMember(owner, group.body._id, target._id);
+
+    const res = await request(app)
+      .post('/api/group/members/add')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: group.body._id, userId: target._id });
+    expect(res.status).toBe(403);
+    expect(res.body.reason).toBe('BANNED');
+  });
 });

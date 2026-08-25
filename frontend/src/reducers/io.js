@@ -131,6 +131,18 @@ const reducer = (state = initialState, action) => {
         ...state,
         onlineUsers: action.data,
       };
+    // Live "you lost access to this group" signal (removed/banned while the
+    // room was open) — patches the currently-open room in place, same idiom
+    // as USER_PROFILE_UPDATED above. BottomBar.jsx reads room.accessRevoked
+    // to disable the composer and show who did it instead of just letting
+    // the next send silently 404.
+    case Actions.ROOM_ACCESS_REVOKED:
+      return {
+        ...state,
+        room: (state.room && state.room._id === action.groupId)
+          ? { ...state.room, accessRevoked: { reason: action.reason, actorName: action.actorName } }
+          : state.room,
+      };
     case Actions.REFRESH_MEETINGS:
       return {
         ...state,

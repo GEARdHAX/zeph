@@ -1,5 +1,6 @@
 const Room = require('../models/Room');
 const User = require('../models/User');
+const GroupMember = require('../models/GroupMember');
 const ConversationUserState = require('../models/ConversationUserState');
 const { isPrivileged } = require('../authorization/policy');
 const attachBlockState = require('../utils/attachBlockState');
@@ -40,15 +41,31 @@ module.exports = async (req, res, next) => {
     }
   }
 
+  // A group the user was removed/banned/left from stays in their inbox
+  // (read-only, per canReadRoomHistory) instead of vanishing outright —
+  // matches WhatsApp/Telegram keeping existing scrollback visible until the
+  // user explicitly deletes the conversation (still respected via
+  // excludedIds above). Former-group-membership rows widen the `people`
+  // filter below; a 1:1 DM's visibility is unaffected since this only adds
+  // group ids.
+  const formerGroupIds = await GroupMember.find({
+    user: req.user.id, status: { $in: ['REMOVED', 'BANNED', 'LEFT'] },
+  }).distinct('group');
+
   Room.find({
-    people: { $in: [req.user.id] },
     _id: { $nin: [...excludedIds, ...boundaryExcludedIds] },
-    $or: [
+    $and: [
       {
-        lastMessage: { $ne: null },
+        $or: [
+          { people: { $in: [req.user.id] } },
+          { _id: { $in: formerGroupIds }, isGroup: true },
+        ],
       },
       {
-        isGroup: true,
+        $or: [
+          { lastMessage: { $ne: null } },
+          { isGroup: true },
+        ],
       },
     ],
   })
@@ -65,6 +82,20 @@ module.exports = async (req, res, next) => {
     .limit(limit)
     .exec(async (err, rooms) => {
       if (err) return res.status(500).json({ error: true });
+
+      // Per-conversation delete-history cutoffs for this user, batched in
+      // one query — same `deletedBefore` cursor more-messages.js/join-
+      // room.js/sync-messages.js already respect for the message list
+      // itself. Without this, the sidebar preview kept showing a message
+      // from BEFORE a delete-then-rejoin (e.g. a stale "X was removed by Y"
+      // moderation message) as if it were the latest activity, even though
+      // that same message is correctly hidden once the conversation is
+      // actually opened — a confusing mismatch between the two views.
+      const states = await ConversationUserState.find({
+        user: req.user.id, conversation: { $in: rooms.map((r) => r._id) }, deletedBefore: { $ne: null },
+      }).select('conversation deletedBefore').lean();
+      const cutoffByRoomId = new Map(states.map((s) => [s.conversation.toString(), s.deletedBefore]));
+
       // Built as plain objects, NOT reassigned onto each room's `people`
       // path — a live Mongoose document's `people` schema path is typed as
       // ObjectId refs, so setting it back to an array of plain objects
@@ -78,8 +109,11 @@ module.exports = async (req, res, next) => {
           delete obj.level;
           return obj;
         });
+        const cutoff = cutoffByRoomId.get(room._id.toString());
+        const lastMessageHiddenByCutoff = cutoff && room.lastMessage && new Date(room.lastMessage.date) <= cutoff;
         return {
           ...room.toObject(),
+          ...(lastMessageHiddenByCutoff ? { lastMessage: null, lastAuthor: null } : {}),
           people: await attachBlockState(sanitizedPeople, req.user.id),
         };
       }));

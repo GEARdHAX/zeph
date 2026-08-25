@@ -1,5 +1,6 @@
 const Room = require('../models/Room');
 const ConversationUserState = require('../models/ConversationUserState');
+const groupPolicy = require('../authorization/groupPolicy');
 const store = require('../store');
 const logger = require('../logger');
 
@@ -21,9 +22,20 @@ module.exports = async (req, res) => {
     return res.status(404).json({ status: 'error' });
   }
 
+  // A removed/banned/left former group member is no longer in room.people,
+  // but still needs to be able to locally hide the now-inaccessible
+  // conversation from their own inbox — otherwise it sits there forever
+  // with no way to remove it. groupPolicy.wasEverMember() checks for ANY
+  // GroupMember row regardless of status, unlike getMembership()/
+  // isMember below which both correctly exclude ex-members from every
+  // other group operation. DM behavior (the room.people check) is
+  // completely unchanged. See DECISIONS.md.
   const isMember = room.people.some((person) => person.toString() === userID.toString());
   if (!isMember) {
-    return res.status(403).json({ status: 'error' });
+    const wasGroupMember = room.isGroup && await groupPolicy.wasEverMember(room._id, userID);
+    if (!wasGroupMember) {
+      return res.status(403).json({ status: 'error' });
+    }
   }
 
   // Per-user tombstone only — the Room document and every Message in it are

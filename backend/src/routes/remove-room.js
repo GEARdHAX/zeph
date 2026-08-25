@@ -3,8 +3,8 @@ const Room = require('../models/Room');
 const GroupMember = require('../models/GroupMember');
 const groupPolicy = require('../authorization/groupPolicy');
 const forceLeaveGroupRoom = require('../utils/forceLeaveGroupRoom');
+const broadcastToGroup = require('../utils/broadcastToGroup');
 const logger = require('../logger');
-const store = require('../store');
 
 module.exports = async (req, res, next) => {
   let { id } = req.fields;
@@ -39,13 +39,18 @@ module.exports = async (req, res, next) => {
     // Non-owner "remove room" on a group means "leave the group" — only the
     // caller's own membership is affected, the group and its messages are
     // untouched for everyone else.
-    await GroupMember.updateOne({ _id: membership._id }, { $set: { active: false, updatedAt: new Date() } });
+    const remainingMemberIds = room.people.filter((p) => p.toString() !== req.user.id.toString());
+
+    await GroupMember.updateOne(
+      { _id: membership._id },
+      { $set: { active: false, status: 'LEFT', updatedAt: new Date() } },
+    );
     await Room.updateOne({ _id: room._id }, { $pull: { people: req.user.id } });
 
-    forceLeaveGroupRoom(req.user.id.toString(), room._id.toString());
+    forceLeaveGroupRoom(req.user.id.toString(), room._id.toString(), { reason: 'left', groupName: room.title });
 
     logger.info({ groupId: room._id, actorId: req.user.id, targetId: req.user.id, selfLeave: true }, 'group_member_removed');
-    store.io.to(`group:${room._id}`).emit('group:member:removed', { groupId: room._id, userId: req.user.id, self: true });
+    broadcastToGroup(remainingMemberIds, 'group:member:removed', { groupId: room._id, userId: req.user.id, self: false });
 
     return res.status(200).json({ status: 'success', message: 'left group' });
   }

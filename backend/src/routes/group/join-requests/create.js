@@ -1,8 +1,8 @@
 const Room = require('../../../models/Room');
 const GroupMember = require('../../../models/GroupMember');
 const groupPolicy = require('../../../authorization/groupPolicy');
+const broadcastToGroup = require('../../../utils/broadcastToGroup');
 const logger = require('../../../logger');
-const store = require('../../../store');
 
 // No-invite discovery path for a PRIVATE group the caller already knows the
 // id of (no public group search/browse exists — see DECISIONS.md). Distinct
@@ -49,7 +49,13 @@ module.exports = async (req, res) => {
   }
 
   logger.info({ groupId: room._id, userId }, 'group_join_request_created');
-  store.io.to(`group:${room._id}`).emit('group:join-request:created', { groupId: room._id, userId, requestId: request._id });
+
+  const admins = await GroupMember.find({
+    group: room._id, role: { $in: ['OWNER', 'ADMIN'] }, active: true, status: { $in: ['ACTIVE', null] },
+  }).select('user');
+  broadcastToGroup(admins.map((a) => a.user), 'group:join-request:created', {
+    groupId: room._id, userId, requestId: request._id,
+  });
 
   res.status(200).json({ status: 'pending' });
 };

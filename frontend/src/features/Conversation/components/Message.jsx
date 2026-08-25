@@ -61,6 +61,21 @@ function Message({
     };
   }, [menuOpen]);
 
+  // Moderation event ("X was removed by Y") — rendered as a centered pill
+  // like DaySeparator's date divider, not a chat bubble: no author, no
+  // avatar, no delete/copy menu, no read receipts. Bail out before the
+  // author-fallback normalization below since a system message never had
+  // an author to begin with — "Deleted User" would be misleading here.
+  if (message.type === 'system') {
+    return (
+      <div className="flex items-center justify-center px-1 py-1.5 sm:px-2">
+        <span className="rounded-full bg-muted/80 px-2.5 py-1 text-center text-[11px] font-medium text-muted-foreground shadow-xs">
+          {content}
+        </span>
+      </div>
+    );
+  }
+
   if (!author) author = { firstName: 'Deleted', lastName: 'User' };
   if (previous && !previous.author) previous.author = { firstName: 'Deleted', lastName: 'User' };
   if (next && !next.author) next.author = { firstName: 'Deleted', lastName: 'User' };

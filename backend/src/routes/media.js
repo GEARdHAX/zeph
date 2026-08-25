@@ -16,8 +16,8 @@ const canAccessMedia = async (media, userId) => {
   const message = await Message.findOne({ media: media._id }).select('room');
   if (!message) return false;
 
-  const room = await Room.findById(message.room).select('people isGroup');
-  if (!room) return false;
+  const room = await Room.findById(message.room).select('people isGroup disabledAt');
+  if (!room || room.disabledAt) return false;
 
   if (room.isGroup) {
     const membership = await groupPolicy.getMembershipWithFallback(room._id, userId);

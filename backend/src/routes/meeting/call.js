@@ -26,7 +26,7 @@ module.exports = async (req, res, next) => {
       ],
     })
     .then(async (room) => {
-      if (!room) return res.status(404).json({ error: true });
+      if (!room || room.disabledAt) return res.status(404).json({ error: true });
 
       const isMember = room.people.some((person) => person._id.toString() === req.user.id.toString());
       if (!isMember) return res.status(403).json({ error: true });

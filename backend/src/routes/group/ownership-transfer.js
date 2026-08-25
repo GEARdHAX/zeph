@@ -2,8 +2,8 @@ const Room = require('../../models/Room');
 const GroupMember = require('../../models/GroupMember');
 const GroupAuditLog = require('../../models/GroupAuditLog');
 const groupPolicy = require('../../authorization/groupPolicy');
+const broadcastToGroup = require('../../utils/broadcastToGroup');
 const logger = require('../../logger');
-const store = require('../../store');
 
 // OWNER-only. New owner must already be an ACTIVE member (no implicit add).
 // Old owner becomes ADMIN, not demoted further — a deliberate handoff, not
@@ -48,7 +48,7 @@ module.exports = async (req, res) => {
   });
 
   logger.info({ groupId: room._id, previousOwnerId: actorId, newOwnerId: userId }, 'group_ownership_transferred');
-  store.io.to(`group:${room._id}`).emit('group:ownership:transferred', { groupId: room._id, newOwnerId: userId });
+  broadcastToGroup(room.people, 'group:ownership:transferred', { groupId: room._id, newOwnerId: userId }, { excludeUserId: actorId });
 
   res.status(200).json({ status: 'success' });
 };

@@ -29,15 +29,21 @@ module.exports = async (req, res, next) => {
     })
     .populate('lastMessage')
     .exec(async (err, room) => {
-      if (err || !room) return res.status(404).json({ error: true });
+      if (err || !room || room.disabledAt) return res.status(404).json({ error: true });
 
-      const isMember = room.people.some((person) => person._id.toString() === req.user.id.toString());
-      if (!isMember) return res.status(403).json({ error: true });
+      // A former group member (removed/banned/left) keeps read access to
+      // history they already have — only a current member gets the
+      // defense-in-depth GroupMember re-check below. See canReadRoomHistory.
+      const isCurrentMember = room.people.some((person) => person._id.toString() === req.user.id.toString());
+      const canRead = isCurrentMember
+        || (room.isGroup && await groupPolicy.wasEverMember(room._id, req.user.id));
+      if (!canRead) return res.status(403).json({ error: true });
 
       // Defense in depth for groups: Room.people is a synced cache, but
       // GroupMember is authoritative — re-check it independently in case of
-      // drift. See DECISIONS.md D-035.
-      if (room.isGroup) {
+      // drift. See DECISIONS.md D-035. Skipped for a former member — their
+      // membership row is intentionally REMOVED/BANNED/LEFT, that's expected.
+      if (room.isGroup && isCurrentMember) {
         const membership = await groupPolicy.getMembershipWithFallback(room._id, req.user.id);
         if (!membership) return res.status(404).json({ error: true });
       }
@@ -63,9 +69,14 @@ module.exports = async (req, res, next) => {
         return obj;
       });
 
+      const accessRevoked = await groupPolicy.getAccessRevokedInfo(room, req.user.id, isCurrentMember);
+      const joinInfo = isCurrentMember ? await groupPolicy.getJoinInfo(room, req.user.id) : undefined;
+
       const sanitizedRoom = {
         ...room.toObject(),
         people: await attachBlockState(sanitizedPeople, req.user.id),
+        ...(accessRevoked ? { accessRevoked } : {}),
+        ...(joinInfo ? { myJoinInfo: joinInfo } : {}),
       };
 
       res.status(200).json({ room: sanitizedRoom });

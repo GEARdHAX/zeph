@@ -5,6 +5,7 @@ const sanitizeDeletedMessage = require('../utils/sanitizeDeletedMessage');
 const requireVisibleConversation = require('../utils/requireVisibleConversation');
 const roomHasBoundaryViolation = require('../utils/roomHasBoundaryViolation');
 const { hasValidVaultToken } = require('../vault/vaultToken');
+const groupPolicy = require('../authorization/groupPolicy');
 
 // Reconnect resync: returns messages added to a room after lastMessageID, newest-cursor-first
 // like more-messages.js but inverted ($gt instead of $lt) since this fills a forward gap
@@ -23,12 +24,14 @@ module.exports = async (req, res, next) => {
     return res.status(404).json({ error: true });
   }
 
-  if (!room) {
+  if (!room || room.disabledAt) {
     return res.status(404).json({ error: true });
   }
 
-  const isMember = room.people.some((person) => person.toString() === req.user.id.toString());
-  if (!isMember) {
+  // A former group member (removed/banned/left) can still resync history
+  // they already had access to — see canReadRoomHistory.
+  const canRead = await groupPolicy.canReadRoomHistory(room, req.user.id);
+  if (!canRead) {
     return res.status(403).json({ error: true });
   }
 

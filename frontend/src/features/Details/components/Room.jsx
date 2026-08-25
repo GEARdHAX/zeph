@@ -5,17 +5,22 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useGlobal } from 'reactn';
 import {
-  Users, Image as ImageIcon, Link2, Shield,
+  Users, Image as ImageIcon, Link2, Shield, LogOut,
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
 import ProfileView from '../../Panel/components/ProfileView';
 import InviteGroup from '../../Group/components/InviteGroup';
 import GroupAdminPanel from '../../Group/components/GroupAdminPanel';
 import createRoom from '../../../actions/createRoom';
-import { getGroup } from '../../../actions/groupAdmin';
+import getRoom from '../../../actions/getRoom';
+import { getGroup, leaveGroup } from '../../../actions/groupAdmin';
 import Actions from '../../../constants/Actions';
 import getMediaCategory from '../../../lib/mediaType';
 import getFileIcon from '../../../lib/fileIcon';
@@ -77,6 +82,7 @@ const STATUS_COLOR = {
 
 function Room() {
   const room = useSelector((state) => state.io.room) || {};
+  const io = useSelector((state) => state.io.io);
   const onlineUsers = useSelector((state) => state.io.onlineUsers) || [];
   const imagesNumber = useSelector((state) => state.io.room?.images?.length || 0);
   const user = useGlobal('user')[0] || {};
@@ -89,6 +95,8 @@ function Room() {
   const [showInviteGroup, setShowInviteGroup] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [groupInfo, setGroupInfo] = useState(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -97,7 +105,7 @@ function Room() {
     setPreviewUsername(null);
     try {
       const res = await createRoom(targetUserID);
-      dispatch({ type: Actions.ROOM, room: res.data.room });
+      dispatch({ type: Actions.SET_ROOM, room: res.data.room });
       navigate(`/room/${res.data.room._id}`);
     } catch (err) {
       console.error('Could not start chat:', err);
@@ -116,7 +124,58 @@ function Room() {
     getGroup(room._id).then((res) => setGroupInfo(res.data.group)).catch(() => setGroupInfo(null));
   }, [room.isGroup, room._id]);
 
+  // The member list rendered below reads straight from Redux room.people,
+  // which only gets set on navigation/initial fetch — a direct add
+  // (InviteGroup's "Add from friends") or an invite-link join updates the
+  // DB and notifies the newly-added person, but every OTHER member with
+  // this panel already open (including the one who just clicked "Add")
+  // never saw their own room.people grow, making a successful add look
+  // like it silently failed. GroupAdminPanel already re-fetches its own
+  // (separate) member list the same way for the same events — this mirrors
+  // that for the plain Details panel, which anyone (not just admins) can
+  // have open. A full room re-fetch, not a targeted patch, since people
+  // need to arrive fully populated (avatar, name) for the row to render.
+  useEffect(() => {
+    if (!io || !room.isGroup || !room._id) return undefined;
+    const groupId = room._id;
+
+    const refetchRoom = (payload) => {
+      if (payload?.groupId !== groupId) return;
+      getRoom(groupId).then((res) => dispatch({ type: Actions.SET_ROOM, room: res.data.room })).catch(() => {});
+    };
+
+    io.on('group:member:added', refetchRoom);
+    io.on('group:member:removed', refetchRoom);
+    io.on('group:member:banned', refetchRoom);
+
+    return () => {
+      io.off('group:member:added', refetchRoom);
+      io.off('group:member:removed', refetchRoom);
+      io.off('group:member:banned', refetchRoom);
+    };
+  }, [io, room.isGroup, room._id, dispatch]);
+
   const canManageGroup = groupInfo && (groupInfo.myRole === 'OWNER' || groupInfo.myRole === 'ADMIN');
+  // A plain MEMBER has no way to reach GroupAdminPanel (canManageGroup-gated
+  // above), so they previously had no leave-group entry point at all — this
+  // is that entry point. The OWNER's own leave/transfer flow already exists
+  // inside GroupAdminPanel (reachable since an owner always has
+  // canManageGroup) and isn't duplicated here.
+  const canLeaveGroup = groupInfo && groupInfo.myRole !== 'OWNER';
+
+  const onLeaveGroup = async () => {
+    setLeaving(true);
+    try {
+      await leaveGroup(room._id);
+      toast.success('You left the group.');
+      setConfirmLeave(false);
+      navigate('/', { replace: true });
+    } catch (err) {
+      toast.error('Could not leave group.');
+    } finally {
+      setLeaving(false);
+    }
+  };
 
   useEffect(() => {
     if (scrollContainer.current && scrollContainer.current.scrollTop === 0) {
@@ -305,6 +364,16 @@ function Room() {
                   Manage Group
                 </Button>
               )}
+              {canLeaveGroup && (
+                <Button
+                  variant="secondary"
+                  className="mb-1.5 justify-start gap-2 text-xs text-destructive hover:text-destructive"
+                  onClick={() => setConfirmLeave(true)}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Leave Group
+                </Button>
+              )}
               {members}
             </div>
           )}
@@ -347,6 +416,7 @@ function Room() {
         <InviteGroup
           groupId={room._id}
           groupName={room.title}
+          existingMemberIds={(room.people || []).map((p) => p._id || p)}
           onClose={() => setShowInviteGroup(false)}
         />
       )}
@@ -360,6 +430,25 @@ function Room() {
           onSettingsChanged={(patch) => setGroupInfo((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }))}
         />
       )}
+
+      <Dialog open={confirmLeave} onOpenChange={setConfirmLeave}>
+        <DialogContent className="rounded-2xl border border-border bg-card">
+          <DialogHeader>
+            <DialogTitle>Leave this group?</DialogTitle>
+            <DialogDescription>
+              You will lose access to this group. You can rejoin later if invited.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setConfirmLeave(false)} disabled={leaving}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" className="rounded-xl shadow-xs" onClick={onLeaveGroup} disabled={leaving}>
+              Leave Group
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -2,11 +2,12 @@ import {
   useRef, useState, useEffect, lazy, Suspense,
 } from 'react';
 import {
-  Send, Image, Smile, Paperclip, Sparkles,
+  Send, Image, Smile, Paperclip, Sparkles, ShieldOff, Trash2,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import moment from 'moment';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
@@ -19,6 +20,7 @@ import getRooms from '../../../actions/getRooms';
 import typing from '../../../actions/typing';
 import retryWithBackoff from '../../../lib/retryWithBackoff';
 import draftReply from '../../../actions/draftReply';
+import deleteConversation from '../../../actions/deleteConversation';
 import useTheme from '../../../lib/useTheme';
 import { validateFile } from '../../../lib/mediaPolicy';
 import RichMessageInput from './RichMessageInput';
@@ -58,9 +60,31 @@ function BottomBar({ aiEnabled }) {
   const [videoQueue, setVideoQueue] = useState([]);
 
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const typingTimeout = useRef(null);
 
   const pickerRef = useRef(null);
+
+  const [deletingConversation, setDeletingConversation] = useState(false);
+
+  // Set live by ROOM_ACCESS_REVOKED (reducers/io.js) when a
+  // group:member:removed{self:true} event arrives for the currently-open
+  // room — see initIO.jsx. reason 'left' (the user's own deliberate leave)
+  // never sets this, only 'removed'/'banned'/'deleted' do.
+  const accessRevoked = room?.accessRevoked;
+
+  const onDeleteConversation = async () => {
+    if (!room?._id) return;
+    setDeletingConversation(true);
+    try {
+      await deleteConversation(room._id);
+      toast.success('Conversation removed from your inbox.');
+      navigate('/', { replace: true });
+    } catch (err) {
+      toast.error('Could not delete this conversation.');
+      setDeletingConversation(false);
+    }
+  };
 
   useEffect(() => {
     const handleOutside = (e) => {
@@ -79,6 +103,7 @@ function BottomBar({ aiEnabled }) {
   }, [isPicker]);
 
   useEffect(() => {
+    if (accessRevoked) return undefined;
     if (text === '') {
       clearTimeout(typingTimeout.current);
       dispatch(typing(room, false));
@@ -310,6 +335,31 @@ function BottomBar({ aiEnabled }) {
       .then((res) => dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
       .catch((err) => console.log(err));
   };
+
+  if (accessRevoked) {
+    const actionLabel = accessRevoked.reason === 'banned' ? 'banned from' : 'removed from';
+    return (
+      <div className="flex w-full flex-col items-center gap-2.5 border-t border-border/60 bg-card px-3.5 py-4 text-center text-card-foreground">
+        <div className="flex items-center gap-2 text-xs font-medium text-destructive">
+          <ShieldOff className="h-4 w-4 shrink-0" />
+          <span>
+            {`You were ${actionLabel} this group`}
+            {accessRevoked.actorName ? ` by ${accessRevoked.actorName}` : ''}
+          </span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={deletingConversation}
+          onClick={onDeleteConversation}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          {deletingConversation ? 'Removing…' : 'Delete Group DM'}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex w-full items-center gap-2 border-t border-border/60 bg-card px-3.5 pt-3 pb-6 sm:py-2.5 text-card-foreground">

@@ -42,3 +42,12 @@ export const requestToJoinGroup = (groupId) => axios({
   url: `${Config.url || ''}/api/group/join-requests`,
   data: { groupId },
 });
+
+// Direct add by user id — any group member can do this (ADD_MEMBER is
+// open to every role, see groupPolicy.js), distinct from the invite-link
+// flow above in that the friend is added immediately, no click-through.
+export const addGroupMember = (groupId, userId) => axios({
+  method: 'post',
+  url: `${Config.url || ''}/api/group/members/add`,
+  data: { id: groupId, userId },
+});

@@ -127,6 +127,41 @@ describe('Join request approval', () => {
     expect(log.target.toString()).toBe(requester._id.toString());
   });
 
+  // Regression: a user who deleted this group from their inbox (a prior
+  // membership, removed, then deleted), then requests to join again and
+  // gets approved, stayed permanently invisible in rooms/list — nothing
+  // cleared the stale ConversationUserState.deletedAt tombstone on
+  // approval. See unhideConversationForUser.js.
+  it('reappears in the requester\'s inbox after being deleted, removed, then re-approved', async () => {
+    const owner = await createUser();
+    const requester = await createUser();
+    const group = await createGroup(owner, [requester._id]);
+    const groupId = group.body._id;
+
+    await request(app).post('/api/group/members/remove')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, userId: requester._id.toString() });
+
+    await request(app).post('/api/conversation/delete')
+      .set('Authorization', `Bearer ${tokenFor(requester)}`)
+      .send({ conversationId: groupId });
+
+    const listBefore = await request(app).post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(requester)}`).send({});
+    expect(listBefore.body.rooms.map((r) => r._id)).not.toContain(groupId);
+
+    await requestJoin(requester, groupId);
+    const approve = await request(app)
+      .post(`/api/group/join-requests/${requester._id}/approve`)
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ groupId });
+    expect(approve.status).toBe(200);
+
+    const listAfter = await request(app).post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(requester)}`).send({});
+    expect(listAfter.body.rooms.map((r) => r._id)).toContain(groupId);
+  });
+
   it('rejects approval by a non-admin member', async () => {
     const owner = await createUser();
     const member = await createUser();

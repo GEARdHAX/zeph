@@ -1,8 +1,9 @@
 const Room = require('../../models/Room');
 const GroupMember = require('../../models/GroupMember');
+const GroupAuditLog = require('../../models/GroupAuditLog');
 const groupPolicy = require('../../authorization/groupPolicy');
+const broadcastToGroup = require('../../utils/broadcastToGroup');
 const logger = require('../../logger');
-const store = require('../../store');
 
 const VALID_ROLES = ['ADMIN', 'MEMBER'];
 
@@ -42,10 +43,18 @@ module.exports = async (req, res) => {
     return res.status(409).json({ error: true, reason: 'role_changed' });
   }
 
+  await GroupAuditLog.create({
+    group: room._id,
+    actor: actorId,
+    action: 'role_changed',
+    target: userId,
+    metadata: { oldRole: targetMembership.role, newRole: role },
+  });
+
   logger.info({
     groupId: room._id, actorId, targetId: userId, oldRole: targetMembership.role, newRole: role,
   }, 'group_role_changed');
-  store.io.to(`group:${room._id}`).emit('group:member:role-updated', { groupId: room._id, userId, role });
+  broadcastToGroup(room.people, 'group:member:role-updated', { groupId: room._id, userId, role }, { excludeUserId: actorId });
 
   res.status(200).json({ status: 'success', role });
 };

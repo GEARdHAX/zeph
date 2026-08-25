@@ -23,6 +23,33 @@ const dayLabel = (date) => {
   return m.format('MMMM D, YYYY');
 };
 
+// Maps GroupMember.joinedVia (backend enum, see models/GroupMember.js) to
+// the empty-state copy shown when this member's own history is empty —
+// their real join system-message can fall before their own
+// ConversationUserState.deletedBefore cutoff after a delete-then-rejoin
+// cycle (see unhideConversationForUser.js), hiding it along with
+// everything else, so a generic "No messages here yet" is misleading right
+// after joining. 'CREATED' (the group creator) never hits this — they have
+// no one else's history to be missing in the first place.
+const JOIN_METHOD_LABEL = {
+  ADDED: 'You were added to this group',
+  INVITE_LINK: 'You joined via invite link',
+  JOIN_REQUEST: 'Your request to join was approved',
+};
+
+function JoinedEmptyState({ joinInfo }) {
+  const label = JOIN_METHOD_LABEL[joinInfo.method] || 'You joined this group';
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+      <div className="text-sm font-semibold text-foreground">{label}</div>
+      <div className="text-xs text-muted-foreground mt-1">
+        {joinInfo.inviterName ? `Invited by ${joinInfo.inviterName}. ` : ''}
+        Send a message to start the conversation!
+      </div>
+    </div>
+  );
+}
+
 function DaySeparator({ date }) {
   return (
     <div className="flex items-center gap-3 px-1 py-1.5 sm:px-2">
@@ -130,10 +157,14 @@ function Messages() {
         {messagesList}
 
         {messages.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-            <div className="text-sm font-semibold text-foreground">No messages here yet</div>
-            <div className="text-xs text-muted-foreground mt-1">Send a message to start the conversation!</div>
-          </div>
+          room.myJoinInfo ? (
+            <JoinedEmptyState joinInfo={room.myJoinInfo} />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+              <div className="text-sm font-semibold text-foreground">No messages here yet</div>
+              <div className="text-xs text-muted-foreground mt-1">Send a message to start the conversation!</div>
+            </div>
+          )
         )}
 
         {typing && (

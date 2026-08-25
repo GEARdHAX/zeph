@@ -1,7 +1,7 @@
 import IO from 'socket.io-client';
 import { setGlobal, getGlobal } from 'reactn';
 import { toast } from 'react-toastify';
-import { PhoneIncoming } from 'lucide-react';
+import { PhoneIncoming, Users, ShieldOff } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Config from '../config';
 import Actions from '../constants/Actions';
@@ -102,6 +102,70 @@ export function IncomingCallToast({ meetingID, caller, added }) {
   );
 }
 
+// Fired when this user is added to a group (direct add, invite link, or an
+// approved join request all emit the same group:member:added event — see
+// broadcastToGroup.js call sites). The event payload itself only carries
+// {groupId, userId, role}, so the toast's title/avatar come from the
+// group's entry in the room list this same handler already refetches
+// (getRooms()) — no extra request just for the toast.
+export function AddedToGroupToast({ room }) {
+  return (
+    <button
+      type="button"
+      onClick={() => navigateTo(`/room/${room._id}`)}
+      className="flex w-full cursor-pointer items-center gap-2.5 text-left"
+    >
+      <Avatar className="h-9 w-9 shrink-0 border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-bold">
+        {room.picture && (
+          <img
+            src={`${Config.url || ''}/api/images/${room.picture.shieldedID}/256`}
+            alt=""
+            className="aspect-square size-full object-cover"
+          />
+        )}
+        <AvatarFallback className="bg-transparent text-white">
+          <Users className="h-4 w-4" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <div className="truncate text-xs font-semibold text-foreground">{room.title || 'Group'}</div>
+        <div className="truncate text-xs text-muted-foreground">You were added to this group</div>
+      </div>
+    </button>
+  );
+}
+
+// Fired when this user is removed or banned from a group while online —
+// group:member:removed carries reason:'removed'/'banned' plus groupName/
+// actorName directly in the payload (see forceLeaveGroupRoom.js), so unlike
+// AddedToGroupToast this doesn't need a getRooms() round trip first: the
+// room is about to disappear from the list, not appear in it. Clicking
+// navigates home rather than into the now-inaccessible room.
+export function RemovedFromGroupToast({
+  groupName, reason, actorName,
+}) {
+  const actionLabel = reason === 'banned' ? 'banned from' : 'removed from';
+  return (
+    <button
+      type="button"
+      onClick={() => navigateTo('/')}
+      className="flex w-full cursor-pointer items-center gap-2.5 text-left"
+    >
+      <Avatar className="h-9 w-9 shrink-0 border border-border bg-destructive/15 text-destructive">
+        <AvatarFallback className="bg-transparent text-destructive">
+          <ShieldOff className="h-4 w-4" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <div className="truncate text-xs font-semibold text-foreground">{groupName || 'Group'}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {`You were ${actionLabel} this group${actorName ? ` by ${actorName}` : ''}`}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 // Module-level, not component state — initIO is called from plain action
 // code (init.js on boot, App.jsx for magic-link login, Login/index.jsx for
 // manual login), never from a component with its own mount/unmount to hang
@@ -163,7 +227,14 @@ const initIO = (token) => (dispatch) => {
     audio.src = messageSound;
     audio.autoplay = true;
     audio.onended = () => audio.remove();
-    document.body.appendChild(audio);
+    // System messages ("X was removed by Y") are moderation events, not
+    // someone's chat message — no sound, no "new message" toast (the
+    // removed/banned user already gets their own distinct RemovedFromGroupToast
+    // elsewhere). Still counts as unread and still updates the sidebar below.
+    const isSystemMessage = message.type === 'system';
+    if (!isSystemMessage) {
+      document.body.appendChild(audio);
+    }
 
     if (!roomIsOpen) {
       store.dispatch({ type: Actions.MESSAGES_ADD_ROOM_UNREAD, roomID: room._id });
@@ -171,7 +242,7 @@ const initIO = (token) => (dispatch) => {
       // a toast for the open room would just duplicate what's already on
       // screen. Suppressed while a call is active so an incoming toast
       // doesn't cover the call UI.
-      if (!getGlobal().inCall) {
+      if (!getGlobal().inCall && !isSystemMessage) {
         toast(<NewMessageToast room={room} message={message} />, { toastId: message._id });
       }
     }
@@ -266,6 +337,77 @@ const initIO = (token) => (dispatch) => {
   // inbox list, which this event alone doesn't carry — refetch instead of
   // trying to reconstruct it, same as message-in's existing getRooms() call.
   io.on('conversation-unhidden', () => {
+    getRooms()
+      .then((res) => store.dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
+      .catch((err) => console.log(err));
+  });
+
+  // Fires for every group membership change (direct add, invite-link join,
+  // approved join request — all three emit the same event, see
+  // broadcastToGroup.js call sites), delivered to every existing member AND
+  // the newly-added person. Only the newly-added person gets the toast/
+  // sound/dashboard-entry this is for; an existing member watching someone
+  // else join has GroupAdminPanel's own listener for that (if it's open)
+  // and doesn't need a toast for every arrival.
+  io.on('group:member:added', (data) => {
+    const myUserID = getGlobal().user?.id;
+    if (!data?.groupId || data.userId !== myUserID) return;
+
+    const audio = document.createElement('audio');
+    audio.style.display = 'none';
+    audio.src = messageSound;
+    audio.autoplay = true;
+    audio.onended = () => audio.remove();
+    document.body.appendChild(audio);
+
+    getRooms()
+      .then((res) => {
+        store.dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms });
+        const room = res.data.rooms.find((r) => r._id === data.groupId);
+        if (room && !getGlobal().inCall) {
+          toast(<AddedToGroupToast room={room} />, { toastId: `group-added-${data.groupId}` });
+        }
+      })
+      .catch((err) => console.log(err));
+  });
+
+  // Fires when THIS user is removed, banned, or leaves a group (self:true —
+  // see forceLeaveGroupRoom.js) or another remaining member is removed/left
+  // (self:false, broadcastToGroup.js). Only the self:true, reason !== 'left'
+  // case needs a toast/sound/dashboard-refresh here — 'left' is the user's
+  // own deliberate action (GroupAdminPanel already toasts+navigates for it),
+  // and self:false is a different member leaving, which the sidebar's own
+  // getRooms() refresh below still needs to reflect (member counts/last
+  // message) but doesn't warrant a personal notification.
+  io.on('group:member:removed', (data) => {
+    const myUserID = getGlobal().user?.id;
+    if (!data?.groupId) return;
+
+    if (data.self && data.userId === myUserID) {
+      store.dispatch({
+        type: Actions.ROOM_ACCESS_REVOKED,
+        groupId: data.groupId,
+        reason: data.reason || 'removed',
+        actorName: data.actorName,
+      });
+
+      if (data.reason !== 'left') {
+        const audio = document.createElement('audio');
+        audio.style.display = 'none';
+        audio.src = messageSound;
+        audio.autoplay = true;
+        audio.onended = () => audio.remove();
+        document.body.appendChild(audio);
+
+        if (!getGlobal().inCall) {
+          toast(
+            <RemovedFromGroupToast groupName={data.groupName} reason={data.reason} actorName={data.actorName} />,
+            { toastId: `group-removed-${data.groupId}` },
+          );
+        }
+      }
+    }
+
     getRooms()
       .then((res) => store.dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
       .catch((err) => console.log(err));

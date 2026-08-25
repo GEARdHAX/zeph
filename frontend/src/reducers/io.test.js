@@ -29,3 +29,26 @@ describe('io reducer — delivery/read receipts', () => {
     expect(state.messages[0].readBy).toEqual(['u1']);
   });
 });
+
+describe('io reducer — ROOM_ACCESS_REVOKED', () => {
+  it('patches the currently-open room with accessRevoked when the groupId matches', () => {
+    const state = io({ room: { _id: 'g1', title: 'Team' } }, {
+      type: Actions.ROOM_ACCESS_REVOKED, groupId: 'g1', reason: 'banned', actorName: 'Alice Owner',
+    });
+    expect(state.room.accessRevoked).toEqual({ reason: 'banned', actorName: 'Alice Owner' });
+  });
+
+  it('does nothing if the event is for a different room than the one currently open', () => {
+    const state = io({ room: { _id: 'g1', title: 'Team' } }, {
+      type: Actions.ROOM_ACCESS_REVOKED, groupId: 'g2', reason: 'removed', actorName: 'Bob',
+    });
+    expect(state.room.accessRevoked).toBeUndefined();
+  });
+
+  it('does nothing if no room is currently open', () => {
+    const state = io({ room: null }, {
+      type: Actions.ROOM_ACCESS_REVOKED, groupId: 'g1', reason: 'removed', actorName: 'Bob',
+    });
+    expect(state.room).toBeNull();
+  });
+});

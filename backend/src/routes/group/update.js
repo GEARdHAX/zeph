@@ -2,12 +2,16 @@ const Room = require('../../models/Room');
 const xss = require('xss');
 const groupPolicy = require('../../authorization/groupPolicy');
 const GroupAuditLog = require('../../models/GroupAuditLog');
+const broadcastToGroup = require('../../utils/broadcastToGroup');
 const logger = require('../../logger');
-const store = require('../../store');
 
 const ALLOWED_PRIVACY = ['PUBLIC', 'PRIVATE', 'INVITE_ONLY'];
-// Configurable slow-mode intervals, per spec — 0 means off.
-const ALLOWED_SLOW_MODE_SECONDS = [0, 5, 10, 30, 60, 300];
+// Slow mode: 0 = off, otherwise any whole-second interval up to 6 hours —
+// covers the spec's presets (5s/10s/30s/1m/5m) plus a custom value from the
+// frontend's "Custom…" input. The upper bound exists only to reject
+// obviously-wrong input (e.g. a stray extra zero), not to constrain
+// legitimate moderation use.
+const MAX_SLOW_MODE_SECONDS = 6 * 60 * 60;
 
 module.exports = async (req, res) => {
   const {
@@ -32,7 +36,7 @@ module.exports = async (req, res) => {
   if (typeof privacy === 'string' && ALLOWED_PRIVACY.includes(privacy)) update.privacy = privacy;
   if (slowModeSeconds !== undefined) {
     const parsed = Number(slowModeSeconds);
-    if (!ALLOWED_SLOW_MODE_SECONDS.includes(parsed)) {
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > MAX_SLOW_MODE_SECONDS) {
       return res.status(400).json({ error: true, reason: 'INVALID_SLOW_MODE' });
     }
     update['settings.slowModeSeconds'] = parsed;
@@ -43,7 +47,7 @@ module.exports = async (req, res) => {
     group: room._id, actor: req.user.id, action: 'settings_changed', metadata: update,
   });
 
-  store.io.to(`group:${room._id}`).emit('group:updated', { groupId: room._id, ...update });
+  broadcastToGroup(room.people, 'group:updated', { groupId: room._id, ...update }, { excludeUserId: req.user.id });
 
   res.status(200).json({ status: 'success' });
 };

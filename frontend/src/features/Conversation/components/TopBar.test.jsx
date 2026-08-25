@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
@@ -156,6 +156,35 @@ describe('Conversation TopBar — privacy menu', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete DM' }));
     await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith('room-1'));
+  });
+
+  // Regression: opening a dead room URL directly (e.g. a group the owner
+  // already deleted — Room.disabledAt) 404s the fetch, so state.io.room
+  // stays null and TopBar's `room = useSelector(...) || {}` makes
+  // room._id undefined. "Delete DM" previously called
+  // deleteConversation(undefined), which silently dropped conversationId
+  // from the JSON body (JSON.stringify omits undefined) and the server
+  // 400'd with no visible explanation. TopBar must fall back to the room
+  // id from the URL itself.
+  it('"Delete DM" falls back to the URL\'s room id when state.io.room never loaded (404/"Room Not Found")', async () => {
+    const user = userEvent.setup();
+    deleteConversation.mockResolvedValue({ data: { status: 'success' } });
+    const store = makeStore(null);
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={['/room/dead-room-1']}>
+          <Routes>
+            <Route path="/room/:id" element={<TopBar back={() => {}} loading={false} aiEnabled={false} />} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    await user.click(await screen.findByText('Delete DM'));
+    await user.click(screen.getByRole('button', { name: 'Delete DM' }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith('dead-room-1'));
   });
 
   it('"Block" calls blockUser with the other participant\'s username, no confirmation dialog', async () => {

@@ -8,6 +8,10 @@ const store = require('../../../store');
 // Denied -> status:'LEFT', not deleted. Leaves no permanent block (unlike
 // ban) — the row is reusable if this user requests again later, matching
 // join-requests/create.js's upsert-over-LEFT/REMOVED path.
+// Deny is a private notice to the denied user only — not a group-wide
+// broadcast — so this targets their personal room directly (auto-joined at
+// socket connect, same delivery mechanism as message.js) rather than using
+// broadcastToGroup.js.
 module.exports = async (req, res) => {
   const { userId } = req.params;
   const { groupId } = req.fields;
@@ -34,7 +38,7 @@ module.exports = async (req, res) => {
   });
 
   logger.info({ groupId: room._id, actorId, targetId: userId }, 'group_join_request_denied');
-  store.io.to(`group:${room._id}`).emit('group:join-request:denied', { groupId: room._id, userId });
+  store.io.to(userId.toString()).emit('group:join-request:denied', { groupId: room._id, userId });
 
   res.status(200).json({ status: 'success' });
 };

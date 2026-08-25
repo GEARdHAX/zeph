@@ -5,6 +5,112 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-039: A deleted group was still fully usable — message.js and 7 other routes never checked disabledAt — 2026-08-25
+
+**Problem:** Reported after D-037/D-038 shipped: after the OWNER deleted a
+group, a remaining member could still send messages into it, and those
+messages were still delivered to the owner who had already left/deleted it.
+
+**Root cause:** `group/delete.js` marks a group deleted by setting
+`Room.disabledAt` (soft-delete — see its own comment: "immediate access
+revocation for every route, since every group route already 404s on
+room.disabledAt"). That assumption was false. `message.js` — the single
+highest-traffic route in the app — fetched the room and checked membership,
+but never checked `disabledAt` at all. Since `Room.people` also isn't
+cleared on delete (by design, so `forceLeaveGroupRoom` can iterate it once
+at delete-time), a departed/removed member's client that still had the
+group open could keep sending, and those sends kept reaching everyone
+still in the stale `people` array — including the owner, whose own
+`disabledAt` check protects *reading* the group but was never consulted by
+the send path they'd otherwise never hit again.
+
+A repo-wide audit of every route that fetches a `Room` document found the
+same missing condition in 7 more places: `get-room.js`, `join-room.js`,
+`message-delete.js`, `message-read.js`, `more-messages.js`,
+`sync-messages.js`, `media.js` (attachment streaming), and
+`meeting/call.js`. None of these are new to this session — this gap
+predates D-037 and was simply never exercised by an existing test, since no
+prior test ever deleted a group and then tried to act on it.
+
+**Decision:** added `|| room.disabledAt` to each route's existing
+not-found check, at the exact point each already has the `Room` document in
+hand — no new query, same pattern `group/get.js`/`group/update.js`/etc.
+already used correctly. Deliberately did not touch `create-room.js`/
+`list-rooms.js` — `disabledAt` is a group-only field, and those two are
+DM-creation/DM-listing paths where it never applies.
+
+**Why this went undetected:** every existing group test exercised routes
+independently; none chained "delete a group, then try to use it" as a
+single scenario. `test/group-deleted-access.test.js` closes this
+specifically — created a group, deleted it, then asserted 404 on message
+send, room/get, room/join, and group/get, with the message-send test
+verified to fail (200 instead of 404) against the pre-fix code before
+confirming it passes against the fix.
+
+**Testing:** 4 new tests. Full backend suite: 455/455 (451 baseline + 4
+new), zero regressions.
+
+---
+
+## D-038: D-037's status field 404'd every pre-existing group membership — missing backfill, not a code bug alone — 2026-08-25
+
+**Problem:** Immediately after D-037 shipped, the group owner reported the
+new "Manage Group" button wasn't appearing for a real, pre-existing group
+they owned. `POST /api/group/get` returned `{"error":true}` (404) for the
+owner of their own group. Direct DB inspection showed the `GroupMember` row
+was correct in every way that mattered — `role:'OWNER', active:true` — and
+even *looked* like it had `status:'ACTIVE'` when read through Mongoose
+(`find().toObject()`). A raw driver query bypassing Mongoose's schema
+(`collection.findOne()`) revealed the actual persisted document: **no
+`status` field at all**. Mongoose's schema `default: 'ACTIVE'` was silently
+filling the field in memory on every read, making a field that was never
+written to disk look identical to one that was — the diagnostic script that
+found this (`GroupMember.find().toObject()`) was itself fooled by the same
+masking until a `collection.findOne()` (raw driver, no schema) exposed the
+gap. All 5 `GroupMember` rows in the dev database predated D-037's status
+field and were affected (4 `active:true`, 1 `active:false`).
+
+**Root cause:** D-037 added `getMembership()`'s `status: 'ACTIVE'` filter
+without accounting for rows written before that field existed. Every write
+path since D-037 keeps `active` and `status` in sync by construction, but
+nothing retroactively populated `status` on rows that predated it — a
+schema addition with a default value is invisible until you query on the
+new field specifically, which is exactly what D-037 did.
+
+**Decision:**
+- `backend/src/scripts/backfillGroupMemberStatus.js` — one-time, idempotent
+  migration: `active:true` rows with no `status` → `status:'ACTIVE'`
+  (unambiguous). `active:false` rows with no `status` → `status:'REMOVED'`
+  (a judgment call — `active` never distinguished self-leave from
+  admin-removal historically, so LEFT vs REMOVED can't be recovered; REMOVED
+  is the more conservative choice for anything gating a rejoin path). Run
+  once per environment: `node src/scripts/backfillGroupMemberStatus.js`.
+- `getMembership()`'s filter changed from `status: 'ACTIVE'` to
+  `status: { $in: ['ACTIVE', null] }` — defense-in-depth so a missed
+  backfill on another environment (staging, a teammate's local DB, prod)
+  degrades to "matches the old active-only behavior" instead of silently
+  404ing real memberships. This tolerance is not a substitute for running
+  the backfill — new rows always get a real `status` written by every
+  create/update path — it only covers rows this migration hasn't reached yet.
+
+**Why this went undetected in D-037's own testing:** every test in that
+pass created its `GroupMember` rows through `GroupMember.create()`/the real
+API routes, which apply the schema default and write it normally — there
+was no test fixture simulating a row that predated the schema change.
+`backend/test/groups.test.js`'s new "Legacy GroupMember rows with no status
+field" describe block closes this gap by inserting via
+`GroupMember.collection.insertOne()` directly (bypassing Mongoose's
+defaults, reproducing a genuinely pre-D-037 row) rather than through the
+model — verified this test fails (404 instead of 200) against the
+pre-fix query before confirming it passes against the fix.
+
+**Testing:** 2 new tests in `groups.test.js` (legacy ACTIVE row still
+readable/sendable, legacy inactive row still correctly rejected). Full
+backend suite: 443/443 (441 baseline + 2 new), zero regressions. Fix
+verified directly against the affected dev-database row before and after.
+
+---
+
 ## D-037: Group architecture 80/20 completion — join requests, ban, slow mode, ownership transfer, audit log — 2026-08-25
 
 **Problem:** A spec for "Chitcx Group Architecture" (roles, membership
