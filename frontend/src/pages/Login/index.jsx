@@ -58,6 +58,7 @@ function Login() {
   const setToken = useGlobal('token')[1];
   const setUser = useGlobal('user')[1];
   const [entryPath, setEntryPath] = useGlobal('entryPath');
+  const setPendingFriendInviteToken = useGlobal('pendingFriendInviteToken')[1];
 
   const navigate = useNavigate();
 
@@ -106,7 +107,20 @@ function Login() {
       setUser(jwtDecode(res.data.token));
       setToken(res.data.token);
       dispatch(initIO(res.data.token));
-      navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath, { replace: true });
+
+      // A friend-invite link is the one entryPath that should NOT navigate
+      // straight to its own page post-registration — Home instead pops an
+      // "Add Friend" dialog over the inbox (see pendingFriendInviteToken in
+      // init.js), so a brand-new user lands in the app, not on another
+      // full-page interstitial. Every other entryPath (a group invite, a
+      // deep-linked room, etc.) keeps navigating there directly, unchanged.
+      const friendInviteMatch = entryPath?.match(/^\/invite\/f\/(.+)$/);
+      if (friendInviteMatch) {
+        await setPendingFriendInviteToken(friendInviteMatch[1]);
+        navigate('/', { replace: true });
+      } else {
+        navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath, { replace: true });
+      }
       await setEntryPath(null);
     } catch (err) {
       let errors = {};

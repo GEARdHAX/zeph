@@ -129,6 +129,16 @@ const initSocketAuth = (mediasoupEnabled) => {
 module.exports = (mediasoupEnabled) => {
   initSocketAuth(mediasoupEnabled);
 
+  // Mounted before CORS/rate-limiting/body-parsing so a monitor/load-balancer
+  // probe is never blocked by any of that, and before Mongo connects so it
+  // can correctly report 503 during the connecting-at-boot window instead of
+  // erroring. docker-compose.yml's healthcheck already curls
+  // http://localhost:PORT/healthz (no /api prefix) — this route was written
+  // for exactly that but was never actually mounted anywhere, so the
+  // healthcheck has been silently unreachable (curl connection error, not a
+  // real health signal) since it was added. See routes/health.js.
+  store.app.get('/healthz', require('./routes/health'));
+
   store.app.use(cors({ origin: store.config.corsOrigin }));
 
   const authLimiter = rateLimit({

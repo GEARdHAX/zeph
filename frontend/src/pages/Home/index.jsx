@@ -19,6 +19,7 @@ import Admin from '../../features/Admin';
 import NavRail from '../../features/Shell/components/NavRail';
 import BottomNav from '../../features/Shell/components/BottomNav';
 import NotificationsPlaceholder from '../../features/Shell/components/NotificationsPlaceholder';
+import PendingFriendInviteDialog from '../../features/Shell/components/PendingFriendInviteDialog';
 import useNavSync from '../../features/Shell/useNavSync';
 
 function Home() {
@@ -129,6 +130,8 @@ function Home() {
           </div>
         )}
       </div>
+
+      <PendingFriendInviteDialog />
     </Div100vh>
   );
 }

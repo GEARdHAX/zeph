@@ -3,11 +3,11 @@ import {
 } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
-import { setGlobal } from 'reactn';
+import { setGlobal, getGlobal } from 'reactn';
 import io from '../../reducers/io';
 import messages from '../../reducers/messages';
 import rtc from '../../reducers/rtc';
@@ -129,5 +129,64 @@ describe('Login tabbed auth flow', () => {
 
     await userEv.click(screen.getByRole('button', { name: /hide password/i }));
     expect(passwordInput).toHaveAttribute('type', 'password');
+  });
+});
+
+describe('Register redirects after a friend-invite entryPath', () => {
+  async function fillAndSubmitRegister(userEv) {
+    await userEv.click(screen.getByRole('tab', { name: 'Register' }));
+    await userEv.type(screen.getByPlaceholderText('First Name'), 'New');
+    await userEv.type(screen.getByPlaceholderText('Last Name'), 'User');
+    await userEv.type(screen.getByPlaceholderText('Username'), 'newuser');
+    await userEv.type(screen.getByPlaceholderText('Email'), 'new@example.com');
+    await userEv.type(screen.getByPlaceholderText('Password'), 'password123');
+    await userEv.type(screen.getByPlaceholderText('Repeat Password'), 'password123');
+    await userEv.click(screen.getByRole('button', { name: /register/i }));
+  }
+
+  it('stashes pendingFriendInviteToken and navigates to "/" instead of the invite page, when entryPath is a friend invite', async () => {
+    await setGlobal({
+      token: null, user: {}, entryPath: '/invite/f/abc123token', pendingFriendInviteToken: null,
+    });
+    const userEv = userEvent.setup();
+    render(
+      <Provider store={makeStore()}>
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<div>Home landed</div>} />
+            <Route path="/invite/f/:token" element={<div>Invite page landed</div>} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    await fillAndSubmitRegister(userEv);
+
+    expect(await screen.findByText('Home landed')).toBeInTheDocument();
+    expect(getGlobal().pendingFriendInviteToken).toBe('abc123token');
+  });
+
+  it('still navigates directly to entryPath for a non-friend-invite path (unchanged behavior)', async () => {
+    await setGlobal({
+      token: null, user: {}, entryPath: '/invite/g/somegrouptoken', pendingFriendInviteToken: null,
+    });
+    const userEv = userEvent.setup();
+    render(
+      <Provider store={makeStore()}>
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<div>Home landed</div>} />
+            <Route path="/invite/g/:token" element={<div>Group invite page landed</div>} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    await fillAndSubmitRegister(userEv);
+
+    expect(await screen.findByText('Group invite page landed')).toBeInTheDocument();
+    expect(getGlobal().pendingFriendInviteToken).toBeNull();
   });
 });

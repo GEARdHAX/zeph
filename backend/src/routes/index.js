@@ -8,6 +8,12 @@ const inviteCreateLimit = inviteRateLimit({ max: 20, windowMs: 60 * 60 * 1000, k
 const invitePreviewLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'invite:preview' });
 const inviteAcceptLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'invite:accept' });
 
+// Same handler as the unauthenticated /healthz mount in init.js (for
+// docker-compose.yml's healthcheck) — this /api-prefixed alias is for
+// external uptime monitors/manual checks against the hosted API origin,
+// where /api/health is the more discoverable convention.
+router.get('/health', require('./health'));
+
 router.get('/images/:id', require('./images'));
 router.get('/files/:id', require('./files'));
 router.get('/images/:id/:size', require('./images'));

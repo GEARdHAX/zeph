@@ -1,7 +1,9 @@
-const Image = require('../models/Image');
-const mkdirp = require('mkdirp');
+const { Readable } = require('stream');
 const sharp = require('sharp');
+const Image = require('../models/Image');
+const storage = require('../storage');
 const store = require('../store');
+const logger = require('../logger');
 const randomstring = require('randomstring');
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -26,9 +28,7 @@ module.exports = async (req, res) => {
 
   const shield = randomstring.generate({ length: 120, charset: 'alphanumeric', capitalization: 'lowercase' });
 
-  let imageObject;
-
-  imageObject = new Image({
+  const imageObject = new Image({
     name: image.name,
     author: req.user.id,
     size: image.size,
@@ -37,32 +37,30 @@ module.exports = async (req, res) => {
 
   await imageObject.save();
 
-  const folder = `${store.config.dataFolder}/${req.user.id}`;
+  const shieldedID = shield + imageObject._id;
+  // Same relative-key convention as upload-media.js's storageKey — resolved
+  // by storage.js via R2 (when configured) or local disk otherwise, unlike
+  // the old direct-fs write this replaces which only ever worked on a
+  // persistent local disk (broken on Render's ephemeral filesystem). See
+  // Image.js's storageKey comment / DECISIONS.md.
+  const baseKey = `${req.user.id}/${shieldedID}.jpg`;
 
   try {
-    await mkdirp(folder);
+    const mainBuffer = await sharp(path).rotate().toBuffer();
+    await storage.putObject(baseKey, Readable.from(mainBuffer), 'image/jpeg');
+
+    await Promise.all(store.config.sizes.map(async (size) => {
+      const sizedKey = `${req.user.id}/${shieldedID}-${size}.jpg`;
+      const dimensions = crop === 'square' ? { width: size, height: size } : { width: size };
+      const resizedBuffer = await sharp(path).rotate().resize(dimensions).toBuffer();
+      await storage.putObject(sizedKey, Readable.from(resizedBuffer), 'image/jpeg');
+    }));
   } catch (err) {
+    logger.error({ err, imageId: imageObject._id }, 'Failed to write image to storage');
     return res.status(500).json({ status: 500, error: 'WRITE_ERROR' });
   }
 
-  const shieldedID = shield + imageObject._id;
-
-  const location = `${folder}/${shieldedID}.jpg`;
-
-  await sharp(path).rotate().toFile(location);
-
-  for (let i = 0; i < store.config.sizes.length; i++) {
-    const location = `${folder}/${shieldedID}-${store.config.sizes[i]}.jpg`;
-
-    let size = {};
-
-    if (crop === 'square') size = { width: store.config.sizes[i], height: store.config.sizes[i] };
-    else size = { width: store.config.sizes[i] };
-
-    await sharp(path).rotate().resize(size).toFile(location);
-  }
-
-  imageObject.location = location;
+  imageObject.storageKey = baseKey;
   imageObject.shieldedID = shieldedID;
 
   try {

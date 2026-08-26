@@ -1,8 +1,8 @@
-const File = require('../models/File');
-const mkdirp = require('mkdirp');
 const fs = require('fs');
 const path = require('path');
-const store = require('../store');
+const File = require('../models/File');
+const storage = require('../storage');
+const logger = require('../logger');
 const randomstring = require('randomstring');
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB, matches the frontend's existing client-side check
@@ -38,12 +38,9 @@ module.exports = async (req, res) => {
     return res.status(415).json({ status: 415, error: 'FILE_TYPE_NOT_ALLOWED' });
   }
 
-  const filePath = file.path;
   const shield = randomstring.generate({ length: 120, charset: 'alphanumeric', capitalization: 'lowercase' });
 
-  let fileObject;
-
-  fileObject = new File({
+  const fileObject = new File({
     name: file.name,
     author: req.user.id,
     size: file.size,
@@ -53,24 +50,20 @@ module.exports = async (req, res) => {
 
   await fileObject.save();
 
-  const folder = `${store.config.dataFolder}/${req.user.id}`;
+  const shieldedID = shield + fileObject._id;
+  const safeExtension = originalExtension && originalExtension.length <= 10 ? originalExtension : '.bin';
+  // See upload.js/Image.js's storageKey comment — same rationale, same
+  // convention as upload-media.js.
+  const storageKey = `${req.user.id}/${shieldedID}${safeExtension}`;
 
   try {
-    await mkdirp(folder);
+    await storage.putObject(storageKey, fs.createReadStream(file.path), file.type);
   } catch (err) {
+    logger.error({ err, fileId: fileObject._id }, 'Failed to write file to storage');
     return res.status(500).json({ status: 500, error: 'WRITE_ERROR' });
   }
 
-  const shieldedID = shield + file._id;
-  const safeExtension = originalExtension && originalExtension.length <= 10 ? originalExtension : '.bin';
-
-  const location = `${folder}/${shieldedID}${safeExtension}`;
-
-  const stream = fs.createWriteStream(location);
-  const reader = fs.createReadStream(filePath);
-  reader.pipe(stream);
-
-  fileObject.location = location;
+  fileObject.storageKey = storageKey;
   fileObject.shieldedID = shieldedID;
 
   try {

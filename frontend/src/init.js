@@ -90,6 +90,11 @@ const init = async () => {
     showPanel: true,
     panel: 'standard',
     newGroupUsers: [],
+    // Set by Login/index.jsx's onRegister when the visitor arrived via a
+    // /invite/f/:token link and just created an account — Home reads this
+    // once on mount to pop the "Add Friend" dialog over the inbox instead
+    // of routing back to the full-page invite preview. Cleared once shown.
+    pendingFriendInviteToken: null,
   };
 
   setGlobal(state).then(() => console.log('Global state init complete!', state));
