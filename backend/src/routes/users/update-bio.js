@@ -1,4 +1,5 @@
 const User = require('../../models/User');
+const { invalidateProfileCache } = require('../../userProfileCache');
 
 // Must match frontend/src/features/Panel/components/EditBioPopup.jsx and
 // frontend/src/lib/parseBio.js's own limits — no shared constant across the
@@ -29,6 +30,8 @@ module.exports = async (req, res) => {
     { $set: { bio: raw } },
     { new: true },
   ).select('-email -password -friends -__v -vaultPinHash');
+
+  await invalidateProfileCache(updated.usernameNormalized);
 
   res.status(200).json({ status: 'success', user: updated });
 };

@@ -46,7 +46,7 @@ function SearchBar() {
   const searchVal = useGlobal('search')[0] || '';
 
   return (
-    <div className="px-4 py-2">
+    <div data-tour="search-bar" className="px-4 py-2">
       <div className="relative flex h-10 w-full items-center rounded-xl border border-input bg-muted/40 px-3.5 transition-colors focus-within:border-primary/50 focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/20">
         <Search
           className="h-4 w-4 shrink-0 cursor-pointer text-muted-foreground"

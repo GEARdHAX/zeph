@@ -280,7 +280,7 @@ function Room() {
   return (
     <div className="flex h-full w-full flex-col bg-card text-card-foreground overflow-y-auto">
       {/* Top Banner / Avatar Header */}
-      <div className="flex flex-col items-center p-6 border-b border-border/60 text-center">
+      <div data-tour="group-header" className="flex flex-col items-center p-6 border-b border-border/60 text-center">
         <button
           type="button"
           disabled={room.isGroup || !other.username}
@@ -346,6 +346,7 @@ function Room() {
             <div className="flex flex-col gap-0.5">
               {room.isGroup && (
                 <Button
+                  data-tour="group-invite-button"
                   variant="secondary"
                   className="mb-1.5 justify-start gap-2 text-xs"
                   onClick={() => setShowInviteGroup(true)}
@@ -356,6 +357,7 @@ function Room() {
               )}
               {canManageGroup && (
                 <Button
+                  data-tour="group-manage-button"
                   variant="secondary"
                   className="mb-1.5 justify-start gap-2 text-xs"
                   onClick={() => setShowAdminPanel(true)}
@@ -374,7 +376,7 @@ function Room() {
                   Leave Group
                 </Button>
               )}
-              {members}
+              <div data-tour="group-member-list">{members}</div>
             </div>
           )}
 

@@ -48,9 +48,13 @@ module.exports = async (req, res, next) => {
   const state = await ConversationUserState.findOne({ conversation: roomID, user: req.user.id }).select('deletedBefore');
   const deletedBefore = state && state.deletedBefore;
 
+  const PAGE_SIZE = 20;
+
   Message.find({ room: roomID, _id: { $lt: firstMessageID } })
     .sort({ _id: -1 })
-    .limit(20)
+    // Fetch one extra beyond the page — its presence (not a second query)
+    // is how hasMore is determined, so the DB still does the limiting.
+    .limit(PAGE_SIZE + 1)
     .populate({
       path: 'author',
       select: '-email -password -friends -__v -vaultPinHash',
@@ -62,9 +66,12 @@ module.exports = async (req, res, next) => {
     .populate([{ path: 'media', strictPopulate: false }])
     .lean()
     .then((messages) => {
-      messages.reverse();
+      const hasMore = messages.length > PAGE_SIZE;
+      const page = hasMore ? messages.slice(0, PAGE_SIZE) : messages;
+      page.reverse();
       res.status(200).json({
-        messages: messages
+        hasMore,
+        messages: page
           .filter((e) => !(e.deletedFor || []).some((uid) => uid.toString() === req.user.id.toString()))
           .filter((e) => !deletedBefore || new Date(e.date) > deletedBefore)
           .map((e) => {

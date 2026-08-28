@@ -364,12 +364,14 @@ function TopBar({ back, loading, aiEnabled }) {
       </div>
 
       <div className="flex items-center gap-1 text-muted-foreground">
-        <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-foreground" onClick={() => call(true)} title="Video Call">
-          <Video className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-foreground" onClick={() => call(false)} title="Audio Call">
-          <Phone className="h-4 w-4" />
-        </Button>
+        <div data-tour="call-buttons" className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-foreground" onClick={() => call(true)} title="Video Call">
+            <Video className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-foreground" onClick={() => call(false)} title="Audio Call">
+            <Phone className="h-4 w-4" />
+          </Button>
+        </div>
         <Button
           variant="ghost"
           size="icon"
@@ -380,6 +382,7 @@ function TopBar({ back, loading, aiEnabled }) {
           <Star className={cn('h-4 w-4', isFavorite() && 'fill-current')} />
         </Button>
         <Button
+          data-tour="conversation-info-button"
           variant="ghost"
           size="icon"
           className={cn('h-8 w-8 hover:text-foreground', showDetails && 'bg-muted text-primary')}

@@ -67,11 +67,18 @@ function Messages() {
   const messages = useSelector((state) => state.io.messages) || [];
   const room = useSelector((state) => state.io.room) || {};
   const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const typing = useSelector((state) => state.messages.typing);
 
   const dispatch = useDispatch();
   const chat = useRef(null);
   const [open, setOpen] = useState(null);
+  // Set right before an older-history prepend changes messages.length, so
+  // the auto-scroll effect below can tell "history loaded" apart from "new
+  // message arrived" and skip the scroll-to-bottom for the former — without
+  // this both cases looked identical to that effect and loading history
+  // yanked the view down to the bottom instead of preserving position.
+  const restoreScrollRef = useRef(null);
 
   let other = {
     firstName: 'A',
@@ -110,26 +117,57 @@ function Messages() {
     );
   });
 
+  // Trigger a bit before the physical top, not exactly at it — gives the
+  // request time to land before the user actually hits the edge.
+  const HISTORY_TRIGGER_DISTANCE = 200;
+
   const onScroll = () => {
-    if (chat.current && chat.current.scrollTop === 0) {
-      if (loading || !messages.length) return;
-      setLoading(true);
-      getMoreMessages({ roomID: room._id, firstMessageID: messages[0]._id })
-        .then((res) => {
-          dispatch({ type: Actions.MORE_MESSAGES, messages: res.data.messages });
-          setLoading(false);
-        })
-        .catch(() => {
-          setLoading(false);
-        });
-    }
+    const el = chat.current;
+    if (!el) return;
+    if (el.scrollTop > HISTORY_TRIGGER_DISTANCE) return;
+    if (loading || !hasMore || !messages.length) return;
+
+    setLoading(true);
+    // Captured before the fetch resolves and prepends messages — the
+    // restore effect below diffs against the post-render scrollHeight to
+    // keep whatever the user was looking at in the same visual spot.
+    restoreScrollRef.current = { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop };
+    getMoreMessages({ roomID: room._id, firstMessageID: messages[0]._id })
+      .then((res) => {
+        setHasMore(res.data.hasMore !== false);
+        dispatch({ type: Actions.MORE_MESSAGES, messages: res.data.messages });
+        setLoading(false);
+      })
+      .catch(() => {
+        restoreScrollRef.current = null;
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
-    if (chat.current) {
-      chat.current.scrollTop = chat.current.scrollHeight;
+    if (!chat.current) return;
+    if (restoreScrollRef.current) {
+      // History was prepended — hold the same content in view instead of
+      // jumping to the bottom (or leaving scrollTop at 0, which is what a
+      // naive "do nothing" would produce here since the prepended content
+      // pushes everything down).
+      const { scrollHeight: oldHeight, scrollTop: oldTop } = restoreScrollRef.current;
+      chat.current.scrollTop = oldTop + (chat.current.scrollHeight - oldHeight);
+      restoreScrollRef.current = null;
+      return;
     }
+    // A genuinely new message (or the very first load of this room) —
+    // scroll-to-bottom is the correct behavior here, unchanged from before.
+    chat.current.scrollTop = chat.current.scrollHeight;
   }, [messages.length]);
+
+  // A different room was opened — its own initial page always starts fresh
+  // with more history assumed available, and any pending restore from the
+  // previous room's unmounted scroll position must not leak into this one.
+  useEffect(() => {
+    setHasMore(true);
+    restoreScrollRef.current = null;
+  }, [room._id]);
 
   useEffect(() => {
     if (typing && chat.current) {
@@ -139,6 +177,7 @@ function Messages() {
 
   return (
     <div
+      data-tour="message-area"
       className="relative z-0 flex-1 w-full overflow-y-auto overflow-x-hidden flex justify-center py-2 bg-transparent"
       ref={chat}
       onScroll={onScroll}

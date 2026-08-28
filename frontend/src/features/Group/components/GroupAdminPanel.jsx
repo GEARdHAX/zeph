@@ -31,6 +31,7 @@ import {
   removeMember, banMember, changeMemberRole, transferOwnership, updateGroupSettings,
   leaveGroup, deleteGroup,
 } from '../../../actions/groupAdmin';
+import HelpHint from '../../../tours/HelpHint';
 
 const SLOW_MODE_OPTIONS = [
   { value: 0, label: 'Off' },
@@ -317,7 +318,7 @@ function GroupAdminPanel({
 
           <div className="flex flex-col gap-6 px-4 pb-4">
             {canModerate && (
-              <div>
+              <div data-tour="group-slow-mode">
                 <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Clock className="h-3.5 w-3.5" />
                   Slow Mode
@@ -390,9 +391,10 @@ function GroupAdminPanel({
               </div>
             )}
 
-            <div>
-              <div className="mb-2 text-xs font-semibold text-foreground">
+            <div data-tour="group-admin-member-list">
+              <div className="mb-2 flex items-center gap-1 text-xs font-semibold text-foreground">
                 {`Members${members ? ` (${members.length})` : ''}`}
+                <HelpHint tourId="groups" stepIndex={0} label="What do roles mean?" ctx={{ myRole }} />
               </div>
               <div className="flex flex-col gap-0.5">
                 {(members || []).map((m) => {

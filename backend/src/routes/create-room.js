@@ -94,29 +94,33 @@ module.exports = async (req, res, next) => {
     ],
   };
 
-  Room.findOne({
-    people: { $all: [req.user.id, counterpart] },
-    isGroup: false,
-  })
+  // Canonical sorted-pair key — see Room.js's dmKey comment. Atomic
+  // find-or-create via upsert on this unique key closes the race where two
+  // concurrent "open chat" requests (e.g. both users clicking into the same
+  // new DM at once) previously could both pass a findOne-miss and each
+  // .save() their own room, producing two DM rooms for the same pair.
+  const dmKey = [req.user.id.toString(), counterpart.toString()].sort().join(':');
+
+  Room.findOneAndUpdate(
+    { dmKey },
+    { $setOnInsert: { people: [req.user.id, counterpart], isGroup: false, dmKey } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  )
     .populate(peoplePopulate)
     .exec((err, room) => {
-      if (err) return res.status(500).json({ error: true });
-      if (room) {
-        findMessagesAndEmit(room);
-      } else {
-        Room({ people: [req.user.id, counterpart], isGroup: false })
-          .save()
-          .then((room) => {
-            // Same field exclusion as the existing-room lookup above — this
-            // path previously populated with NO select at all, leaking the
-            // full raw User document (password hash included) for a
-            // brand-new room's first response.
-            Room.findOne({ _id: room._id })
-              .populate(peoplePopulate)
-              .then((room) => {
-                findMessagesAndEmit(room);
-              });
-          });
+      if (err) {
+        // 11000 = the sparse-unique dmKey index caught a genuine concurrent
+        // insert that upsert's own atomicity didn't fully prevent (a known
+        // MongoDB upsert race under very high concurrency) — the other
+        // request's room now exists, so just fetch it instead of erroring.
+        if (err.code === 11000) {
+          return Room.findOne({ dmKey })
+            .populate(peoplePopulate)
+            .then((room) => findMessagesAndEmit(room))
+            .catch(() => res.status(500).json({ error: true }));
+        }
+        return res.status(500).json({ error: true });
       }
+      findMessagesAndEmit(room);
     });
 };

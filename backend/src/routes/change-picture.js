@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Room = require('../models/Room');
 const store = require('../store');
 const logger = require('../logger');
+const { invalidateProfileCache } = require('../userProfileCache');
 
 module.exports = (req, res, next) => {
   let { imageID } = req.fields;
@@ -20,6 +21,8 @@ module.exports = (req, res, next) => {
     .populate([{ path: 'picture', strictPopulate: false }])
     .exec(async (err, user) => {
       if (err) return res.status(500).json({ error: true });
+
+      await invalidateProfileCache(user.usernameNormalized);
 
       // Every other person sharing a room (1:1 or group) with this user has
       // the OLD picture cached in their already-open state.io.room/rooms —

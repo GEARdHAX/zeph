@@ -1,0 +1,97 @@
+/*
+  Chitcx visual theme for Driver.js popovers/overlay — layered ON TOP of
+  driver.js's own dist/driver.css (loaded first, see driver.js's
+  loadDriverAssets), never editing Driver's source. Uses this project's own
+  design tokens (index.css's `--color-*` @theme mappings) so a tour popover
+  looks like the rest of the app, not like a generic library default, and
+  automatically follows the user's light/dark theme since these tokens
+  already do (see D-022 in DECISIONS.md).
+*/
+
+.chitcx-tour-popover.driver-popover {
+  background-color: var(--color-card);
+  color: var(--color-card-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 0.5rem);
+  box-shadow: 0 10px 30px -5px rgb(0 0 0 / 0.25), 0 4px 10px -3px rgb(0 0 0 / 0.15);
+  font-family: inherit;
+  max-width: min(340px, calc(100vw - 2rem));
+}
+
+.chitcx-tour-popover .driver-popover-title {
+  color: var(--color-card-foreground);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.chitcx-tour-popover .driver-popover-description {
+  color: var(--color-muted-foreground);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.chitcx-tour-popover .driver-popover-progress-text {
+  color: var(--color-muted-foreground);
+  font-size: 0.6875rem;
+}
+
+.chitcx-tour-popover .driver-popover-footer button {
+  background-color: var(--color-secondary, var(--color-muted));
+  color: var(--color-secondary-foreground, var(--color-foreground));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 0.375rem);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-shadow: none;
+  padding: 0.375rem 0.75rem;
+}
+
+.chitcx-tour-popover .driver-popover-footer button:hover {
+  background-color: var(--color-muted);
+}
+
+.chitcx-tour-popover .driver-popover-next-btn,
+.chitcx-tour-popover .driver-popover-done-btn {
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border-color: var(--color-primary);
+}
+
+.chitcx-tour-popover .driver-popover-next-btn:hover,
+.chitcx-tour-popover .driver-popover-done-btn:hover {
+  background-color: var(--color-primary);
+  opacity: 0.9;
+}
+
+.chitcx-tour-popover .driver-popover-close-btn {
+  color: var(--color-muted-foreground);
+}
+
+.chitcx-tour-popover .driver-popover-close-btn:hover {
+  color: var(--color-foreground);
+}
+
+.chitcx-tour-popover .driver-popover-arrow {
+  border-color: var(--color-card);
+}
+
+/* Visible focus state for keyboard navigation (spec §23 — accessibility,
+   "visible focus state"). Driver.js's buttons are real <button> elements,
+   so a standard focus ring composes correctly here. */
+.chitcx-tour-popover .driver-popover-footer button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* prefers-reduced-motion is also enforced at the JS config level
+   (createTour disables driver.js's `animate` option entirely when the
+   media query matches — see driver.js), this CSS-level guard is
+   belt-and-suspenders against any transition this stylesheet itself
+   declares in the future. */
+@media (prefers-reduced-motion: reduce) {
+  .chitcx-tour-popover,
+  .chitcx-tour-popover * {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}

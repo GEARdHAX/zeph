@@ -5,6 +5,231 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-043: Redis caching layer — user profile lookups only, deliberately narrow — 2026-08-26
+
+**Problem:** Redis was now wired into this app three ways (Socket.IO
+adapter D-040, BullMQ D-041, and available to any route via
+`store.config.redisUrl`), but never once used for its most obvious job —
+caching an expensive read. `users/resolve.js`'s `User.findOne` (public
+profile lookup, hit by the Add People flow and the universal profile
+viewer) runs on every call with zero caching.
+
+**Two candidates rejected first, on purpose:**
+- `groupPolicy.getMembership` (called by nearly every group route) — the
+  highest-traffic read in the group subsystem, but it's an AUTHORIZATION
+  check, not a display read. A stale cache entry here could let a just-
+  removed/banned member act as an active member for the TTL window — a
+  real security regression, not a UX inconvenience. Not worth the risk for
+  a portfolio-scale app.
+- `list-rooms.js` (sidebar listing) — touches `Room`, `GroupMember`,
+  `ConversationUserState`, `User` (privileged list), and
+  `attachBlockState`'s own dependencies. Caching the whole response safely
+  would need invalidation hooks in nearly every mutation route in the
+  app — high risk of a missed spot silently serving a wrong/stale sidebar.
+
+**Chosen: `users/resolve.js`'s `User` lookup only** (not the whole route
+response — `relationship`/`commonGroups` stay per-viewer, uncached,
+correctly). Profile data (name/avatar/bio) changing a few seconds late is
+purely cosmetic, and the write surface is small and fully enumerable: only
+4 routes ever mutate the cached fields (`user-edit.js` — root admin editing
+any account, `users/change-username.js`, `users/update-bio.js`,
+`change-picture.js`). `discoveryEnabled`/`level` are cached too (same
+document) but are read-only today (no route toggles `discoveryEnabled`;
+`level` changes are a manual DB operation) — nothing to invalidate for
+those fields yet, revisit if that changes.
+
+**`src/userProfileCache.js`** — cache-aside, keyed by `usernameNormalized`
+(the model's own unique index). 5-minute TTL as a safety net for any missed
+invalidation spot, NOT the primary correctness mechanism — explicit
+`invalidateProfileCache()` calls are. A `null` fetch result (genuinely
+nonexistent user) is never cached, so a real 404 stays re-checked on every
+call rather than permanently cached as "missing." Best-effort, same
+posture as every other Redis-touching module this pass: no `REDIS_URL`, or
+Redis genuinely unreachable, degrades to "always hit the DB" — never an
+app-breaking error.
+
+**The username-change edge case:** the cache key IS the username, so
+renaming a user (self-service via `change-username.js`, or root-admin via
+`user-edit.js`) moves their cached entry to an entirely new key — both
+routes invalidate the OLD username (from `req.user`'s pre-update value, or
+the request body's `user.username` for the admin path) AND the new one, so
+neither a stale old-key entry lingers nor does a request for the new
+username fail to see the fresh data.
+
+**Testing:** 8 new tests. `userProfileCache.test.js` exercises the real
+Redis instance directly (hit/miss/invalidation/null-not-cached).
+`resolve-profile-cache.test.js` proves it end-to-end through the actual
+route for all 3 self-service mutation paths (bio, username, picture) —
+each test confirms the SECOND request sees fresh data immediately, not
+stale for the TTL window. Both skip cleanly when `REDIS_URL` isn't set
+(e.g. a CI environment without the secret), matching this project's
+established pattern for real-infra tests. Full suites: 517/517 backend
+(509 baseline + 8), 338/338 frontend (unchanged, no frontend work needed
+for this pass), zero regressions.
+
+---
+
+## D-042: Direct-to-R2 media uploads — presign/complete split, post-upload validation — 2026-08-26
+
+**Problem:** `upload-media.js` proxied every file through Node — the whole
+upload buffers into a temp file, then `storage.putObject` buffers it AGAIN
+into memory before the R2 `PutObjectCommand` (see `storage.js`'s own
+comment acknowledging this). For large attachments (video up to 50MB) this
+is real memory pressure per concurrent upload, and Node's bandwidth is the
+bottleneck twice over (client→Node, then Node→R2) instead of once
+(client→R2 directly).
+
+**The security tradeoff (the actual hard part):** the existing defenses —
+`isConsistentWithCategory` (magic-number sniffing) and `inspectArchive`
+(zip-bomb heuristic) — both need real bytes on local disk via `fs`
+random-access reads, checked BEFORE trusting an upload. Uploading straight
+to R2 means Node never sees the bytes at write time, so those checks can't
+run pre-upload anymore. Two options considered: (1) post-upload validation
+— accept the file into R2, then have Node download it back and run the
+identical checks, deleting it immediately on failure; (2) keep the risky
+categories (document/archive) on the proxy path, only fast-path images/
+video. Chose (1): simpler (one flow, not two by category), and the actual
+window where an unvalidated object exists in R2 is inert — nothing in the
+app ever serves/renders a `Media` doc until its `status` is `READY`, which
+only happens after validation passes.
+
+**Decision:**
+- `storage.js` — added `getPresignedUploadUrl(key, contentType)` via
+  `@aws-sdk/s3-request-presigner`. Returns `null` when R2 isn't configured
+  (local-disk mode has no equivalent trick) — callers must check.
+- `routes/upload-media-presign.js` (step 1) — validates what's checkable
+  without file bytes (extension allowlist, declared size), creates a
+  `Media(status:'UPLOADING')` row, returns a presigned PUT URL. 501s
+  cleanly if R2 isn't actually configured.
+- `routes/upload-media-complete.js` (step 2) — downloads the now-uploaded
+  object back to a local temp file, runs the EXACT SAME
+  `isConsistentWithCategory`/`inspectArchive` checks `upload-media.js`
+  already ran, generates the thumbnail. Failure → `storage.deleteObject`
+  the bad file immediately + `status:'FAILED'`. Success → `status:'READY'`.
+- `GET /api/info` — new `directUploadEnabled` field (mirrors the existing
+  `aiEnabled` pattern) so the frontend knows which flow to use.
+- `frontend/actions/uploadMedia.js` — same external signature/return shape
+  as before (`BottomBar.jsx`'s one call site needed zero changes), branches
+  internally: `directUploadEnabled` true → presign → PUT straight to R2 →
+  complete; false → the original proxy POST. The flag is cached per page-
+  load (a deploy-time config choice, not something that changes mid-session)
+  rather than re-fetched before every file send.
+- `upload.js` (avatars) / `upload-file.js` (legacy attachments) intentionally
+  NOT migrated to this flow — low-value targets (small files, low upload
+  volume compared to chat media) for the added complexity.
+
+**Test isolation:** the real test env has no R2 credentials (by design,
+same as production local-disk mode), so `upload-media-direct.test.js` mocks
+`storage.js`'s R2-backed functions directly to exercise the presign→
+complete flow's actual logic (status transitions, cleanup-on-failure)
+rather than requiring a live bucket in CI — `getPresignedUploadUrl` itself
+is a thin wrapper around the AWS SDK's own `getSignedUrl`; the read/write/
+delete functions it composes with already existed and are covered live by
+`upload-media.test.js`/`media-serving.test.js`.
+
+**Testing:** 8 new backend tests, 4 new frontend tests. Full suites:
+509/509 backend (501 baseline + 8), 338/338 frontend (334 baseline + 4),
+zero regressions. Production build clean.
+
+---
+
+## D-041: BullMQ wired up — group-deletion cleanup is the first real job — 2026-08-26
+
+**Problem:** `group/delete.js` had a `queues/groupCleanup.js` require wrapped
+in try/catch with a comment "wired in Phase 4" — the file never existed, so
+enqueueing was permanently a silent no-op. A deleted group's `Message` rows,
+their `Media` objects (DB rows + R2/local storage bytes), and now-dead
+`GroupInvite` links were never actually reclaimed — `Room.disabledAt`
+correctly made the group inaccessible, but nothing ever cleaned up the data
+behind it.
+
+**Decision:** Built the queue for real. `src/queues/connection.js` — a
+shared `ioredis` connection factory separate from `setupRedisAdapter.js`'s
+pub/sub pair (BullMQ requires its own connection with
+`maxRetriesPerRequest:null`, its own documented constraint, incompatible
+with sharing a client used for something else). `src/queues/groupCleanup.js`
+— the `Queue` + `enqueueGroupCleanup(groupId)`, called from `group/delete.js`
+right after `disabledAt` is set; a 24h delay before the job runs, matching
+the "group is already inaccessible, this only reclaims storage" framing —
+no user-facing urgency, so a generous delay costs nothing and gives an
+implicit undo window even though no explicit undo UI exists.
+`src/queues/groupCleanupWorker.js` — the `Worker` + `processGroupCleanup`,
+started from `index.js` alongside the Redis adapter.
+
+**Cleanup scope, deliberately narrow:** deletes `Message` rows for the room,
+the `Media` docs those messages reference (both the Mongo row and the
+storage object via `storage.deleteObject`), and the group's `GroupInvite`
+rows. Does NOT touch: `Room` (soft-delete stays permanent, matches every
+other delete in this app), `GroupMember` rows (`canReadRoomHistory`/
+`wasEverMember` — see D-039 — still need these for a former member's own
+inbox even after the group is gone), `GroupAuditLog` (audit history is
+meant to outlive the thing it audited), or the legacy `Image`/`File`
+collections (those back per-user profile pictures, never scoped to a single
+group — deleting them here would risk breaking an unrelated conversation's
+avatar).
+
+**Best-effort, same posture as the Redis adapter (D-040):** no `REDIS_URL`
+→ `enqueueGroupCleanup` logs and returns, never throws — the group stays
+correctly inaccessible via `disabledAt` regardless of whether cleanup ever
+runs. A failed enqueue (Redis reachable at boot but down at delete-time) is
+logged, not thrown, for the same reason.
+
+**Test isolation:** `test/helpers/app.js` (used by every route test) now
+forces `redisUrl: null` in the config it hands to routes — without this,
+every group-deletion test would silently connect to and enqueue jobs in
+the real Upstash instance from `.env`, and leave that connection open past
+the test run (Jest's "did not exit" warning, confirmed and fixed during
+this change). `groupCleanup.test.js` deliberately exercises the real Redis
++ real Mongo path in isolation (its own `store.config`, explicit
+`closeQueueConnection()` in `afterAll`) rather than mocking Redis — there's
+no mock library in this project for it, and the real-infra path is exactly
+what needed proving. Manually smoke-tested end-to-end outside Jest too:
+enqueue → 500ms delay → worker picks it up → `group_cleanup_completed`
+logged — confirmed against the live Upstash + Atlas instances, not just
+unit-level.
+
+**Testing:** 4 new tests. Full backend suite: 501/501 (497 baseline + 4
+new), zero regressions.
+
+---
+
+## D-040: Socket.IO Redis adapter wired up — multi-instance delivery, best-effort — 2026-08-26
+
+**Problem:** Every group/DM delivery in this app is a targeted
+`store.io.to(userId).emit(...)` (see `broadcastToGroup.js`, `message.js`),
+never a Socket.IO room join. With plain `socket.io` and no adapter, that
+targeting only resolves against sockets connected to the SAME process —
+running more than one backend instance behind a load balancer would
+silently drop delivery to any recipient connected to a different instance.
+`Config.redisUrl` existed since D-003 but was never actually consumed
+anywhere.
+
+**Decision:** Added `@socket.io/redis-adapter` + `ioredis`, wired via a new
+`backend/src/setupRedisAdapter.js` (extracted from `index.js` so it's unit-
+testable without booting the whole server). Best-effort by design, matching
+every other optional-infra pattern in this codebase (R2, AI provider):
+`REDIS_URL` unset or unreachable falls back to single-process mode, never a
+boot crash. The initial connection attempt uses a bounded 5s timeout with
+retries disabled (`retryStrategy: () => null`) so a genuinely unreachable
+Redis fails fast at startup instead of hanging; normal reconnect behavior
+(exponential-ish backoff) is restored on the pub/sub clients only after the
+first connection succeeds, so a later transient Redis blip doesn't
+permanently kill multi-instance delivery.
+
+**Verified against a real Upstash instance** (not just mocked): connects,
+`io.adapter()` is called, logs confirm "multi-instance delivery enabled".
+
+**Testing:** 3 new tests (`setupRedisAdapter.test.js`) covering unset URL,
+empty-string URL, and unreachable-host — all resolve in well under a
+second thanks to the bounded connect timeout. Full backend suite:
+497/497 (494 baseline + 3 new), zero regressions.
+
+**Not yet done (tracked separately, same Redis instance will serve these
+next):** BullMQ background jobs, direct-to-R2 presigned uploads, a real
+Redis caching layer for hot read paths.
+
+---
+
 ## D-039: A deleted group was still fully usable — message.js and 7 other routes never checked disabledAt — 2026-08-25
 
 **Problem:** Reported after D-037/D-038 shipped: after the OWNER deleted a

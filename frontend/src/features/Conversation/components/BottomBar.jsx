@@ -362,7 +362,7 @@ function BottomBar({ aiEnabled }) {
   }
 
   return (
-    <div className="relative flex w-full items-center gap-2 border-t border-border/60 bg-card px-3.5 pt-3 pb-6 sm:py-2.5 text-card-foreground">
+    <div data-tour="message-composer" className="relative flex w-full items-center gap-2 border-t border-border/60 bg-card px-3.5 pt-3 pb-6 sm:py-2.5 text-card-foreground">
       {isPicker && (
         <div ref={pickerRef} className="absolute bottom-[84px] left-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-border">
           <Picker
@@ -376,6 +376,7 @@ function BottomBar({ aiEnabled }) {
 
       <div className="flex items-center gap-0.5 text-muted-foreground shrink-0">
         <Button
+          data-tour="emoji-button"
           variant="ghost"
           size="icon"
           className="h-8 w-8 rounded-full hover:text-foreground"
@@ -397,6 +398,7 @@ function BottomBar({ aiEnabled }) {
           }}
         />
         <Button
+          data-tour="attachment-button"
           variant="ghost"
           size="icon"
           className="h-8 w-8 rounded-full hover:text-foreground"
@@ -431,7 +433,7 @@ function BottomBar({ aiEnabled }) {
           plain input, so bold/italic/etc formatting syntax can be
           live-styled as the user types (see RichMessageInput.jsx for why a
           plain input can't do this at all). */}
-      <div className="relative flex-1 flex items-center">
+      <div data-tour="message-input" className="relative flex-1 flex items-center">
         <RichMessageInput
           className="flex h-10 w-full items-center overflow-x-auto overflow-y-hidden whitespace-nowrap rounded-xl border border-input bg-muted/40 px-3.5 text-xs text-foreground outline-none transition-all focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/20"
           placeholder="Type something to send..."
@@ -458,6 +460,7 @@ function BottomBar({ aiEnabled }) {
         )}
 
         <Button
+          data-tour="send-button"
           size="icon"
           className="h-9 w-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
           aria-label="Send message"

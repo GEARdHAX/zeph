@@ -16,7 +16,12 @@ store.io = {
   to: () => ({ emit: () => {} }),
   emit: () => {},
 };
-store.config = config;
+// Never let tests touch a real external Redis (BullMQ/Socket.IO adapter
+// both read store.config.redisUrl) — same reasoning as stubbing store.io
+// below: tests must be hermetic and never depend on/pollute real infra.
+// A dedicated test (queues/groupCleanup*.test.js) exercises the actual
+// Redis-backed behavior in isolation with its own explicit connection.
+store.config = { ...config, redisUrl: null };
 store.connected = true;
 
 passport.use(

@@ -59,6 +59,7 @@ function Login() {
   const setUser = useGlobal('user')[1];
   const [entryPath, setEntryPath] = useGlobal('entryPath');
   const setPendingFriendInviteToken = useGlobal('pendingFriendInviteToken')[1];
+  const setIsNewRegistration = useGlobal('isNewRegistration')[1];
 
   const navigate = useNavigate();
 
@@ -107,6 +108,10 @@ function Login() {
       setUser(jwtDecode(res.data.token));
       setToken(res.data.token);
       dispatch(initIO(res.data.token));
+      // Home reads this once to offer (not force) the onboarding tour —
+      // see init.js's isNewRegistration comment / spec §7. Only ever set
+      // here, never in onLogin below — a returning user never sees this.
+      await setIsNewRegistration(true);
 
       // A friend-invite link is the one entryPath that should NOT navigate
       // straight to its own page post-registration — Home instead pops an

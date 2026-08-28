@@ -95,6 +95,14 @@ const init = async () => {
     // once on mount to pop the "Add Friend" dialog over the inbox instead
     // of routing back to the full-page invite preview. Cleared once shown.
     pendingFriendInviteToken: null,
+    // Set by Login/index.jsx's onRegister for EVERY brand-new account
+    // (never on a plain login) — Home reads this once to show a subtle,
+    // dismissible "Take a tour?" suggestion (spec §7: "Do NOT automatically
+    // force the tour... prefer an optional first-login suggestion, ability
+    // to skip"). This is NOT the tour itself starting — just a one-time
+    // prompt offering it. Cleared once shown, same lifecycle as
+    // pendingFriendInviteToken above.
+    isNewRegistration: false,
   };
 
   setGlobal(state).then(() => console.log('Global state init complete!', state));

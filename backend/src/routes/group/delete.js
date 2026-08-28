@@ -2,13 +2,16 @@ const Room = require('../../models/Room');
 const groupPolicy = require('../../authorization/groupPolicy');
 const forceLeaveGroupRoom = require('../../utils/forceLeaveGroupRoom');
 const broadcastToGroup = require('../../utils/broadcastToGroup');
+const { enqueueGroupCleanup } = require('../../queues/groupCleanup');
 const logger = require('../../logger');
 
 // Owner-only deletion lifecycle: mark disabled (immediate access revocation
 // for every route, since every group route already 404s on room.disabledAt)
 // -> force every connected member off the socket room -> notify -> enqueue
-// BullMQ cleanup (wired in Phase 4; a null/no-op enqueue here until then —
-// see queues/groupCleanup.js). No synchronous cascade-delete of messages.
+// BullMQ cleanup (24h delay, see queues/groupCleanup.js/groupCleanupWorker.js
+// — best-effort, a no-op if Redis isn't configured). No synchronous
+// cascade-delete of messages; the group is already fully inaccessible via
+// disabledAt regardless of whether/when the cleanup job runs.
 module.exports = async (req, res) => {
   const { id } = req.fields;
   const actorId = req.user.id;
@@ -33,14 +36,10 @@ module.exports = async (req, res) => {
 
   logger.info({ groupId: room._id, ownerId: actorId }, 'group_delete_requested');
 
-  let enqueueGroupCleanup;
-  try {
-    ({ enqueueGroupCleanup } = require('../../queues/groupCleanup'));
-  } catch (e) {
-    // queues/groupCleanup.js doesn't exist until Phase 4 — group is already
-    // fully inaccessible via the disabledAt check above regardless.
-  }
-  if (enqueueGroupCleanup) enqueueGroupCleanup(room._id.toString());
+  // Fire-and-forget, matches every other post-response side effect above —
+  // the HTTP response below doesn't wait on this. See enqueueGroupCleanup's
+  // own comment for why a failed enqueue is logged, not thrown.
+  enqueueGroupCleanup(room._id.toString());
 
   res.status(200).json({ status: 'success' });
 };

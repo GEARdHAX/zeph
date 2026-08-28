@@ -114,6 +114,7 @@ function TopBar() {
         {/* Plus: Add Person or Create Group (Reliable Direct Dropdown) */}
         <div className="relative" ref={menuRef}>
           <Button
+            data-tour="new-chat-button"
             variant="ghost"
             size="icon"
             className={`h-8 w-8 rounded-full transition-colors ${

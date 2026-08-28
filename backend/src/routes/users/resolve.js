@@ -3,6 +3,7 @@ const Relationship = require('../../models/Relationship');
 const GroupMember = require('../../models/GroupMember');
 const Room = require('../../models/Room');
 const { isPrivileged } = require('../../authorization/policy');
+const { getCachedProfile } = require('../../userProfileCache');
 
 // Profile resolution for the Add People flow AND the universal profile
 // viewer: username -> public profile + current relationship state with the
@@ -12,9 +13,16 @@ module.exports = async (req, res, next) => {
   const { username } = req.params;
   if (!username || typeof username !== 'string') return res.status(400).json({ error: true });
 
-  const user = await User.findOne({ usernameNormalized: username.toLowerCase() })
+  const usernameNormalized = username.toLowerCase();
+  // Only the viewer-independent User document is cached — relationship/
+  // commonGroups below are per-(caller,target) pairs and were never
+  // candidates for this. See userProfileCache.js and DECISIONS.md for why
+  // this field set specifically (and not groupPolicy's membership checks)
+  // is safe to serve slightly stale.
+  const user = await getCachedProfile(usernameNormalized, () => User.findOne({ usernameNormalized })
     .select('username firstName lastName tagLine bio picture discoveryEnabled level')
-    .populate({ path: 'picture', strictPopulate: false });
+    .populate({ path: 'picture', strictPopulate: false })
+    .lean());
 
   const isSelf = user && user._id.toString() === req.user.id.toString();
 

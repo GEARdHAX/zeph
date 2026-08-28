@@ -23,6 +23,8 @@ router.post('/check-user', require('./checkUser'));
 router.post('/upload', passport.authenticate('jwt', { session: false }, null), require('./upload'));
 router.post('/upload/file', passport.authenticate('jwt', { session: false }, null), require('./upload-file'));
 router.post('/upload/media', passport.authenticate('jwt', { session: false }, null), require('./upload-media'));
+router.post('/upload/media/presign', passport.authenticate('jwt', { session: false }, null), require('./upload-media-presign'));
+router.post('/upload/media/:mediaId/complete', passport.authenticate('jwt', { session: false }, null), require('./upload-media-complete'));
 router.get('/media/:id', passport.authenticate('jwt', { session: false }, null), require('./media'));
 router.get('/media/:id/thumbnail', passport.authenticate('jwt', { session: false }, null), require('./media').thumbnail);
 router.post('/register', require('./register'));

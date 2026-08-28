@@ -127,7 +127,7 @@ function Panel() {
 
       {callStatus === 'in-call' && (!location.pathname.startsWith('/meeting') || over === false) && <MeetingBar />}
 
-      <div className="flex-1 overflow-y-auto pt-1">
+      <div data-tour="conversation-list" className="flex-1 overflow-y-auto pt-1">
         {nav === 'rooms' && roomsList}
         {nav === 'rooms' && filteredRooms.length === 0 && (
           <Notice text={activeFilter === 'All' ? 'No conversations yet. Start a chat!' : `No ${activeFilter.toLowerCase()} conversations.`} />

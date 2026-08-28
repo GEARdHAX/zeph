@@ -1,5 +1,6 @@
 const User = require('../../models/User');
 const xss = require('xss');
+const { invalidateProfileCache } = require('../../userProfileCache');
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
 
@@ -18,12 +19,23 @@ module.exports = async (req, res) => {
     return res.status(409).json({ error: true, reason: 'username_taken' });
   }
 
+  // The cache key IS the username, so a change moves the caller's cached
+  // profile to a new key entirely — both the old (now-stale, would
+  // otherwise linger until its TTL) and new (never yet cached, no-op if
+  // absent) keys need invalidating. req.user still holds the pre-update
+  // value here (fetched fresh per-request by the JWT auth middleware).
+  const previousUsernameNormalized = req.user.usernameNormalized;
+
   try {
     const updated = await User.findOneAndUpdate(
       { _id: req.user.id },
       { $set: { username, usernameNormalized } },
       { new: true },
     ).select('-email -password -friends -__v -vaultPinHash');
+    await Promise.all([
+      invalidateProfileCache(previousUsernameNormalized),
+      invalidateProfileCache(usernameNormalized),
+    ]);
     res.status(200).json({ status: 'success', user: updated });
   } catch (err) {
     // Unique index on usernameNormalized — a concurrent request claiming

@@ -19,6 +19,8 @@ app.use(pinoHttp({
 app.use(compression());
 const http = require('http');
 const io = require('socket.io');
+const setupRedisAdapter = require('./src/setupRedisAdapter');
+const { startGroupCleanupWorker } = require('./src/queues/groupCleanupWorker');
 const store = require('./src/store');
 const init = require('./src/init');
 // MEDIASOUP_ENABLED controls whether the WebRTC SFU is loaded.
@@ -51,13 +53,21 @@ store.config = Config;
 // websocket handshake is rejected as cross-origin before any app-level auth
 // logic runs, and every socket silently fails to connect in a browser.
 store.io = io(server, { cors: { origin: Config.corsOrigin, credentials: true } });
-init(mediasoupEnabled);
-if (mediasoupEnabled && mediasoup) {
-  mediasoup.init();
-  logger.info('Mediasoup SFU enabled');
-} else {
-  logger.info('Mediasoup SFU disabled (MEDIASOUP_ENABLED != true) — API-only mode');
-}
+
+const startServer = async () => {
+  await setupRedisAdapter(store.io, Config.redisUrl);
+  init(mediasoupEnabled);
+  if (mediasoupEnabled && mediasoup) {
+    mediasoup.init();
+    logger.info('Mediasoup SFU enabled');
+  } else {
+    logger.info('Mediasoup SFU disabled (MEDIASOUP_ENABLED != true) — API-only mode');
+  }
+  // Best-effort, same posture as the Redis adapter above — no worker means
+  // enqueued cleanup jobs simply wait in Redis until a worker process picks
+  // them up, never a boot crash or lost job.
+  startGroupCleanupWorker();
+};
 
 const listen = () => server.listen(Config.port, () => logger.info(`Server listening on port ${Config.port}`));
 
@@ -72,6 +82,7 @@ server.on('error', (e) => {
 });
 
 listen();
+startServer().catch((err) => logger.error({ err }, 'startServer failed'));
 
 let scheduler;
 let schedulerDone = false;

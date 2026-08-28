@@ -89,6 +89,27 @@ const getObjectStream = async (key) => {
   return fs.createReadStream(localPath);
 };
 
+// Presigned direct-upload URL — the client PUTs bytes straight to R2, never
+// through this Node process. Only meaningful in object-storage mode: local
+// disk has no equivalent "upload straight to disk from the browser" trick,
+// so callers must check useObjectStorage first (see routes/upload-media-
+// presign.js, which falls back to the existing proxy-through-Node route
+// entirely when this isn't available — see DECISIONS.md). The upload is
+// NOT trusted until the caller re-fetches and validates it afterward
+// (content-sniff, archive-bomb scan) — this only gets the bytes into R2,
+// it doesn't establish that they're safe. See routes/upload-media-complete.js.
+const getPresignedUploadUrl = async (key, contentType, expiresInSeconds = 300) => {
+  if (!useObjectStorage) return null;
+  const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+  const { client, commands } = getS3();
+  const command = new commands.PutObjectCommand({
+    Bucket: process.env.R2_BUCKET,
+    Key: key,
+    ContentType: contentType,
+  });
+  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+};
+
 const deleteObject = async (key) => {
   if (useObjectStorage) {
     const { client, commands } = getS3();
@@ -107,5 +128,5 @@ const deleteObject = async (key) => {
 };
 
 module.exports = {
-  useObjectStorage, putObject, getObjectStream, deleteObject,
+  useObjectStorage, putObject, getObjectStream, getPresignedUploadUrl, deleteObject,
 };

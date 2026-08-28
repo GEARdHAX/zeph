@@ -21,6 +21,7 @@ import BottomNav from '../../features/Shell/components/BottomNav';
 import NotificationsPlaceholder from '../../features/Shell/components/NotificationsPlaceholder';
 import PendingFriendInviteDialog from '../../features/Shell/components/PendingFriendInviteDialog';
 import useNavSync from '../../features/Shell/useNavSync';
+import FirstLoginTourSuggestion from '../../tours/FirstLoginTourSuggestion';
 
 function Home() {
   const location = useLocation();
@@ -132,6 +133,7 @@ function Home() {
       </div>
 
       <PendingFriendInviteDialog />
+      <FirstLoginTourSuggestion />
     </Div100vh>
   );
 }

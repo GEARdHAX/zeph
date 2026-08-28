@@ -39,7 +39,7 @@ function NotificationsPlaceholder() {
   return (
     <div className="flex h-full w-full flex-col bg-background text-foreground overflow-y-auto">
       {/* Header */}
-      <div className="flex h-16 w-full shrink-0 items-center justify-between border-b border-border/60 bg-card px-6">
+      <div data-tour="notifications-header" className="flex h-16 w-full shrink-0 items-center justify-between border-b border-border/60 bg-card px-6">
         <div>
           <h1 className="text-base font-bold text-foreground">Notifications</h1>
           <p className="text-xs text-muted-foreground">Recent alerts, unread messages, and mentions</p>

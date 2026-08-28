@@ -42,6 +42,7 @@ function NavRail() {
 
   return (
     <nav
+      data-tour="nav-rail"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={cn(

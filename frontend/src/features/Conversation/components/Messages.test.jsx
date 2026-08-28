@@ -1,7 +1,7 @@
 import {
-  describe, it, expect, beforeEach,
+  describe, it, expect, beforeEach, vi,
 } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
@@ -13,7 +13,10 @@ import messages from '../../../reducers/messages';
 import rtc from '../../../reducers/rtc';
 import emoji from '../../../reducers/emoji';
 import Actions from '../../../constants/Actions';
+import getMoreMessages from '../../../actions/getMoreMessages';
 import Messages from './Messages';
+
+vi.mock('../../../actions/getMoreMessages', () => ({ default: vi.fn() }));
 
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
 const AUTHOR = { _id: 'user-2', firstName: 'Other', lastName: 'Person' };
@@ -39,17 +42,20 @@ function renderMessages(msgs, roomOverrides = {}) {
   });
   store.dispatch({ type: Actions.SET_MESSAGES, messages: msgs });
 
-  render(
+  const utils = render(
     <Provider store={store}>
       <MemoryRouter>
         <Messages />
       </MemoryRouter>
     </Provider>,
   );
+
+  return { store, ...utils };
 }
 
 beforeEach(async () => {
   await setGlobal({ user: ME });
+  getMoreMessages.mockReset();
 });
 
 describe('Messages day separators', () => {
@@ -160,5 +166,70 @@ describe('Empty-state message reflects how the member joined (myJoinInfo)', () =
     renderMessages([]);
 
     expect(screen.getByText('No messages here yet')).toBeInTheDocument();
+  });
+});
+
+describe('older-history loading preserves scroll position (does not jump to bottom)', () => {
+  const setScrollMetrics = (el, { scrollTop, scrollHeight }) => {
+    Object.defineProperty(el, 'scrollTop', { value: scrollTop, writable: true, configurable: true });
+    Object.defineProperty(el, 'scrollHeight', { value: scrollHeight, writable: true, configurable: true });
+  };
+
+  it('scrolling near the top requests older messages once scrollTop is within the trigger distance', async () => {
+    getMoreMessages.mockResolvedValue({ data: { messages: [], hasMore: false } });
+    renderMessages([makeMessage({ _id: 'm-1' })]);
+    const scrollEl = screen.getByText('hello').closest('[class*="overflow-y-auto"]');
+
+    setScrollMetrics(scrollEl, { scrollTop: 150, scrollHeight: 2000 });
+    fireEvent.scroll(scrollEl);
+
+    await waitFor(() => expect(getMoreMessages).toHaveBeenCalledWith({ roomID: 'room-1', firstMessageID: 'm-1' }));
+  });
+
+  it('does not request history when scrollTop is beyond the trigger distance', () => {
+    renderMessages([makeMessage({ _id: 'm-1' })]);
+    const scrollEl = screen.getByText('hello').closest('[class*="overflow-y-auto"]');
+
+    setScrollMetrics(scrollEl, { scrollTop: 500, scrollHeight: 2000 });
+    fireEvent.scroll(scrollEl);
+
+    expect(getMoreMessages).not.toHaveBeenCalled();
+  });
+
+  it('after older messages are prepended, scrollTop is adjusted by the height delta instead of jumping to the bottom', async () => {
+    // jsdom never actually grows scrollHeight as content is added, so this
+    // stubs scrollHeight to report growth once the second message is in the
+    // DOM — standing in for what a real browser's layout would already have
+    // done by the time React's effect runs.
+    getMoreMessages.mockResolvedValue({
+      data: { messages: [makeMessage({ _id: 'm-0', content: 'older' })], hasMore: true },
+    });
+    renderMessages([makeMessage({ _id: 'm-1' })]);
+    const scrollEl = screen.getByText('hello').closest('[class*="overflow-y-auto"]');
+
+    setScrollMetrics(scrollEl, { scrollTop: 50, scrollHeight: 2000 });
+    let scrollHeight = 2000;
+    Object.defineProperty(scrollEl, 'scrollHeight', { get: () => scrollHeight, configurable: true });
+    fireEvent.scroll(scrollEl);
+
+    scrollHeight = 2600; // grows once the older message is about to render
+    await waitFor(() => expect(screen.getByText('older')).toBeInTheDocument());
+
+    // 50 (old scrollTop) + (2600 - 2000) delta = 650, NOT scrollHeight
+    // (a bottom-jump would land there instead).
+    await waitFor(() => expect(scrollEl.scrollTop).toBe(650));
+  });
+
+  it('stops requesting once hasMore is false', async () => {
+    getMoreMessages.mockResolvedValue({ data: { messages: [], hasMore: false } });
+    renderMessages([makeMessage({ _id: 'm-1' })]);
+    const scrollEl = screen.getByText('hello').closest('[class*="overflow-y-auto"]');
+
+    setScrollMetrics(scrollEl, { scrollTop: 50, scrollHeight: 2000 });
+    fireEvent.scroll(scrollEl);
+    await waitFor(() => expect(getMoreMessages).toHaveBeenCalledTimes(1));
+
+    fireEvent.scroll(scrollEl);
+    expect(getMoreMessages).toHaveBeenCalledTimes(1);
   });
 });

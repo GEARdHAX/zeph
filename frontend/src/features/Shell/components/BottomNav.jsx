@@ -21,7 +21,7 @@ function BottomNav() {
   const unreadTotal = roomsWithNewMessages.length;
 
   return (
-    <nav className="flex h-14 w-full shrink-0 items-center justify-around border-t border-border bg-card px-1 text-card-foreground">
+    <nav data-tour="bottom-nav" className="flex h-14 w-full shrink-0 items-center justify-around border-t border-border bg-card px-1 text-card-foreground">
       {ITEMS.map(({
         to, label, Icon, end,
       }) => (

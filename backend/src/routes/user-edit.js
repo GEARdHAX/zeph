@@ -2,6 +2,7 @@ const User = require('../models/User');
 const argon2 = require('argon2');
 const validator = require('validator');
 const xss = require('xss');
+const { invalidateProfileCache } = require('../userProfileCache');
 
 module.exports = async (req, res, next) => {
   let username = xss(req.fields.username);
@@ -39,12 +40,31 @@ module.exports = async (req, res, next) => {
     lastName: xss(lastName),
   };
 
+  // The target's OLD username (from the request body's `user` field, the
+  // pre-edit value the frontend already had loaded) — needed because the
+  // cache key IS the username, so a change here (a root admin can rename
+  // any account) moves the cached entry to a new key. See
+  // change-username.js's identical old+new invalidation for the self-
+  // service path.
+  const previousUsernameNormalized = (user.username || '').toLowerCase();
+  const respondWithInvalidation = async (updated) => {
+    await Promise.all([
+      invalidateProfileCache(previousUsernameNormalized),
+      invalidateProfileCache(updated.usernameNormalized),
+    ]);
+    return updated;
+  };
+
   if (typeof password === 'string' && password.length > 0) {
     argon2.hash(password).then((hash) => {
       query = { ...query, password: hash };
-      User.findOneAndUpdate({ email }, { $set: query }, { new: true }).then((user) => res.status(200).json(user));
+      User.findOneAndUpdate({ email }, { $set: query }, { new: true })
+        .then(respondWithInvalidation)
+        .then((updated) => res.status(200).json(updated));
     });
   } else {
-    User.findOneAndUpdate({ email }, { $set: query }, { new: true }).then((user) => res.status(200).json(user));
+    User.findOneAndUpdate({ email }, { $set: query }, { new: true })
+      .then(respondWithInvalidation)
+      .then((updated) => res.status(200).json(updated));
   }
 };
