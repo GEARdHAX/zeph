@@ -1,16 +1,10 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
 import { Compass } from 'lucide-react';
 import useTour from './useTour';
+import ZephWordmark from '../components/ZephWordmark';
 
-// Fires once, right after a brand-new account registers (never on a plain
-// login — see Login/index.jsx's onRegister, the only place
-// isNewRegistration is ever set true). Spec §7 is explicit: "Do NOT
-// automatically force the tour immediately after login... prefer a
-// subtle 'Take a tour' option." A toast — dismissible by its own timeout
-// or an explicit click, never blocking anything — is about as subtle as an
-// offer can be; the tour itself only starts if the user clicks it.
 function FirstLoginTourSuggestionToastBody({ onAccept }) {
   return (
     <button
@@ -23,7 +17,10 @@ function FirstLoginTourSuggestionToastBody({ onAccept }) {
       </div>
       <div className="min-w-0">
         <div className="text-xs font-semibold text-foreground">New here?</div>
-        <div className="text-xs text-muted-foreground">Take a quick tour of zeph.</div>
+        <div className="text-xs text-muted-foreground flex items-center gap-1">
+          <span>Take a quick tour of</span>
+          <ZephWordmark className="text-xs font-medium" />
+        </div>
       </div>
     </button>
   );
@@ -35,10 +32,6 @@ function FirstLoginTourSuggestion() {
 
   useEffect(() => {
     if (!isNewRegistration) return;
-    // Cleared immediately (not on toast dismiss/click) — this is a
-    // one-time, this-session-only offer, never re-shown on a later visit
-    // even if the toast times out unseen. Matches spec §7's "optional
-    // first-login suggestion" framing, not a persistent nag.
     setIsNewRegistration(false);
 
     toast(

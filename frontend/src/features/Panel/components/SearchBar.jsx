@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import search from '../../../actions/search';
 import useExplicitSearch from '../../../lib/useExplicitSearch';
@@ -54,13 +54,12 @@ function SearchBar() {
         />
         <input
           className="w-full bg-transparent px-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none"
-          placeholder="Search conversations, then Enter for people..."
+          placeholder="Search conversations"
           ref={searchInput}
           value={searchVal}
           onChange={onChange}
           onKeyDown={onKeyDown}
         />
-        <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-muted-foreground cursor-pointer hover:text-foreground" />
       </div>
     </div>
   );

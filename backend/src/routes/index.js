@@ -88,6 +88,8 @@ router.post('/group/join-requests/:userId/deny', jwtAuth, require('./group/join-
 router.post('/conversation/hide', passport.authenticate('jwt', { session: false }, null), require('./conversation-hide'));
 router.post('/conversation/unhide', passport.authenticate('jwt', { session: false }, null), require('./conversation-unhide'));
 router.post('/conversation/delete', passport.authenticate('jwt', { session: false }, null), require('./conversation-delete'));
+router.post('/conversation/restore', passport.authenticate('jwt', { session: false }, null), require('./conversation-restore'));
+router.post('/conversations/removed', passport.authenticate('jwt', { session: false }, null), require('./removed-list'));
 
 router.get('/vault/list', passport.authenticate('jwt', { session: false }, null), require('./vault-list'));
 router.get('/vault/status', passport.authenticate('jwt', { session: false }, null), require('./vault-status'));

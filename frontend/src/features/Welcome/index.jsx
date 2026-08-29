@@ -1,5 +1,6 @@
 import { useGlobal } from 'reactn';
 import Picture from '../../components/Picture';
+import ZephWordmark from '../../components/ZephWordmark';
 import Config from '../../config';
 
 function Welcome() {
@@ -51,8 +52,9 @@ function Welcome() {
       </div>
 
       {/* Bottom Status / Version Bar */}
-      <div className="flex h-12 w-full items-center justify-end px-6 text-xs text-muted-foreground border-t border-border/50">
-        <span>{`${Config.brand} v${version || '2.9.1'}`}</span>
+      <div className="flex h-12 w-full items-center justify-end gap-1 px-6 text-xs text-muted-foreground border-t border-border/50">
+        <ZephWordmark className="text-xs font-semibold" />
+        <span>{`v${version || '2.9.1'}`}</span>
       </div>
     </div>
   );

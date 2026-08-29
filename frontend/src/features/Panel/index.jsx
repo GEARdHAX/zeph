@@ -16,6 +16,7 @@ import getMeetings from '../../actions/getMeetings';
 import Actions from '../../constants/Actions';
 import Settings from './components/Settings';
 import VaultUnlock from './components/VaultUnlock';
+import RemovedConversations from './components/RemovedConversations';
 
 const FILTER_PILLS = ['All', 'Unread', 'Favorites', 'Groups'];
 
@@ -152,6 +153,7 @@ function Panel() {
         )}
         {nav === 'settings' && <Settings />}
         {nav === 'vault' && <VaultUnlock />}
+        {nav === 'removed' && <RemovedConversations />}
       </div>
     </div>
   );

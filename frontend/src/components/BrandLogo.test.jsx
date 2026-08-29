@@ -1,18 +1,25 @@
-import { describe, it, expect } from 'vitest';
+﻿import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import BrandLogo from './BrandLogo';
 import Config from '../config';
 
 describe('BrandLogo', () => {
-  it('renders as an accessible placeholder mark, not a real logo image', () => {
+  it('renders with an accessible img role and label', () => {
     render(<BrandLogo />);
-    const el = screen.getByRole('img', { name: /zeph logo placeholder/i });
-    expect(el.tagName).not.toBe('IMG');
+    const el = screen.getByRole('img', { name: /zeph/i });
+    expect(el).toBeInTheDocument();
   });
 
   it('accepts a custom className for sizing', () => {
     render(<BrandLogo className="h-4 w-4 custom-class" />);
     expect(screen.getByRole('img')).toHaveClass('custom-class');
+  });
+
+  it('renders an img element with brand assets', () => {
+    const { container } = render(<BrandLogo variant="lockup" />);
+    const img = container.querySelector('img');
+    expect(img).toBeInTheDocument();
+    expect(img.src).toBeTruthy();
   });
 });
 

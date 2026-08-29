@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Settings, Plus, Cpu, UserPlus, Users, Lock, Link2, UserPlus2,
+  Settings, Plus, Cpu, UserPlus, Users, Lock, Link2, UserPlus2, ArchiveRestore,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -175,6 +175,22 @@ function TopBar() {
           aria-label="Private Vault"
         >
           <Lock className="h-4 w-4" />
+        </Button>
+
+        {/* Removed Conversations — everything a Room row's hover trash-can
+            button has ever removed from this user's own inbox, each with a
+            one-click Restore. Without this, a conversation removed by every
+            member (a real possibility in a small group) had no way back
+            short of already knowing its URL or a still-valid invite link. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('h-8 w-8 rounded-full hover:bg-muted hover:text-foreground', nav === 'removed' && 'text-primary')}
+          onClick={() => setNav('removed')}
+          title="Removed Conversations"
+          aria-label="Removed Conversations"
+        >
+          <ArchiveRestore className="h-4 w-4" />
         </Button>
 
         {/* Settings */}

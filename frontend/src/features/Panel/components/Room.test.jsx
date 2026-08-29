@@ -147,6 +147,26 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
     expect(screen.getByTestId('location-probe').textContent).toBe('/room/room-1');
   });
 
+  it('positions the delete button to align with the date text it replaces on hover (regression: was measured against the outer wrapper while the date text was measured against the inner padded button, so on hover the icon visibly overlapped "Aug 29" / "7:24 PM" instead of cleanly swapping with it)', () => {
+    renderRoom(makeRoom());
+    const deleteButton = screen.getByRole('button', { name: 'Remove conversation' });
+
+    // right-4/top-1/2/-translate-y-1/2 was the old, wrapper-relative
+    // positioning that caused the overlap — asserting its absence, not just
+    // the new classes' presence, so a future edit can't silently reintroduce
+    // the same mismatch under a different class combination.
+    expect(deleteButton.className).not.toMatch(/\bright-4\b/);
+    expect(deleteButton.className).not.toMatch(/\btop-1\/2\b/);
+    expect(deleteButton.className).not.toMatch(/-translate-y-1\/2/);
+
+    // The date span (what the button visually replaces) must fade out on
+    // hover for a non-vault row — if it didn't, the two would still overlap
+    // regardless of where the button itself sits. makeRoom() has no
+    // lastMessage, so Room.jsx falls back to rendering "Today" as the date.
+    const dateSpan = screen.getByText('Today');
+    expect(dateSpan.className).toMatch(/group-hover\/row:opacity-0/);
+  });
+
   it('does not render a remove button for a vault row', () => {
     const rootReducer = combineReducers({
       emoji, io, messages, rtc,
@@ -162,5 +182,85 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
 
     expect(screen.queryByRole('button', { name: 'Remove conversation' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+    // Nothing to swap with on hover (no delete button here), so the date
+    // text must stay a plain, always-visible span.
+    expect(screen.getByText('Today').className).not.toMatch(/group-hover\/row:opacity-0/);
+  });
+});
+
+describe('Panel Room row — removed-conversations list (restore)', () => {
+  function renderRemovedRow(room, onRestored) {
+    const rootReducer = combineReducers({
+      emoji, io, messages, rtc,
+    });
+    const store = createStore(rootReducer, applyMiddleware(thunk));
+    render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <Room room={room} removed onRestored={onRestored} />
+        </MemoryRouter>
+      </Provider>,
+    );
+    return store;
+  }
+
+  it('renders a Restore button, not the normal remove-from-inbox trash icon', () => {
+    renderRemovedRow(makeRoom());
+    expect(screen.getByRole('button', { name: /restore/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove conversation' })).not.toBeInTheDocument();
+  });
+
+  it('clicking the row does not navigate (same as an inVault row — no click-through into a hidden/removed conversation)', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Provider store={createStore(combineReducers({
+        emoji, io, messages, rtc,
+      }), applyMiddleware(thunk))}
+      >
+        <MemoryRouter initialEntries={['/']}>
+          <LocationProbe />
+          <Routes>
+            <Route path="*" element={<Room room={makeRoom()} removed />} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    // The row's outer selectable button has no accessible name of its own
+    // (the row's text content is inside it, not an aria-label) — select it
+    // structurally instead, matching how it's the first button and the
+    // Restore button is the second/last.
+    const rowButton = container.querySelectorAll('button')[0];
+    await user.click(rowButton);
+    expect(screen.getByTestId('location-probe').textContent).toBe('/');
+  });
+
+  it('calling restore hits conversation/restore and calls onRestored with the room id', async () => {
+    axios.mockResolvedValue({ data: { status: 'success' } });
+    const onRestored = vi.fn();
+    const user = userEvent.setup();
+    renderRemovedRow(makeRoom(), onRestored);
+
+    await user.click(screen.getByRole('button', { name: /restore/i }));
+
+    expect(axios).toHaveBeenCalledWith(expect.objectContaining({
+      method: 'post',
+      url: expect.stringContaining('/api/conversation/restore'),
+      data: { conversationId: 'room-1' },
+    }));
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(onRestored).toHaveBeenCalledWith('room-1');
+  });
+
+  it('does not call onRestored when the restore request fails', async () => {
+    axios.mockRejectedValue(new Error('network error'));
+    const onRestored = vi.fn();
+    const user = userEvent.setup();
+    renderRemovedRow(makeRoom(), onRestored);
+
+    await user.click(screen.getByRole('button', { name: /restore/i }));
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    expect(onRestored).not.toHaveBeenCalled();
   });
 });

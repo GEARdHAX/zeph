@@ -105,3 +105,61 @@ describe('A deleted group is fully inaccessible, not just to the owner', () => {
     expect(res.status).toBe(404);
   });
 });
+
+// A deleted group is permanently unopenable (every check above), but
+// list-rooms.js never filters on disabledAt (by design — a deleted group
+// stays visible until the user explicitly removes it, same as any other
+// conversation, see list-rooms.js's own comment). Without a working
+// conversation/delete path, that row would sit in the inbox forever,
+// leading nowhere on every click, with no way to dismiss it.
+describe('A deleted group can still be removed from the inbox (conversation/delete is not gated on disabledAt)', () => {
+  it('the group still appears in list-rooms after deletion (it is not auto-hidden)', async () => {
+    const owner = await createUser();
+    const member = await createUser();
+    const group = await createGroup(owner, [member._id]);
+    await deleteGroup(owner, group.body._id);
+
+    const list = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({});
+    expect(list.body.rooms.map((r) => r._id)).toContain(group.body._id);
+  });
+
+  it('a member can remove a deleted group from their own inbox via conversation/delete', async () => {
+    const owner = await createUser();
+    const member = await createUser();
+    const group = await createGroup(owner, [member._id]);
+    await deleteGroup(owner, group.body._id);
+
+    const del = await request(app)
+      .post('/api/conversation/delete')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({ conversationId: group.body._id });
+    expect(del.status).toBe(200);
+
+    const list = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({});
+    expect(list.body.rooms.map((r) => r._id)).not.toContain(group.body._id);
+  });
+
+  it('the owner can also remove the group they just deleted from their own inbox', async () => {
+    const owner = await createUser();
+    const group = await createGroup(owner, []);
+    await deleteGroup(owner, group.body._id);
+
+    const del = await request(app)
+      .post('/api/conversation/delete')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ conversationId: group.body._id });
+    expect(del.status).toBe(200);
+
+    const list = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({});
+    expect(list.body.rooms.map((r) => r._id)).not.toContain(group.body._id);
+  });
+});

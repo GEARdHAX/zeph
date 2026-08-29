@@ -102,9 +102,13 @@ if (Config.nodemailerEnabled) {
         schedulerDone = true;
       }
 
-      // Mailer cron job
-
-      const emails = await Email.find({ sent: false });
+      // Mailer cron job — MAX_ATTEMPTS caps retries so a persistently broken
+      // SMTP relay (bad credentials, provider outage) doesn't retry the same
+      // doomed email every 5s forever; it's parked (sent stays false,
+      // attempts maxed) for manual/log inspection instead of silently
+      // hammering the provider indefinitely.
+      const MAX_ATTEMPTS = 5;
+      const emails = await Email.find({ sent: false, attempts: { $lt: MAX_ATTEMPTS } });
 
       for (let email of emails) {
         try {
@@ -121,6 +125,12 @@ if (Config.nodemailerEnabled) {
           await entry.save();
         } catch (e) {
           logger.error({ err: e }, 'Failed to send scheduled email');
+          // e.message only (SMTP response text/code) — never the configured
+          // credentials, which nodemailer/pino never surface on the error.
+          await Email.updateOne(
+            { _id: email._id },
+            { $inc: { attempts: 1 }, $set: { lastError: e.message } },
+          );
         }
       }
 

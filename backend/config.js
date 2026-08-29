@@ -70,18 +70,18 @@ module.exports = {
     announcedIp: process.env.MAPPED_IP === 'true' ? process.env.PUBLIC_IP_ADDRESS : null,
   },
 
-  nodemailerEnabled: false,
+  nodemailerEnabled: process.env.MAILER_ENABLED === 'true',
   nodemailer: {
-    from: 'admin@example.com', // example: address@outlook.com (required)
+    from: process.env.MAILER_FROM || 'admin@example.com',
   },
   nodemailerTransport: {
-    service: undefined, // example: hotmail (leave blank if using own smtp below)
-    host: 'smtp.yourdomain.tld', // example: smtp.yourdomain.tld (leave blank if using service above)
-    port: 587, // example: 587 (leave blank if using service above)
-    secure: false, // require STARTTLS, can be true or false (leave blank if using service above)
+    service: process.env.MAILER_SERVICE || undefined, // example: hotmail (leave blank if using own smtp below)
+    host: process.env.MAILER_HOST || undefined, // example: smtp.yourdomain.tld (leave blank if using service above)
+    port: process.env.MAILER_PORT ? Number(process.env.MAILER_PORT) : undefined,
+    secure: process.env.MAILER_SECURE === 'true',
     auth: {
-      user: 'your_smtp_user',
-      pass: 'your_smtp_password',
+      user: process.env.MAILER_USERNAME,
+      pass: process.env.MAILER_PASSWORD,
     },
   },
 

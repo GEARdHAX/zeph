@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect, useRef, useState,
 } from 'react';
 import { useGlobal } from 'reactn';
@@ -21,22 +21,41 @@ import getInfo from '../../actions/getInfo';
 import useTheme from '../../lib/useTheme';
 import useZephLoader from '../../lib/useZephLoader';
 import BrandLogo from '../../components/BrandLogo';
+import ZephWordmark from '../../components/ZephWordmark';
 import Config from '../../config';
 
 const FEATURES = [
-  { Icon: MessageCircle, title: 'Real-time Messaging', text: 'Instant delivery across all your devices.' },
-  { Icon: Video, title: 'Voice & Video Calls', text: 'High quality calls for you and your team.' },
-  { Icon: Users, title: 'Groups & Channels', text: 'Stay connected with everyone.' },
-  { Icon: ShieldCheck, title: 'Secure & Private', text: 'Your data is always protected.' },
+  {
+    Icon: MessageCircle,
+    title: 'Real-time Messaging',
+    text: 'Instant delivery across all your devices.',
+  },
+  {
+    Icon: Video,
+    title: 'Voice & Video Calls',
+    text: 'High quality calls for you and your team.',
+  },
+  {
+    Icon: Users,
+    title: 'Group Communities',
+    text: 'Collaborate with friends and colleagues seamlessly.',
+  },
+  {
+    Icon: ShieldCheck,
+    title: 'End-to-End Security',
+    text: 'Your conversations are always private and protected.',
+  },
 ];
 
 function Login() {
+  const navigate = useNavigate();
   const dispatch = useDispatch();
-  const [info, setInfo] = useState({});
+
   const [tab, setTab] = useState('login');
   const [showCredits, setShowCredits] = useState(false);
   const { theme, toggle: toggleTheme } = useTheme();
   const zephLoader = useZephLoader();
+
   // A ref, not state — must be readable/settable synchronously the instant
   // onLogin/onRegister runs, with zero re-render delay. A second submit
   // (double-click, double-Enter, or just clicking again before the overlay
@@ -47,38 +66,37 @@ function Login() {
   // loop from the beginning every time, looking exactly like "stuck on
   // the dot" even though the sequencer itself was never broken.
   const submittingRef = useRef(false);
-  // Reactive mirror of submittingRef, for disabling the submit buttons —
-  // the ref is what actually prevents a double-submit (see above), this is
-  // purely so the button reflects it visually/functionally too (belt-and-
-  // suspenders: disabled= alone isn't airtight against a fast double-Enter
-  // landing both keydowns before the first re-render commits).
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [keep, setKeep] = useState(true);
-  const [loginErrors, setLoginErrors] = useState({});
 
-  const [registerUsername, setRegisterUsername] = useState('');
-  const [registerEmail, setRegisterEmail] = useState('');
   const [registerFirstName, setRegisterFirstName] = useState('');
   const [registerLastName, setRegisterLastName] = useState('');
+  const [registerUsername, setRegisterUsername] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerRepeatPassword, setRegisterRepeatPassword] = useState('');
-  const [registerErrors, setRegisterErrors] = useState({});
 
+  // Password Visibility
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterRepeatPassword, setShowRegisterRepeatPassword] = useState(false);
+
+  // Status & Global state
+  const [loginErrors, setLoginErrors] = useState({});
+  const [registerErrors, setRegisterErrors] = useState({});
+  const [info, setInfo] = useState({});
+  const [entryPath, setEntryPath] = useGlobal('entryPath');
   const setToken = useGlobal('token')[1];
   const setUser = useGlobal('user')[1];
-  const [entryPath, setEntryPath] = useGlobal('entryPath');
   const setPendingFriendInviteToken = useGlobal('pendingFriendInviteToken')[1];
   const setIsNewRegistration = useGlobal('isNewRegistration')[1];
 
-  const navigate = useNavigate();
-
   useEffect(() => {
-    getInfo().then((res) => {
-      setInfo(res.data);
-    });
+    getInfo().then((res) => setInfo(res.data)).catch(() => {});
   }, []);
 
   const onLogin = async (e) => {
@@ -89,14 +107,19 @@ function Login() {
     zephLoader.show('Logging in');
     try {
       const res = await login(email, password);
+      // token/user must land in reactn global state, not just storage —
+      // App.jsx's route guard reads useGlobal('token') on every render, so
+      // without this the app immediately bounces back to /login right
+      // after a successful login (storage alone doesn't drive routing).
       if (keep) localStorage.setItem('token', res.data.token);
-      if (keep) localStorage.setItem('user', JSON.stringify(jwtDecode(res.data.token)));
-      setLoginErrors({});
+      else sessionStorage.setItem('token', res.data.token);
       setAuthToken(res.data.token);
       setUser(jwtDecode(res.data.token));
       setToken(res.data.token);
+      // initIO is a thunk (initIO(token) -> (dispatch) => {...}) — must be
+      // dispatched, not called with dispatch as a second argument.
       dispatch(initIO(res.data.token));
-      navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath, { replace: true });
+      navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath || '/', { replace: true });
       await setEntryPath(null);
     } catch (err) {
       let errors = {};
@@ -119,25 +142,28 @@ function Login() {
     try {
       await register({
         username: registerUsername,
-        email: registerEmail,
         firstName: registerFirstName,
         lastName: registerLastName,
+        email: registerEmail,
         password: registerPassword,
         repeatPassword: registerRepeatPassword,
       });
+      // /api/register only creates the account and returns the user doc —
+      // no token. A follow-up login() is what actually authenticates the
+      // client, same credentials just submitted.
       const res = await login(registerEmail, registerPassword);
-      setRegisterErrors({});
       if (keep) localStorage.setItem('token', res.data.token);
+      else sessionStorage.setItem('token', res.data.token);
       setAuthToken(res.data.token);
       setUser(jwtDecode(res.data.token));
       setToken(res.data.token);
       dispatch(initIO(res.data.token));
       // Home reads this once to offer (not force) the onboarding tour —
-      // see init.js's isNewRegistration comment / spec §7. Only ever set
-      // here, never in onLogin below — a returning user never sees this.
+      // only ever set here, never in onLogin above — a returning user
+      // never sees this.
       await setIsNewRegistration(true);
 
-      // A friend-invite link is the one entryPath that should NOT navigate
+      // Friend invites (spec A 24): never bounce a newly registered user
       // straight to its own page post-registration — Home instead pops an
       // "Add Friend" dialog over the inbox (see pendingFriendInviteToken in
       // init.js), so a brand-new user lands in the app, not on another
@@ -184,7 +210,7 @@ function Login() {
           <div>
             <Link to="/login" className="flex items-center gap-3">
               <BrandLogo className="h-8 w-8" />
-              <span className="font-zeph text-2xl font-extrabold tracking-tight text-white">{Config.brand}</span>
+              <ZephWordmark className="text-2xl font-extrabold tracking-tight text-white" />
             </Link>
 
             <h1 className="mt-14 text-4xl font-extrabold leading-[1.15] tracking-tight xl:text-[42px]">
@@ -214,13 +240,15 @@ function Login() {
           </div>
 
           {/* Footer branding and credits */}
-          <div className="text-xs text-zinc-500 z-10">
-            {`© ${new Date().getFullYear()} ${Config.brand} · `}
-            <span className="text-primary font-medium">{Config.brand}</span>
-            {` v${info.version || '2.9.1'}`}
+          <div className="text-xs text-zinc-500 z-10 flex items-center gap-1">
+            <span>© {new Date().getFullYear()}</span>
+            <ZephWordmark className="text-xs font-semibold text-zinc-400" />
+            {/* <span>•</span> */}
+            {/* <span className="text-primary font-medium">{Config.brand}</span> */}
+            <span>{`v${info.version || '1.0.0'}`}</span>
             {Config.showCredits && (
               <>
-                {' · '}
+                <span>•</span>
                 <button
                   type="button"
                   className="text-primary underline hover:text-primary/80"
@@ -253,7 +281,7 @@ function Login() {
             <div className="lg:hidden">
               <Link to="/login" className="flex items-center gap-2">
                 <BrandLogo className="h-7 w-7" />
-                <span className="font-zeph text-lg font-extrabold tracking-tight">{Config.brand}</span>
+                <ZephWordmark className="text-lg font-extrabold tracking-tight" />
               </Link>
             </div>
             <div className="ml-auto">
@@ -285,7 +313,7 @@ function Login() {
                   <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
                     Login to continue to
                     {' '}
-                    <span className="font-medium text-foreground">{Config.brand}</span>
+                    <ZephWordmark className="font-semibold text-foreground" />
                   </p>
                 </div>
 
@@ -325,153 +353,223 @@ function Login() {
                   </button>
                 </div>
 
-                {/* Tab 1: Log In */}
-                {tab === 'login' && (
+                {/* Login Form */}
+                {tab === 'login' ? (
                   <form onSubmit={onLogin} className="flex flex-col gap-4">
                     {loginInfo}
-                    <div className="flex flex-col gap-1.5">
-                      <Input
-                        id="login-email"
-                        icon="mail"
-                        placeholder="Username or email"
-                        type="text"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Input
-                        id="login-password"
-                        icon="lock"
-                        placeholder="Password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                    </div>
+                    <Input
+                      id="login-email"
+                      type="text"
+                      placeholder="Username or email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                    <Input
+                      id="login-password"
+                      type={showLoginPassword ? 'text' : 'password'}
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      isPassword
+                      showPassword={showLoginPassword}
+                      onTogglePassword={() => setShowLoginPassword((prev) => !prev)}
+                      required
+                    />
 
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
-                      <label htmlFor="keep-login" className="flex cursor-pointer select-none items-center gap-2 text-muted-foreground hover:text-foreground">
+                    {/* Keep me logged in checkbox */}
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center space-x-2">
                         <Checkbox
                           id="keep-login"
                           checked={keep}
-                          onCheckedChange={(checked) => setKeep(checked === true)}
-                          className="rounded data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          onCheckedChange={(checked) => setKeep(Boolean(checked))}
                         />
-                        <span>Keep me logged in</span>
-                      </label>
-                      {info.nodemailerEnabled && (
-                        <Link to="/forgot-password" className="font-semibold text-primary hover:underline">
-                          Forgot password?
-                        </Link>
-                      )}
+                        <Label
+                          htmlFor="keep-login"
+                          className="cursor-pointer text-xs font-normal text-muted-foreground select-none"
+                        >
+                          Keep me logged in
+                        </Label>
+                      </div>
+                      <Link to="/forgot-password" className="text-xs font-semibold text-primary hover:underline">
+                        Forgot password?
+                      </Link>
                     </div>
 
                     <Button
                       type="submit"
-                      size="lg"
                       disabled={isSubmitting}
-                      className="mt-1 h-11 w-full gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99]"
+                      className="mt-2 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99] disabled:opacity-70"
                     >
                       Log In
-                      <ArrowRight className="h-4 w-4" />
+                      <ArrowRight className="ml-1.5 h-4 w-4" />
                     </Button>
                   </form>
-                )}
-
-                {/* Tab 2: Register */}
-                {tab === 'register' && (
-                  <form onSubmit={onRegister} className="flex flex-col gap-3.5">
+                ) : (
+                  /* Register Form */
+                  <form onSubmit={onRegister} className="flex flex-col gap-3">
                     {registerInfo}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2.5">
                       <Input
-                        icon="pencil"
-                        placeholder="First Name"
+                        id="reg-first-name"
                         type="text"
+                        placeholder="First Name"
                         value={registerFirstName}
                         onChange={(e) => setRegisterFirstName(e.target.value)}
+                        required
                       />
                       <Input
-                        icon="pencil"
-                        placeholder="Last Name"
+                        id="reg-last-name"
                         type="text"
+                        placeholder="Last Name"
                         value={registerLastName}
                         onChange={(e) => setRegisterLastName(e.target.value)}
+                        required
                       />
                     </div>
                     <Input
-                      icon="user"
-                      placeholder="Username"
+                      id="reg-username"
                       type="text"
+                      placeholder="Username"
                       value={registerUsername}
                       onChange={(e) => setRegisterUsername(e.target.value)}
+                      required
                     />
                     <Input
-                      icon="mail"
-                      placeholder="Email"
+                      id="reg-email"
                       type="email"
+                      placeholder="Email"
                       value={registerEmail}
                       onChange={(e) => setRegisterEmail(e.target.value)}
+                      required
                     />
                     <Input
-                      icon="lock"
+                      id="reg-password"
+                      type={showRegisterPassword ? 'text' : 'password'}
                       placeholder="Password"
-                      type="password"
                       value={registerPassword}
                       onChange={(e) => setRegisterPassword(e.target.value)}
+                      isPassword
+                      showPassword={showRegisterPassword}
+                      onTogglePassword={() => setShowRegisterPassword((prev) => !prev)}
+                      required
                     />
                     <Input
-                      icon="lock"
+                      id="reg-repeat-password"
+                      type={showRegisterRepeatPassword ? 'text' : 'password'}
                       placeholder="Repeat Password"
-                      type="password"
                       value={registerRepeatPassword}
                       onChange={(e) => setRegisterRepeatPassword(e.target.value)}
+                      isPassword
+                      showPassword={showRegisterRepeatPassword}
+                      onTogglePassword={() => setShowRegisterRepeatPassword((prev) => !prev)}
+                      required
                     />
+
                     <Button
                       type="submit"
-                      size="lg"
                       disabled={isSubmitting}
-                      className="mt-1 h-11 w-full gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99]"
+                      className="mt-2 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99] disabled:opacity-70"
                     >
                       Register
-                      <ArrowRight className="h-4 w-4" />
+                      <ArrowRight className="ml-1.5 h-4 w-4" />
                     </Button>
                   </form>
                 )}
-
-                {/* Bottom Toggle Prompt */}
-                <div className="mt-6 text-center text-xs sm:text-sm text-muted-foreground">
-                  {tab === 'login' ? "Don't have an account? " : 'Already have an account? '}
-                  <button
-                    type="button"
-                    className="font-bold text-primary transition-colors hover:underline"
-                    onClick={() => setTab(tab === 'login' ? 'register' : 'login')}
-                  >
-                    {tab === 'login' ? 'Register' : 'Log In'}
-                  </button>
-                </div>
               </div>
             ) : (
-              <div className="rounded-2xl border bg-card p-6 text-center text-sm shadow-sm">
-                {'The default background image is from '}
-                <a href="https://picsum.photos/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">
-                  Picsum Photos
-                </a>
-                <br />
-                <br />
-                A big thank you to all contributors to React, Redux, Socket.IO, Emoji Mart, Axios, SASS and Moment
-                <div className="mt-5">
-                  <Button variant="ghost" size="sm" onClick={() => setShowCredits(false)}>
-                    <ArrowLeft className="mr-1 h-4 w-4" />
-                    Close Credits
-                  </Button>
+              /* Credits & Open Source Attributions Panel */
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2 border-b border-border/80 pb-3">
+                  <button
+                    type="button"
+                    aria-label="Close credits"
+                    onClick={() => setShowCredits(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                  <h3 className="text-base font-bold tracking-tight">Open Source Credits &amp; Thanks</h3>
                 </div>
+
+                <div className="flex flex-col gap-3 text-xs leading-relaxed text-muted-foreground">
+                  <p>
+                    Special thanks to the open source community and creators whose work helps power this platform:
+                  </p>
+                  <div className="rounded-xl border border-border/60 bg-muted/40 p-3.5 flex flex-col gap-2">
+                    <div className="font-semibold text-foreground">Avatar Imagery</div>
+                    <div>
+                      Random initial user avatars provided by{' '}
+                      <a
+                        href="https://picsum.photos"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Picsum Photos
+                      </a>
+                      .
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/40 p-3.5 flex flex-col gap-2">
+                    <div className="font-semibold text-foreground">Icons &amp; Assets</div>
+                    <div>
+                      Icons beautifully crafted by{' '}
+                      <a
+                        href="https://lucide.dev"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Lucide Icons
+                      </a>
+                      .
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2 h-10 w-full rounded-xl text-xs font-semibold"
+                  onClick={() => setShowCredits(false)}
+                >
+                  Back to Login
+                </Button>
               </div>
             )}
           </div>
 
-          {/* Bottom spacing anchor for balanced equal margins */}
-          <div className="hidden lg:block h-6" aria-hidden="true" />
+          {/* Right Bottom Footer: Disclaimer + Switch view */}
+          <div className="flex flex-col items-center gap-1 text-center text-xs text-muted-foreground sm:flex-row sm:justify-between">
+            <span>By continuing, you agree to our Terms.</span>
+            <div className="flex items-center gap-1 font-medium text-foreground">
+              {tab === 'login' ? (
+                <>
+                  <span>Don&apos;t have an account?</span>
+                  <button
+                    type="button"
+                    onClick={() => setTab('register')}
+                    className="font-bold text-primary transition-colors hover:underline"
+                  >
+                    Register
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span>Already have an account?</span>
+                  <button
+                    type="button"
+                    onClick={() => setTab('login')}
+                    className="font-bold text-primary transition-colors hover:underline"
+                  >
+                    Log In
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </Div100vh>

@@ -1,32 +1,47 @@
-import { cn } from '@/lib/utils';
+﻿import { cn } from '@/lib/utils';
+import darkBgLogo from '../assets/brand/dark-bg-logo.png';
+import whiteBgLogo from '../assets/brand/white-bg-logo.png';
+import useTheme from '../lib/useTheme';
 
 /**
- * Graphical logo placeholder — centralizes the ONE place that needs to change
- * once the real logo asset is provided. Until then it renders a neutral,
- * clearly-a-placeholder mark (dashed border, no invented icon/shape) rather
- * than a fake logo, so nobody mistakes it for the final design.
+ * BrandLogo — Official ZEPH Brand Asset Component
  *
- * This is the graphical mark only — the "zeph." text wordmark is separate
- * (some contexts show both together, e.g. navbar; some show only the
- * wordmark, e.g. narrow footers). Compose them where needed:
- *   <BrandLogo className="h-8 w-8" /><span>{Config.wordmark}</span>
+ * Automatically displays:
+ *  - `dark-bg-logo.png` when in Dark Mode (or when on dark surfaces)
+ *  - `white-bg-logo.png` when in Light Mode (or when on light surfaces)
  *
- * Replace all duplicated/hardcoded <img src={logo}> usages with this
- * component so swapping in the real asset later touches this one file.
+ * Variants:
+ *  - 'auto' (default): dynamically switches based on current active theme
+ *  - 'dark': forced dark surface variant (dark-bg-logo.png)
+ *  - 'light': forced light surface variant (white-bg-logo.png)
+ *  - 'mark' / 'lockup' / 'full' / 'white' / 'black' aliases for full backwards compatibility
  */
-function BrandLogo({ className = 'h-8 w-8', label = 'zeph logo placeholder' }) {
+function BrandLogo({
+  variant = 'auto',
+  className = 'h-8 w-8',
+  alt = 'zeph logo placeholder',
+  ...props
+}) {
+  const { theme } = useTheme?.() || { theme: 'dark' };
+  const isDark = theme === 'dark';
+
+  let src = isDark ? darkBgLogo : whiteBgLogo;
+
+  if (variant === 'dark' || variant === 'white') {
+    src = darkBgLogo;
+  } else if (variant === 'light' || variant === 'black') {
+    src = whiteBgLogo;
+  }
+
   return (
-    <div
-      role="img"
-      aria-label={label}
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/40 bg-muted/40 text-muted-foreground',
-        className,
-      )}
-    >
-      <span className="text-[0.5em] font-semibold leading-none">z</span>
-    </div>
+    <img
+      src={src}
+      alt={alt}
+      className={cn('inline-flex shrink-0 object-contain select-none pointer-events-none', className)}
+      {...props}
+    />
   );
 }
 
 export default BrandLogo;
+export { BrandLogo };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import {
   MessageCircle, Star, Video, Bell, Settings,
 } from 'lucide-react';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import BrandLogo from '../../../components/BrandLogo';
+import ZephWordmark from '../../../components/ZephWordmark';
 import Config from '../../../config';
 
 const PRIMARY_ITEMS = [
@@ -26,6 +27,7 @@ const SECONDARY_ITEMS = [
 
 function NavRail() {
   const [isHovered, setIsHovered] = useState(false);
+  const setNav = useGlobal('nav')[1];
   const user = useGlobal('user')[0] || {};
   const onlineUsers = useSelector((state) => state.io.onlineUsers) || [];
   const roomsWithNewMessages = useSelector((state) => state.messages.roomsWithNewMessages) || [];
@@ -53,22 +55,26 @@ function NavRail() {
       {/* Top Section */}
       <div className="flex flex-col">
         {/* Brand Header */}
-        <div className="flex h-16 items-center px-4 overflow-hidden">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-            <BrandLogo className="h-7 w-7" />
-          </div>
-          <span
-            className={cn(
-              'ml-3 whitespace-nowrap font-zeph text-xl font-extrabold tracking-tight text-foreground transition-all duration-300 ease-in-out',
-              isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
-            )}
+        <div className="flex h-16 items-center px-2.5 overflow-hidden">
+          <NavLink
+            to="/"
+            onClick={() => setNav('rooms')}
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2 transition-colors hover:bg-accent/40"
           >
-            {Config.brand}
-          </span>
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+              <BrandLogo className="h-6 w-6 object-contain" />
+            </div>
+            <ZephWordmark
+              className={cn(
+                'whitespace-nowrap text-xl font-extrabold tracking-tight text-foreground transition-all duration-300 ease-in-out',
+                isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
+              )}
+            />
+          </NavLink>
         </div>
 
         {/* Navigation Links */}
-        <div className="flex flex-col gap-1.5 px-2.5 py-2">
+        <div className="flex flex-col gap-1.5 px-2.5 py-1">
           {PRIMARY_ITEMS.map(({
             to, label, Icon, end,
           }) => (

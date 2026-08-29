@@ -4,19 +4,29 @@ import moment from 'moment';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useSelector, useDispatch } from 'react-redux';
-import { Unlock, Trash2 } from 'lucide-react';
+import { Unlock, Trash2, ArchiveRestore } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import unhideConversation from '../../../actions/unhideConversation';
 import deleteConversation from '../../../actions/deleteConversation';
+import restoreConversation from '../../../actions/restoreConversation';
 import Actions from '../../../constants/Actions';
 import Config from '../../../config';
 
 // inVault + vaultToken: renders Unhide/Delete row actions instead of the
 // normal click-through, used only when this row is rendered inside
 // VaultUnlock.jsx's unlocked hidden-conversations list.
-function Room({ room, inVault, vaultToken }) {
+//
+// removed + onRestored: renders a single Restore action instead of the
+// normal click-through, used only inside RemovedConversations.jsx's list
+// of conversations THIS user has deleted from their own inbox (a plain
+// per-user tombstone, unrelated to the Private Vault's isHidden/vault-auth
+// concept above — the two are independent conversation states with their
+// own list/restore routes).
+function Room({
+  room, inVault, vaultToken, removed, onRestored,
+}) {
   const roomsWithNewMessages = useSelector((state) => state.messages.roomsWithNewMessages) || [];
   const user = useGlobal('user')[0] || {};
   const setOver = useGlobal('over')[1];
@@ -121,6 +131,21 @@ function Room({ room, inVault, vaultToken }) {
     }
   };
 
+  const onRestore = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      await restoreConversation(room._id);
+      onRestored?.(room._id);
+      toast.success('Conversation restored to your inbox.');
+    } catch (err) {
+      toast.error('Could not restore this conversation.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Normal (non-vault) inbox row — the only other delete entry point is
   // BottomBar's "Delete Group DM" button, which only renders once a room is
   // actually open. A group the owner already deleted (Room.disabledAt) 404s
@@ -153,7 +178,7 @@ function Room({ room, inVault, vaultToken }) {
     <div className="group/row relative px-3 py-1">
       <button
         type="button"
-        onClick={inVault ? undefined : onSelect}
+        onClick={(inVault || removed) ? undefined : onSelect}
         className={cn(
           'group relative flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-all duration-200 hover:bg-accent/60',
           isSelected ? 'bg-accent shadow-xs border border-border text-foreground' : 'bg-transparent text-foreground',
@@ -181,7 +206,18 @@ function Room({ room, inVault, vaultToken }) {
             <span className="truncate text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
               {title}
             </span>
-            <span className="shrink-0 text-[10px] text-muted-foreground">
+            {/* Hidden on row hover for plain (non-vault, non-removed) rows,
+                same as the unread dot below — the delete button (a sibling,
+                absolutely positioned to land in this exact spot) swaps in
+                instead of overlapping it. Vault/removed rows have no delete
+                button here (their own action row sits below instead), so
+                their date never needs to hide. */}
+            <span
+              className={cn(
+                'shrink-0 text-[10px] text-muted-foreground transition-opacity',
+                !inVault && !removed && 'group-hover/row:opacity-0',
+              )}
+            >
               {date || 'Today'}
             </span>
           </div>
@@ -199,7 +235,7 @@ function Room({ room, inVault, vaultToken }) {
         {/* Unread dot — hidden on row hover so it never overlaps the
             hover-revealed delete button below, which sits in the same
             top-right corner. */}
-        {!inVault && hasUnread && (
+        {!inVault && !removed && hasUnread && (
           <span className="absolute right-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-card transition-opacity group-hover/row:opacity-0" />
         )}
       </button>
@@ -209,18 +245,37 @@ function Room({ room, inVault, vaultToken }) {
           other delete entry point (BottomBar's "Delete Group DM") requires
           the room to open successfully first, which a group the owner
           already deleted never does (404s as "Room Not Found") — leaving no
-          way to clear it from the sidebar without this. */}
-      {!inVault && (
+          way to clear it from the sidebar without this.
+
+          Positioned to land exactly where the date span above sits (which
+          fades out on hover), not at the row's vertical center — the two
+          were previously measured against different reference boxes (this
+          button against the outer px-3 wrapper, the date text against the
+          inner p-3 button's own content box), so on hover the icon visibly
+          overlapped "Aug 29" / "7:24 PM" instead of cleanly replacing it.
+          right-6 = outer px-3 (12px) + inner p-3 (12px) so its right edge
+          lines up with the date text's right edge; top-3 matches the inner
+          button's own top padding, landing on the same line as the date. */}
+      {!inVault && !removed && (
         <button
           type="button"
           onClick={onDelete}
           disabled={busy}
           aria-label="Remove conversation"
           title="Remove from inbox"
-          className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover/row:opacity-100 disabled:opacity-50 cursor-pointer"
+          className="absolute right-6 top-3 rounded-full p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover/row:opacity-100 disabled:opacity-50 cursor-pointer"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-3 w-3" />
         </button>
+      )}
+
+      {removed && (
+        <div className="flex items-center justify-end px-3 pb-1 pt-1.5">
+          <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" onClick={onRestore} disabled={busy}>
+            <ArchiveRestore className="h-3 w-3" />
+            Restore
+          </Button>
+        </div>
       )}
 
       {inVault && (
