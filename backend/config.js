@@ -42,7 +42,7 @@ module.exports = {
       return 'localhost';
     }
   })(),
-  vaultRpName: 'Chitcx',
+  vaultRpName: 'zeph.',
   // Socket.IO Redis adapter (cross-process group room delivery) and the
   // group-deletion cleanup queue — both best-effort. Unset/unreachable
   // means single-process mode, never a boot crash. See DECISIONS.md D-035.

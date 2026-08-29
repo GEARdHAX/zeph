@@ -1,14 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import '@fontsource/space-grotesk/300.css';
-import '@fontsource/space-grotesk/400.css';
-import '@fontsource/space-grotesk/500.css';
-import '@fontsource/space-grotesk/600.css';
-import '@fontsource/space-grotesk/700.css';
-// full.css (not the default wght-only import) — ZephSpinner's wordmark
-// needs the opsz/wdth/GRAD/ROND axes too, matching its own
-// font-variation-settings block. See components/ui/ZephSpinner.jsx.
-import '@fontsource-variable/google-sans-flex/full.css';
+// Variable font — one import covers the full weight range (400 body copy
+// through the heavy weight the "zeph." wordmark uses), so unlike the old
+// per-weight Space Grotesk imports there's nothing else to add here. The
+// default (weight-axis-only) import, not full.css — nothing in the app
+// currently uses the opsz/wdth/GRAD/ROND axes, so the much larger full.css
+// payload (every axis × every unicode subset) would be pure bloat.
+import '@fontsource-variable/google-sans-flex';
 import './index.css';
 import { Provider } from 'react-redux';
 import App from './App';

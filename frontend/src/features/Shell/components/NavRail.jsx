@@ -8,7 +8,7 @@ import { useSelector } from 'react-redux';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import logo from '../../../assets/logo.png';
+import BrandLogo from '../../../components/BrandLogo';
 import Config from '../../../config';
 
 const PRIMARY_ITEMS = [
@@ -55,15 +55,15 @@ function NavRail() {
         {/* Brand Header */}
         <div className="flex h-16 items-center px-4 overflow-hidden">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-            <img src={logo} alt="Chitcx" className="h-7 w-7 object-contain" />
+            <BrandLogo className="h-7 w-7" />
           </div>
           <span
             className={cn(
-              'ml-3 whitespace-nowrap text-xl font-bold tracking-tight text-foreground transition-all duration-300 ease-in-out',
+              'ml-3 whitespace-nowrap font-zeph text-xl font-extrabold tracking-tight text-foreground transition-all duration-300 ease-in-out',
               isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
             )}
           >
-            {Config.brand || 'Chitcx'}
+            {Config.brand}
           </span>
         </div>
 

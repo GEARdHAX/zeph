@@ -63,7 +63,7 @@ function GroupInvitePreview() {
               </CardDescription>
             </CardHeader>
             <CardFooter className="justify-center">
-              <Button variant="outline" onClick={() => navigate('/')}>Go to Chitcx</Button>
+              <Button variant="outline" onClick={() => navigate('/')}>Go to zeph.</Button>
             </CardFooter>
           </>
         )}

@@ -11,7 +11,7 @@ export const TourStatus = {
   DISMISSED: 'DISMISSED',
 };
 
-const STORAGE_PREFIX = 'chitcx:tours:';
+const STORAGE_PREFIX = 'zeph:tours:';
 
 // User-scoped so two accounts sharing a browser never inherit each other's
 // onboarding-completed state (spec §26). 'anon' is the pre-login fallback
@@ -30,7 +30,7 @@ let localStorageAvailable = null;
 const isLocalStorageAvailable = () => {
   if (localStorageAvailable !== null) return localStorageAvailable;
   try {
-    const testKey = '__chitcx_tour_storage_test__';
+    const testKey = '__zeph_tour_storage_test__';
     window.localStorage.setItem(testKey, '1');
     window.localStorage.removeItem(testKey);
     localStorageAvailable = true;

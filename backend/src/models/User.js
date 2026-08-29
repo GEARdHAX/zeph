@@ -22,7 +22,7 @@ const UserSchema = new Schema({
   favorites: [{ type: Schema.ObjectId, ref: 'rooms' }],
   tagLine: {
     type: String,
-    default: 'New Chitcx User',
+    default: 'New zeph User',
   },
   // Raw bio text using the app's own custom formatting syntax (**bold**,
   // *italic*, @mentions, #hashtags, etc. — see frontend/src/lib/parseBio.js)

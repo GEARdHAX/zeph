@@ -32,7 +32,7 @@ describe('RequestToJoinGroup', () => {
     const userEv = userEvent.setup();
     render(<RequestToJoinGroup onClose={() => {}} />);
 
-    await userEv.type(screen.getByLabelText(/group id/i), 'https://chitcx.com/room/64f1a2b3c4d5e6f7a8b9c0d1');
+    await userEv.type(screen.getByLabelText(/group id/i), 'https://zeph.example/room/64f1a2b3c4d5e6f7a8b9c0d1');
     await userEv.click(screen.getByRole('button', { name: /send request/i }));
 
     await waitFor(() => expect(requestToJoinGroup).toHaveBeenCalledWith('64f1a2b3c4d5e6f7a8b9c0d1'));

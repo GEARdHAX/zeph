@@ -1,4 +1,4 @@
-# Cost Model — Chitcx
+# Cost Model — zeph.
 
 **Zero recurring cost, zero external cloud billing accounts, no credit card at
 any point in the stack.** Not "should stay free" — designed so there is nothing

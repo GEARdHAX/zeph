@@ -2,6 +2,10 @@ import * as React from 'react';
 import { ZephSpinner } from './zeph-spinner';
 
 const ZephLoadingOverlay = ({ isOpen, label }) => {
+  // NOTE: isOpen/label API is what App.jsx (the sole mount point, via
+  // useZephLoader()) actually calls this with — z-[100000] deliberately
+  // clears GroupAdminPanel's z-[99999], the highest other z-index in the
+  // app as of this writing.
   const overlayRef = React.useRef(null);
 
   // Body scroll lock + focus trap

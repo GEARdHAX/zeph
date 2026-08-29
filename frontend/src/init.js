@@ -11,9 +11,9 @@ const init = async () => {
     e.preventDefault();
   });
 
-  if (localStorage.getItem('app') !== 'Chitcx 3.x.x') {
+  if (localStorage.getItem('app') !== 'zeph 3.x.x') {
     localStorage.clear();
-    localStorage.setItem('app', 'Chitcx 3.x.x');
+    localStorage.setItem('app', 'zeph 3.x.x');
   }
 
   let token = localStorage.getItem('token');

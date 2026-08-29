@@ -23,7 +23,7 @@ function FirstLoginTourSuggestionToastBody({ onAccept }) {
       </div>
       <div className="min-w-0">
         <div className="text-xs font-semibold text-foreground">New here?</div>
-        <div className="text-xs text-muted-foreground">Take a quick tour of Chitcx</div>
+        <div className="text-xs text-muted-foreground">Take a quick tour of zeph.</div>
       </div>
     </button>
   );

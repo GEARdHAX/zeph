@@ -5,6 +5,78 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-044: zeph. rebrand — second rename, config-centralized, no infra/DB renames this time — 2026-08-29
+
+**Decision:** Renamed the product from Chitcx to **zeph.** (lowercase, period
+included in the wordmark) across every user-facing surface: page title,
+manifest, auth pages, navbar, profile/about panels, invite flows, product
+tours, empty states, email-subject fallbacks, WebAuthn relying-party name, and
+docs. Centralized the brand strings that were previously duplicated inline
+(`Config.brand || 'Chitcx'` scattered across ~10 components) into
+`frontend/src/config.js`'s existing `appName`/`brand` fields, now defaulting
+to `'zeph.'`, plus new `shortName`/`wordmark` fields.
+
+**Different from D-019's precedent, deliberately:** D-019 (the Chitcx rebrand)
+renamed the Mongo database name and Docker container/network names as part of
+the rebrand. This pass does **not** — those are infra identifiers, not
+presentation-layer, and this task's constraints explicitly scope the rebrand
+to the application/presentation layer only. `chitcx` stays as the Mongo
+database name, Docker container/network names, npm package names, and CI
+image tags. A future infra-focused pass can revisit that separately if ever
+warranted; conflating it with a branding pass risks an unnecessary breaking
+change for zero user-facing benefit.
+
+**New pieces built, not reused:** the task brief referenced
+`zeph-spinner.jsx` / `zeph-loading-overlay.jsx` / `useZephLoader.js` /
+`@fontsource-variable/google-sans-flex` / a `--font-zeph` token as already
+existing ("old spec context"). None of them existed in this repo — verified
+by an exhaustive `grep`/`find` sweep before writing anything. Built fresh:
+- `frontend/src/components/BrandLogo.jsx` — graphical logo PLACEHOLDER (dashed
+  border, neutral mark), not a designed logo — the real asset lands later and
+  only this one file needs to change when it does. Replaces every hardcoded
+  `<img src={logo}>` (Login, NavRail, Details/Info, ForgotPassword/Logo).
+- `frontend/src/components/ui/zeph-spinner.jsx` + `zeph-loading-overlay.jsx` +
+  `frontend/src/lib/useZephLoader.js` — a typewriter-style loading animation
+  of the word "zeph" (bounce/type/delete loop) — a LOADING SPINNER, distinct
+  from the wordmark/logo. Not wired into any route yet (no existing full-page
+  loading state called for one) — available for the next feature that needs
+  a full-screen loader.
+- Installed `@fontsource-variable/google-sans-flex`, added `--font-zeph`
+  token (same family as `--font-sans` today, kept as a separate token since
+  the wordmark/heading weight choice is deliberate, not incidental — see
+  CLAUDE.md's typography hierarchy). Migrated `--font-sans` off Space Grotesk
+  (fully removed — `@fontsource/space-grotesk` uninstalled, nothing else in
+  the codebase referenced the family name) onto Google Sans Flex as the
+  sitewide body font, both wired through `@theme inline` per D-022's warning
+  about the missing-mapping trap.
+
+**Renamed despite being internal-only (not required, done for consistency):**
+`frontend/src/tours/tourStorage.js`'s `chitcx:tours:` localStorage key prefix
+and `frontend/src/tours/tourTheme.css`'s `.chitcx-tour-popover` CSS class.
+Neither is a DB field, API contract, or schema — outside the hard "don't
+rename schema" constraint — and renaming the storage prefix only resets
+existing users' tour-completion flags once (tours just re-offer, no data
+loss).
+
+**Left unrenamed, with reasons (full table in `REBRAND-AUDIT.md`):** Mongo/
+Docker/npm/CI identifiers (infra, not presentation layer, see above);
+`DECISIONS.md`'s own historical ADR entries including D-019 itself and this
+repo's `PROGRESS.md` (both are dated execution records — rewriting them to
+say "zeph" would misrepresent what was actually decided/built at the time);
+the CodeCanyon/Honeyside/Clover attribution paragraph in `README.md`
+(required attribution per CLAUDE.md, preserved verbatim); `documentation/`
+and `documentation.pdf` (original template assets, already kept as historical
+per D-019); `docs/CHITCX-DESIGN-SYSTEM-MIGRATION.md`'s filename (historical
+artifact name, cross-referenced by exact filename from
+`docs/TESTING-STRATEGY.md`); root `package.json`'s `"name": "adarsh-arya"` /
+`"author"` (npm metadata never rendered in-app, not a UI string).
+
+**Tradeoff:** none structural — this was a strictly additive/renaming pass on
+top of D-019's completed migration, no schema or infra touched, so there's no
+new breaking-change risk beyond the one-time tour-progress reset noted above.
+
+---
+
 ## D-043: Redis caching layer — user profile lookups only, deliberately narrow — 2026-08-26
 
 **Problem:** Redis was now wired into this app three ways (Socket.IO

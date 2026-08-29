@@ -7,7 +7,7 @@ export default function buildMeetingsTour() {
   return {
     id: 'meetings',
     version: 1,
-    title: 'Meetings in Chitcx',
+    title: 'Meetings in zeph.',
     requiredRoute: '/meetings',
     steps: [
       {

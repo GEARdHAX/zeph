@@ -4,7 +4,7 @@ require('dotenv').config();
 const logger = require('./src/logger');
 const pinoHttp = require('pino-http');
 
-logger.info('Chitcx server starting');
+logger.info('zeph server starting');
 
 const express = require('express');
 const compression = require('compression');

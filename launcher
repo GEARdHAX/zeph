@@ -4,7 +4,7 @@ source ~/.profile
 
 # avoid darwin
 if [[ "$OSTYPE" != "linux-gnu" ]]; then
-  echo "The automated installation script does not support your OS (are you on a Mac?). You can most probably install Chitcx manually."
+  echo "The automated installation script does not support your OS (are you on a Mac?). You can most probably install zeph. manually."
   exit
 fi
 
@@ -14,7 +14,7 @@ if [[ "$version" != "v18.20.4" ]]; then
 
   # Welcome
   echo ""
-  echo "Initializing Chitcx installer..."
+  echo "Initializing zeph. installer..."
 
   # Build Essentials
   sudo apt-get update
