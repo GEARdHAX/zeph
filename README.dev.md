@@ -1,4 +1,4 @@
-# Chitcx — Developer Guide
+# zeph. — Developer Guide
 
 This document covers everything you need to get the full stack running locally for development.
 For production deployment, see the files in `infra/`.
@@ -23,7 +23,7 @@ The fastest path. All services (backend, frontend, MongoDB, Redis) start togethe
 ### 1. Clone and enter the repo
 ```bash
 git clone <your-repo-url>
-cd "Clover v2.9.1"
+cd zeph
 ```
 
 ### 2. Configure environment files

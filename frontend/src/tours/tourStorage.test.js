@@ -68,7 +68,7 @@ describe('tourStorage', () => {
     setTourState('user-1', 'chat', {
       status: TourStatus.COMPLETED, currentStep: 5, version: 1, completedAt: 123456,
     });
-    const raw = window.localStorage.getItem('chitcx:tours:user-1:chat');
+    const raw = window.localStorage.getItem('zeph:tours:user-1:chat');
     const parsed = JSON.parse(raw);
     expect(Object.keys(parsed).sort()).toEqual(['completedAt', 'currentStep', 'status', 'version']);
   });

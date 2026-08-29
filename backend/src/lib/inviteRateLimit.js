@@ -1,5 +1,5 @@
 // ponytail: in-memory fixed-window counter, single-instance only — fine for
-// Chitcx's current single-process deployment. If the app ever runs multiple
+// zeph's current single-process deployment. If the app ever runs multiple
 // instances, replace the Map with Redis INCR+EXPIRE (same key shape) since
 // this state won't be shared across processes.
 const buckets = new Map();

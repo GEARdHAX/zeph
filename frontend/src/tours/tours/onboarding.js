@@ -13,12 +13,12 @@ export default function buildOnboardingTour() {
   return {
     id: 'onboarding',
     version: 1,
-    title: 'Welcome to Chitcx',
+    title: 'Welcome to zeph.',
     requiredRoute: '/',
     steps: [
       {
         popover: {
-          title: 'Welcome to Chitcx 👋',
+          title: 'Welcome to zeph. 👋',
           description: "Here's a quick look around. You can skip this anytime, or restart it later from Settings.",
         },
       },

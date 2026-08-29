@@ -70,7 +70,7 @@ export default function buildGroupsTour({ myRole = 'MEMBER' } = {}) {
   return {
     id: 'groups',
     version: 1,
-    title: 'Groups in Chitcx',
+    title: 'Groups in zeph.',
     requiredRoute: '/room/:id/info',
     steps,
   };

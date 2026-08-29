@@ -23,10 +23,10 @@ const backendOutput = {
 };
 
 let frontendOutput = {
-    VITE_SITE_TITLE: 'Chitcx',
+    VITE_SITE_TITLE: 'zeph.',
     VITE_BACKEND_URL: 'http://localhost',
     VITE_DEMO: false,
-    VITE_SITE_BRAND: 'Chitcx',
+    VITE_SITE_BRAND: 'zeph.',
     VITE_SHOW_CREDITS: true,
 };
 
@@ -36,7 +36,7 @@ let frontendOutput = {
     console.log(`received command: ${arg}`.cyan);
 
     console.log("");
-    console.log(`Chitcx v${pkg.version} Installer`.yellow);
+    console.log(`zeph. v${pkg.version} Installer`.yellow);
     console.log("");
 
     if (!['setup', 'rebuild', 'start', 'stop', 'restart'].includes(arg)) {
@@ -50,7 +50,7 @@ let frontendOutput = {
 
     if (arg === 'setup') {
 
-        console.log('Chitcx needs to know the public ip address of your machine.'.cyan);
+        console.log('zeph. needs to know the public ip address of your machine.'.cyan);
         console.log('This is required for the meeting system to work, as traffic will be routed via UDP or TCP through such ip address.');
         console.log('If you don\'t know your ip address, run "ping elderberry.example.com" (replace with your domain) from a local terminal.');
 
@@ -77,7 +77,7 @@ let frontendOutput = {
         backendOutput['MAPPED_IP'] = response.value;
 
         console.log('');
-        console.log('Chitcx requires a domain, such as elderberry.example.com.'.cyan);
+        console.log('zeph. requires a domain, such as elderberry.example.com.'.cyan);
         console.log('Make sure your DNS configuration gets properly propagated before moving forward.');
         console.log('You can use https://dnschecker.org/');
 
@@ -273,7 +273,7 @@ let frontendOutput = {
 
         console.log('');
 
-        console.log(`${arg === 'setup' ? 'installing' : 'rebuilding'} Chitcx backend...`.yellow);
+        console.log(`${arg === 'setup' ? 'installing' : 'rebuilding'} zeph. backend...`.yellow);
         console.log('installing backend node modules...');
         console.log('this might take a while, depending on your machine cpu, ram and connection speed');
         console.log('(might be even 10-15 minutes, please keep calm and wait patiently)');
@@ -285,18 +285,18 @@ let frontendOutput = {
         exec('cd ../backend && pm2 start index.js --name Chitcx');
         exec('pm2 save');
         exec('pm2 startup');
-        console.log('Chitcx backend started'.green);
+        console.log('zeph. backend started'.green);
 
         console.log('');
 
-        console.log(`${arg === 'setup' ? 'installing' : 'rebuilding'} Chitcx frontend...`.yellow);
+        console.log(`${arg === 'setup' ? 'installing' : 'rebuilding'} zeph. frontend...`.yellow);
         console.log('installing frontend node modules...');
         console.log('this might take a while');
         exec('cd ../frontend && yarn --prod --frozen-lockfile');
         console.log('building frontend...');
         console.log('this might take a while');
         exec('cd ../frontend && yarn build');
-        console.log('Chitcx frontend ok'.green);
+        console.log('zeph. frontend ok'.green);
     }
 
     if (arg === 'start') {
@@ -353,13 +353,13 @@ let frontendOutput = {
 
     if (arg === 'stop') {
         console.log("");
-        console.log(`Chitcx has been stopped.`.green);
+        console.log(`zeph. has been stopped.`.green);
         console.log("");
     } else {
         console.log("");
-        console.log(`Chitcx v${pkg.version} ${arg === 'setup' ? 'setup' : 'restart'} complete!`.green);
+        console.log(`zeph. v${pkg.version} ${arg === 'setup' ? 'setup' : 'restart'} complete!`.green);
         if (arg === 'setup') {
-            console.log(`You should now be able to access Chitcx at ${domain}`);
+            console.log(`You should now be able to access zeph. at ${domain}`);
         }
         console.log("");
     }

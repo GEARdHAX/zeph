@@ -1,5 +1,5 @@
 import { useGlobal } from 'reactn';
-import logo from '../../../assets/logo.png';
+import BrandLogo from '../../../components/BrandLogo';
 import Config from '../../../config';
 
 function Info() {
@@ -17,23 +17,23 @@ function Info() {
       <div className="flex flex-col items-center pt-8 text-center z-10">
         {/* Brand Icon */}
         <div className="mb-6 flex h-20 w-20 items-center justify-center">
-          <img src={logo} alt="Chitcx" className="h-16 w-16 object-contain" />
+          <BrandLogo className="h-16 w-16" />
         </div>
 
         {/* Welcome Title */}
         <h3 className="text-base font-bold text-foreground sm:text-lg">
-          {`Welcome to ${Config.brand || 'Chitcx'}!`}
+          {`Welcome to ${Config.brand}!`}
         </h3>
 
         {/* Description */}
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-          {`${Config.brand || 'Chitcx'} is a messaging app that enables real-time messaging, audio and video calls, groups and conferencing.`}
+          {`${Config.brand} is a messaging app that enables real-time messaging, audio and video calls, groups and conferencing.`}
         </p>
       </div>
 
       {/* Footer Branding */}
       <div className="text-center text-xs text-muted-foreground z-10">
-        <div>{`Copyright © ${(Config.brand || 'ADARSH ARYA')}`}</div>
+        <div>{`Copyright © ${Config.brand}`}</div>
         <div className="mt-1">{`v${version || '2.9.1'}`}</div>
       </div>
     </div>

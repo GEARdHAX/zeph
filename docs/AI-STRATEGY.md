@@ -1,4 +1,4 @@
-# AI Assistant Strategy — Chitcx
+# AI Assistant Strategy — zeph.
 
 Status: **backend implemented, frontend UI not yet wired.** Three features
 (summarize, translate, draft-reply), one local provider (Ollama), zero cloud API

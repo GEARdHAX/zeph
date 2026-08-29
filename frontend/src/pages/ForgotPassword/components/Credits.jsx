@@ -6,7 +6,7 @@ function Copyright({ onShowCredits }) {
   const version = useGlobal('version')[0];
   return (
     <div className="absolute bottom-2 left-1/2 z-10 hidden -translate-x-1/2 text-xs text-white/70 md:block">
-      {`© ${moment().year()} ${Config.brand || 'Chitcx'}`}
+      {`© ${moment().year()} ${Config.brand}`}
       {Config.showCredits && (
         <>
           {' - '}

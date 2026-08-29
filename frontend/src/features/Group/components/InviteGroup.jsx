@@ -97,7 +97,7 @@ function InviteGroup({
   const onShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: `Join ${groupName} on Chitcx`, url });
+        await navigator.share({ title: `Join ${groupName} on zeph.`, url });
       } catch (err) {
         // User cancelled the native share sheet — not an error.
       }

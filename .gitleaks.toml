@@ -1,7 +1,7 @@
-# .gitleaks.toml — Custom allowlist rules for the Chitcx repo
+# .gitleaks.toml — Custom allowlist rules for the zeph. repo
 # https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
 
-title = "Chitcx gitleaks config"
+title = "zeph. gitleaks config"
 
 [allowlist]
   description = "Allowlisted patterns that are known-safe in this repo"

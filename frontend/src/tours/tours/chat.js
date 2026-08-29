@@ -8,7 +8,7 @@ export default function buildChatTour() {
   return {
     id: 'chat',
     version: 1,
-    title: 'Chatting in Chitcx',
+    title: 'Chatting in zeph.',
     requiredRoute: '/room/:id',
     steps: [
       {

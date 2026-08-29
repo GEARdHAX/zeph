@@ -65,7 +65,7 @@ function FriendInvitePreview() {
               </CardDescription>
             </CardHeader>
             <CardFooter className="justify-center">
-              <Button variant="outline" onClick={() => navigate('/')}>Go to Chitcx</Button>
+              <Button variant="outline" onClick={() => navigate('/')}>Go to zeph.</Button>
             </CardFooter>
           </>
         )}
@@ -84,7 +84,7 @@ function FriendInvitePreview() {
                 <AvatarFallback className="bg-transparent text-lg font-bold text-white">{initials}</AvatarFallback>
               </Avatar>
               <CardTitle className="mt-2">{fullName}</CardTitle>
-              <CardDescription>{`@${inviter.username} invited you to connect on Chitcx`}</CardDescription>
+              <CardDescription>{`@${inviter.username} invited you to connect on zeph.`}</CardDescription>
             </CardHeader>
             <CardFooter className="justify-center">
               <Button

@@ -17,7 +17,7 @@ import setAuthToken from '../../actions/setAuthToken';
 import initIO from '../../actions/initIO';
 import getInfo from '../../actions/getInfo';
 import useTheme from '../../lib/useTheme';
-import logo from '../../assets/logo.png';
+import BrandLogo from '../../components/BrandLogo';
 import Config from '../../config';
 
 const FEATURES = [
@@ -26,14 +26,6 @@ const FEATURES = [
   { Icon: Users, title: 'Groups & Channels', text: 'Stay connected with everyone.' },
   { Icon: ShieldCheck, title: 'Secure & Private', text: 'Your data is always protected.' },
 ];
-
-function ChitcxLogo({ className = 'h-8 w-8' }) {
-  return (
-    <div className={`relative flex items-center justify-center shrink-0 ${className}`}>
-      <img src={logo} alt="Chitcx" className="h-full w-full object-contain" />
-    </div>
-  );
-}
 
 function Login() {
   const dispatch = useDispatch();
@@ -155,8 +147,8 @@ function Login() {
           {/* Top Branding */}
           <div>
             <Link to="/login" className="flex items-center gap-3">
-              <ChitcxLogo className="h-8 w-8" />
-              <span className="text-2xl font-bold tracking-tight text-white">{Config.brand || 'Chitcx'}</span>
+              <BrandLogo className="h-8 w-8" />
+              <span className="font-zeph text-2xl font-extrabold tracking-tight text-white">{Config.brand}</span>
             </Link>
 
             <h1 className="mt-14 text-4xl font-extrabold leading-[1.15] tracking-tight xl:text-[42px]">
@@ -187,8 +179,8 @@ function Login() {
 
           {/* Footer branding and credits */}
           <div className="text-xs text-zinc-500 z-10">
-            {`© ${new Date().getFullYear()} ${(Config.brand || 'ADARSH ARYA')} · `}
-            <span className="text-primary font-medium">{Config.brand || 'Chitcx'}</span>
+            {`© ${new Date().getFullYear()} ${Config.brand} · `}
+            <span className="text-primary font-medium">{Config.brand}</span>
             {` v${info.version || '2.9.1'}`}
             {Config.showCredits && (
               <>
@@ -224,8 +216,8 @@ function Login() {
           <div className="flex w-full items-center justify-between">
             <div className="lg:hidden">
               <Link to="/login" className="flex items-center gap-2">
-                <ChitcxLogo className="h-7 w-7" />
-                <span className="text-lg font-bold tracking-tight">{Config.brand || 'Chitcx'}</span>
+                <BrandLogo className="h-7 w-7" />
+                <span className="font-zeph text-lg font-extrabold tracking-tight">{Config.brand}</span>
               </Link>
             </div>
             <div className="ml-auto">
@@ -247,7 +239,7 @@ function Login() {
                 {/* Header: Icon + Welcome back + Greeting */}
                 <div className="mb-6 flex flex-col items-center text-center">
                   <div className="mb-3 flex h-14 w-14 items-center justify-center">
-                    <ChitcxLogo className="h-12 w-12" />
+                    <BrandLogo className="h-12 w-12" />
                   </div>
                   <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
                     Welcome back
@@ -257,7 +249,7 @@ function Login() {
                   <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
                     Login to continue to
                     {' '}
-                    <span className="font-medium text-foreground">{Config.brand || 'Chitcx'}</span>
+                    <span className="font-medium text-foreground">{Config.brand}</span>
                   </p>
                 </div>
 

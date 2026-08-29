@@ -52,7 +52,7 @@ function Welcome() {
 
       {/* Bottom Status / Version Bar */}
       <div className="flex h-12 w-full items-center justify-end px-6 text-xs text-muted-foreground border-t border-border/50">
-        <span>{`${Config.brand || 'Chitcx'} v${version || '2.9.1'}`}</span>
+        <span>{`${Config.brand} v${version || '2.9.1'}`}</span>
       </div>
     </div>
   );

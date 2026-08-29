@@ -44,6 +44,24 @@ beforeEach(async () => {
   });
 });
 
+describe('Login branding', () => {
+  it('shows the "zeph." wordmark (lowercase, period, no double period)', () => {
+    renderLogin();
+    const wordmarks = screen.getAllByText('zeph.');
+    expect(wordmarks.length).toBeGreaterThan(0);
+    wordmarks.forEach((el) => {
+      expect(el.textContent).toBe('zeph.');
+      expect(el.textContent).not.toMatch(/\.\./);
+    });
+    expect(screen.queryByText(/chitcx/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the BrandLogo placeholder mark next to the wordmark', () => {
+    renderLogin();
+    expect(screen.getAllByRole('img', { name: /zeph logo placeholder/i }).length).toBeGreaterThan(0);
+  });
+});
+
 describe('Login tabbed auth flow', () => {
   it('shows the login form by default', () => {
     renderLogin();

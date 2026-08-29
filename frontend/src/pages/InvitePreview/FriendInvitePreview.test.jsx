@@ -47,7 +47,7 @@ describe('FriendInvitePreview', () => {
     renderPreview();
 
     await waitFor(() => expect(screen.getByText('Alice A')).toBeInTheDocument());
-    expect(screen.getByText('@alice invited you to connect on Chitcx')).toBeInTheDocument();
+    expect(screen.getByText('@alice invited you to connect on zeph.')).toBeInTheDocument();
   });
 
   it('prompts login instead of accept when logged out', async () => {

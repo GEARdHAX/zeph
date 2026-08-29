@@ -89,7 +89,7 @@ function PendingFriendInviteDialog() {
                 <AvatarFallback className="bg-transparent text-lg font-bold text-white">{initials}</AvatarFallback>
               </Avatar>
               <DialogTitle className="mt-2">{fullName}</DialogTitle>
-              <DialogDescription>{`@${inviter.username} invited you to connect on Chitcx`}</DialogDescription>
+              <DialogDescription>{`@${inviter.username} invited you to connect on zeph.`}</DialogDescription>
             </DialogHeader>
             <DialogFooter className="justify-center gap-2">
               <Button variant="ghost" onClick={close} disabled={state === 'accepting'}>Not now</Button>

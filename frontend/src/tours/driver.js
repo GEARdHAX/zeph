@@ -12,7 +12,7 @@ let activeDriverInstance = null;
 let cssInjected = null; // the dynamic-import Promise, memoized so the CSS is fetched once
 
 // driver.css is Driver.js's own stylesheet (layout/positioning — required,
-// not visual branding) — imported once, lazily, alongside the JS. Chitcx's
+// not visual branding) — imported once, lazily, alongside the JS. zeph's
 // visual match (colors/radius/shadow matching index.css's design tokens)
 // lives in tourTheme.css, a separate file THIS project owns (Driver's own
 // CSS is never edited — spec's "do not modify Driver.js source" extends to
@@ -49,7 +49,7 @@ export const createTour = async ({ steps, config = {}, startIndex = 0 }) => {
     overlayOpacity: 0.65,
     stagePadding: 6,
     stageRadius: 8,
-    popoverClass: 'chitcx-tour-popover',
+    popoverClass: 'zeph-tour-popover',
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',

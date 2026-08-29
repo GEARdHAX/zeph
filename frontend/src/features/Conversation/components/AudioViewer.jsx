@@ -18,7 +18,7 @@ const formatTime = (seconds) => {
 };
 
 // Native <audio> element driven entirely by refs — no state library needed,
-// this custom UI IS the "minimal Chitcx audio player" the brief asks for.
+// this custom UI IS the "minimal zeph audio player" the brief asks for.
 // preload="metadata" so opening the viewer only fetches duration, not the
 // full file, matching the low-bandwidth-first priority in CLAUDE.md.
 function AudioViewer({ src }) {

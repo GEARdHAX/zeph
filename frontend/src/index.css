@@ -1,11 +1,13 @@
 @import 'tailwindcss';
 
 /*
- * Chitcx design system tokens (shadcn/ui convention).
+ * zeph. design system tokens (shadcn/ui convention).
  * Migration complete: UIkit and Sass have been fully removed from the codebase
  * — see docs/CHITCX-DESIGN-SYSTEM-MIGRATION.md and DECISIONS.md D-020/D-021.
+ * (Doc kept under its original filename — historical artifact, cross-referenced
+ * elsewhere by that exact name — see D-044.)
  *
- * Palette: black + white + Chitcx red (D-025, UI/UX restructure Phase 1).
+ * Palette: black + white + zeph red (D-025, UI/UX restructure Phase 1).
  * --primary is the strategic red accent — primary actions, active nav, unread
  * badges, selected state. --destructive stays a separate, more muted red so
  * "delete this" and "this is the brand accent" never look like the same color.
@@ -110,8 +112,14 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
-  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
-    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --font-sans: 'Google Sans Flex Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  /* Same family as --font-sans — kept as a distinct token because the
+     wordmark and heading weights are a deliberate semantic choice (heavy for
+     the "zeph." wordmark, 600-700 for page headings), not just "whatever
+     the body font happens to be". Both point at Google Sans Flex today. */
+  --font-zeph: 'Google Sans Flex Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
 body {

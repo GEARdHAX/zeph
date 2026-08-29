@@ -30,7 +30,7 @@ function InviteFriend({ onClose }) {
   const onShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Add me on Chitcx', url });
+        await navigator.share({ title: 'Add me on zeph.', url });
       } catch (err) {
         // User cancelled the native share sheet — not an error.
       }
@@ -46,7 +46,7 @@ function InviteFriend({ onClose }) {
           <DialogTitle>Invite a Friend</DialogTitle>
         </DialogHeader>
 
-        <p className="text-xs text-muted-foreground">Share your Chitcx invite link.</p>
+        <p className="text-xs text-muted-foreground">Share your zeph. invite link.</p>
 
         {showQr && url && (
           <div className="flex items-center justify-center rounded-xl border border-border bg-white p-6">

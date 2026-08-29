@@ -1,6 +1,6 @@
-# Chitcx — Real-time Conferencing & Collaboration Platform
+# zeph. — Real-time Conferencing & Collaboration Platform
 
-Chitcx is a real-time messaging, audio, and video conferencing platform, engineered with a full-stack JavaScript architecture using Express, React, Socket.IO, and Mediasoup (WebRTC SFU).
+zeph. is a real-time messaging, audio, and video conferencing platform, engineered with a full-stack JavaScript architecture using Express, React, Socket.IO, and Mediasoup (WebRTC SFU).
 
 > **Attribution:** The original application layer (chat, calling, and WebRTC functionality)
 > is built on a commercial template ("Clover" by Honeyside, via CodeCanyon). All security
@@ -157,7 +157,7 @@ Home Page (Main Dashboard Context)
 
 ## 6. Messaging Architecture
 
-Chitcx employs a hybrid transport system: Express REST for structural transactions (registering user accounts, creating group objects) and Socket.IO for reactive events (instant messaging, typing notifications, statuses).
+zeph. employs a hybrid transport system: Express REST for structural transactions (registering user accounts, creating group objects) and Socket.IO for reactive events (instant messaging, typing notifications, statuses).
 
 ```
 Client (Sender)
@@ -367,7 +367,7 @@ Meeting (Video Call)
     ```
 
 ### Production Setup (Ubuntu Server Setup via Launcher)
-For Ubuntu VPS deployments, Chitcx includes a automated launcher script:
+For Ubuntu VPS deployments, zeph. includes a automated launcher script:
 1.  Run the launcher command to trigger the build flow:
     ```bash
     ./launcher setup

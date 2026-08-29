@@ -1,10 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import '@fontsource/space-grotesk/300.css';
-import '@fontsource/space-grotesk/400.css';
-import '@fontsource/space-grotesk/500.css';
-import '@fontsource/space-grotesk/600.css';
-import '@fontsource/space-grotesk/700.css';
+// Variable font — one import covers the full weight range (400 body copy
+// through the heavy weight the "zeph." wordmark uses), so unlike the old
+// per-weight Space Grotesk imports there's nothing else to add here.
+import '@fontsource-variable/google-sans-flex';
 import './index.css';
 import { Provider } from 'react-redux';
 import App from './App';

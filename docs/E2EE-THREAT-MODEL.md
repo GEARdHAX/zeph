@@ -1,4 +1,4 @@
-# E2EE Threat Model — Chattr / Chitcx
+# E2EE Threat Model — zeph.
 
 Status: **design doc, no E2EE code implemented yet.** Per the engineering plan, E2EE
 ships only after this document, and only after a device-identity concept exists in

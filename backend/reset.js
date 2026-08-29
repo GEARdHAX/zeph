@@ -1,7 +1,7 @@
 require('colors');
 require('dotenv').config();
 
-console.log(`Welcome to ${'Chitcx'.cyan}`);
+console.log(`Welcome to ${'zeph.'.cyan}`);
 
 const mongoose = require('mongoose');
 const Room = require('./src/models/Room');
