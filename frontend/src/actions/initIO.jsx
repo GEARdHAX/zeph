@@ -1,7 +1,9 @@
 import IO from 'socket.io-client';
 import { setGlobal, getGlobal } from 'reactn';
 import { toast } from 'react-toastify';
-import { PhoneIncoming, Users, ShieldOff } from 'lucide-react';
+import {
+  PhoneIncoming, Users, ShieldOff, UserPlus, UserCheck,
+} from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Config from '../config';
 import Actions from '../constants/Actions';
@@ -13,6 +15,7 @@ import messageSound from '../assets/message.mp3';
 import socketPromise from '../lib/socket.io-promise';
 import getMediaCategory from '../lib/mediaType';
 import { navigateTo } from '../lib/navigation';
+import callManager from '../lib/callManager';
 
 // Every category getMediaCategory() can actually return (see
 // mediaType.js/mediaPolicy.js) needs an entry here — document/archive/text
@@ -135,6 +138,71 @@ export function AddedToGroupToast({ room }) {
   );
 }
 
+// Fired when someone sends this user a friend request — previously nothing
+// notified either side in realtime; getFriendRequests() only ran once on
+// Notifications' mount, so a request sent while the recipient was already
+// elsewhere in the app (or on that same page) went unnoticed until they
+// happened to revisit it. See friend-requests/send.js.
+export function FriendRequestReceivedToast({ requester }) {
+  const fullName = `${requester?.firstName || ''} ${requester?.lastName || ''}`.trim() || requester?.username || 'Someone';
+  return (
+    <button
+      type="button"
+      onClick={() => navigateTo('/notifications')}
+      className="flex w-full cursor-pointer items-center gap-2.5 text-left"
+    >
+      <Avatar className="h-9 w-9 shrink-0 border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-bold">
+        {requester?.picture && (
+          <img
+            src={`${Config.url || ''}/api/images/${requester.picture.shieldedID}/256`}
+            alt=""
+            className="aspect-square size-full object-cover"
+          />
+        )}
+        <AvatarFallback className="bg-transparent text-white">
+          <UserPlus className="h-4 w-4" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <div className="truncate text-xs font-semibold text-foreground">{fullName}</div>
+        <div className="truncate text-xs text-muted-foreground">Sent you a friend request</div>
+      </div>
+    </button>
+  );
+}
+
+// Fired when someone accepts this user's outgoing friend request — same gap
+// as above, the requester previously had no way to find out except
+// reopening the accepter's profile or noticing a new DM. See
+// friend-requests/accept.js.
+export function FriendRequestAcceptedToast({ accepter }) {
+  const fullName = `${accepter?.firstName || ''} ${accepter?.lastName || ''}`.trim() || accepter?.username || 'Someone';
+  return (
+    <button
+      type="button"
+      onClick={() => navigateTo('/notifications')}
+      className="flex w-full cursor-pointer items-center gap-2.5 text-left"
+    >
+      <Avatar className="h-9 w-9 shrink-0 border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-bold">
+        {accepter?.picture && (
+          <img
+            src={`${Config.url || ''}/api/images/${accepter.picture.shieldedID}/256`}
+            alt=""
+            className="aspect-square size-full object-cover"
+          />
+        )}
+        <AvatarFallback className="bg-transparent text-white">
+          <UserCheck className="h-4 w-4" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <div className="truncate text-xs font-semibold text-foreground">{fullName}</div>
+        <div className="truncate text-xs text-muted-foreground">Accepted your friend request</div>
+      </div>
+    </button>
+  );
+}
+
 // Fired when this user is removed or banned from a group while online —
 // group:member:removed carries reason:'removed'/'banned' plus groupName/
 // actorName directly in the payload (see forceLeaveGroupRoom.js), so unlike
@@ -212,6 +280,19 @@ const initIO = (token) => (dispatch) => {
       getRooms()
         .then((res) => store.dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
         .catch((err) => console.log(err));
+
+      // A call in progress when the socket dropped — see init.js's
+      // socket.on('disconnect', ...), which tears down this socket's
+      // mediasoup transports/producers server-side immediately (no grace
+      // period). The room list/message resync above has nothing to do with
+      // an active call, so this is its own branch: reconnecting the socket
+      // does not by itself rejoin the mediasoup session, callManager.rejoin()
+      // does the actual renegotiation. Guarded on joined/callStatus rather
+      // than just roomID being set, since rejoin() itself also no-ops
+      // without a live `device` (i.e. no call was ever actually joined).
+      if (getGlobal().joined && getGlobal().callStatus === 'in-call') {
+        callManager.rejoin().catch((err) => console.log('call rejoin failed', err));
+      }
     }
     wasConnected = true;
   });
@@ -264,6 +345,22 @@ const initIO = (token) => (dispatch) => {
     getRooms()
       .then((res) => store.dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
       .catch((err) => console.log(err));
+  });
+
+  // Toast-only here — NotificationsPlaceholder.jsx has its own listener on
+  // this same event to live-append to its local `incoming` list when that
+  // page is already open (its state isn't in Redux, so it can't be patched
+  // from here).
+  io.on('friend-request:received', (data) => {
+    if (!getGlobal().inCall) {
+      toast(<FriendRequestReceivedToast requester={data.requester} />, { toastId: `friend-request-${data.relationship._id}` });
+    }
+  });
+
+  io.on('friend-request:accepted', (data) => {
+    if (!getGlobal().inCall) {
+      toast(<FriendRequestAcceptedToast accepter={data.accepter} />, { toastId: `friend-accepted-${data.relationship._id}` });
+    }
   });
 
   // Recipient's client acked receipt (message-delivered emit above) —

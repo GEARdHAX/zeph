@@ -1,5 +1,6 @@
 const User = require('../../models/User');
 const Relationship = require('../../models/Relationship');
+const store = require('../../store');
 const logger = require('../../logger');
 const {
   authorizeAction, Actions, Decisions, findRelationship, isPrivileged,
@@ -52,6 +53,22 @@ module.exports = async (req, res, next) => {
     } else {
       relationship = await new Relationship({ requester: req.user.id, recipient: recipient._id }).save();
     }
+    // Realtime nudge for the recipient — previously nothing told the other
+    // side a request arrived; they only ever saw it by opening Notifications
+    // and re-fetching (getFriendRequests runs once on mount, see
+    // NotificationsPlaceholder.jsx). Same store.io.to(personId) idiom as
+    // message.js/broadcastToGroup.js. Public fields only, same select shape
+    // friend-requests/list.js already returns for this exact card.
+    User.findById(req.user.id)
+      .select('username firstName lastName picture')
+      .populate('picture')
+      .then((requester) => {
+        store.io.to(recipient._id.toString()).emit('friend-request:received', {
+          relationship: { _id: relationship._id, status: relationship.status },
+          requester,
+        });
+      })
+      .catch((err) => logger.warn({ err, userId: req.user.id }, 'Failed to emit friend-request:received'));
     res.status(200).json({ relationship: { _id: relationship._id, status: relationship.status } });
   } catch (err) {
     // Unique index on {requester, recipient} — a concurrent duplicate request

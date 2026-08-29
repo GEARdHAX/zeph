@@ -14,6 +14,7 @@ import Config from '../../../config';
 function NotificationsPlaceholder() {
   const roomsWithNewMessages = useSelector((state) => state.messages.roomsWithNewMessages) || [];
   const rooms = useSelector((state) => state.io.rooms) || [];
+  const socket = useSelector((state) => state.io.io);
   const navigate = useNavigate();
 
   const [incoming, setIncoming] = useState([]);
@@ -23,6 +24,23 @@ function NotificationsPlaceholder() {
       .then((res) => setIncoming(res.data.incoming || []))
       .catch(() => {});
   }, []);
+
+  // Live-append a request that arrives while this page is already open —
+  // without this, a request sent while the user was already sitting on
+  // Notifications was invisible until they navigated away and back (the
+  // fetch above only runs once, on mount). The toast in initIO.jsx covers
+  // every other page; this covers the one page where a toast alone isn't
+  // enough since the user is looking right at the (now stale) list.
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onReceived = (data) => {
+      setIncoming((prev) => (prev.some((r) => r._id === data.relationship._id)
+        ? prev
+        : [{ ...data.relationship, requester: data.requester }, ...prev]));
+    };
+    socket.on('friend-request:received', onReceived);
+    return () => socket.off('friend-request:received', onReceived);
+  }, [socket]);
 
   const respond = async (id, action) => {
     try {

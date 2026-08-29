@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import {
   previewText, NewMessageToast, IncomingCallToast, AddedToGroupToast, RemovedFromGroupToast,
+  FriendRequestReceivedToast, FriendRequestAcceptedToast,
 } from './initIO';
 
 describe('previewText — message toast preview text', () => {
@@ -113,6 +114,40 @@ describe('AddedToGroupToast', () => {
     render(<AddedToGroupToast room={room} />);
 
     expect(screen.getByText('Group')).toBeInTheDocument();
+  });
+});
+
+describe('FriendRequestReceivedToast', () => {
+  it('shows the requester name and the "sent you a friend request" message', () => {
+    render(<FriendRequestReceivedToast requester={{ firstName: 'Rohan', lastName: 'K', username: 'rohan' }} />);
+
+    expect(screen.getByText('Rohan K')).toBeInTheDocument();
+    expect(screen.getByText('Sent you a friend request')).toBeInTheDocument();
+  });
+
+  it('falls back to username when first/last name are missing', () => {
+    render(<FriendRequestReceivedToast requester={{ username: 'rohan' }} />);
+
+    expect(screen.getByText('rohan')).toBeInTheDocument();
+  });
+
+  it('degrades gracefully when requester is missing entirely (malformed payload)', () => {
+    expect(() => render(<FriendRequestReceivedToast requester={undefined} />)).not.toThrow();
+    expect(screen.getByText('Someone')).toBeInTheDocument();
+  });
+});
+
+describe('FriendRequestAcceptedToast', () => {
+  it('shows the accepter name and the "accepted your friend request" message', () => {
+    render(<FriendRequestAcceptedToast accepter={{ firstName: 'Dave', lastName: 'D', username: 'dave' }} />);
+
+    expect(screen.getByText('Dave D')).toBeInTheDocument();
+    expect(screen.getByText('Accepted your friend request')).toBeInTheDocument();
+  });
+
+  it('degrades gracefully when accepter is missing entirely (malformed payload)', () => {
+    expect(() => render(<FriendRequestAcceptedToast accepter={undefined} />)).not.toThrow();
+    expect(screen.getByText('Someone')).toBeInTheDocument();
   });
 });
 

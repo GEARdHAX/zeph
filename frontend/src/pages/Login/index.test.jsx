@@ -1,18 +1,21 @@
 import {
   describe, it, expect, vi, beforeEach,
 } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
-import { setGlobal, getGlobal } from 'reactn';
+import { setGlobal, getGlobal, useGlobal } from 'reactn';
 import io from '../../reducers/io';
 import messages from '../../reducers/messages';
 import rtc from '../../reducers/rtc';
 import emoji from '../../reducers/emoji';
 import Login from './index';
+import loginAction from '../../actions/login';
+import registerAction from '../../actions/register';
+import { ZephLoadingOverlay } from '../../components/ui/zeph-loading-overlay';
 
 vi.mock('../../actions/login', () => ({ default: vi.fn(() => Promise.resolve({ data: { token: 'fake' } })) }));
 vi.mock('../../actions/register', () => ({ default: vi.fn(() => Promise.resolve({})) }));
@@ -40,7 +43,7 @@ function renderLogin() {
 
 beforeEach(async () => {
   await setGlobal({
-    token: null, user: {}, entryPath: '/',
+    token: null, user: {}, entryPath: '/', zephLoading: false,
   });
 });
 
@@ -188,5 +191,125 @@ describe('Register redirects after a friend-invite entryPath', () => {
 
     expect(await screen.findByText('Group invite page landed')).toBeInTheDocument();
     expect(getGlobal().pendingFriendInviteToken).toBeNull();
+  });
+});
+
+describe('Full-screen loader during login/register', () => {
+  // Login itself doesn't render ZephLoadingOverlay (that's mounted once at
+  // the App.jsx root) — this renders it alongside Login, reading the same
+  // global reactively (not a one-time getGlobal() snapshot), to prove
+  // useZephLoader() actually gets toggled by onLogin/onRegister the same
+  // way it will in the real app.
+  function OverlayFromGlobal() {
+    const [zephLoading] = useGlobal('zephLoading');
+    return (
+      <ZephLoadingOverlay
+        isOpen={!!zephLoading}
+        label={typeof zephLoading === 'string' ? zephLoading : undefined}
+      />
+    );
+  }
+
+  function renderLoginWithOverlay() {
+    render(
+      <Provider store={makeStore()}>
+        <MemoryRouter>
+          <OverlayFromGlobal />
+          <Login />
+        </MemoryRouter>
+      </Provider>,
+    );
+  }
+
+  it('shows the loader while login is in flight, then hides it on success', async () => {
+    let resolveLogin;
+    loginAction.mockReturnValue(new Promise((resolve) => { resolveLogin = resolve; }));
+    const userEv = userEvent.setup();
+    renderLoginWithOverlay();
+
+    await userEv.type(screen.getByPlaceholderText('Username or email'), 'me@example.com');
+    await userEv.type(screen.getByPlaceholderText('Password'), 'password123');
+    await userEv.click(screen.getByRole('button', { name: /log in/i }));
+
+    expect(getGlobal().zephLoading).toBe('Logging in');
+
+    resolveLogin({ data: { token: 'fake' } });
+    await waitFor(() => expect(getGlobal().zephLoading).toBe(false));
+  });
+
+  it('hides the loader again after a failed login', async () => {
+    loginAction.mockRejectedValueOnce({ response: { data: { generic: 'Invalid credentials' } } });
+    const userEv = userEvent.setup();
+    renderLoginWithOverlay();
+
+    await userEv.type(screen.getByPlaceholderText('Username or email'), 'me@example.com');
+    await userEv.type(screen.getByPlaceholderText('Password'), 'wrong');
+    await userEv.click(screen.getByRole('button', { name: /log in/i }));
+
+    await screen.findByText('Invalid credentials');
+    expect(getGlobal().zephLoading).toBe(false);
+  });
+
+  it('shows a distinct label while registering', async () => {
+    let resolveRegister;
+    registerAction.mockReturnValue(new Promise((resolve) => { resolveRegister = resolve; }));
+    const userEv = userEvent.setup();
+    renderLoginWithOverlay();
+
+    await userEv.click(screen.getByRole('tab', { name: 'Register' }));
+    await userEv.type(screen.getByPlaceholderText('First Name'), 'New');
+    await userEv.type(screen.getByPlaceholderText('Last Name'), 'User');
+    await userEv.type(screen.getByPlaceholderText('Username'), 'newuser');
+    await userEv.type(screen.getByPlaceholderText('Email'), 'new@example.com');
+    await userEv.type(screen.getByPlaceholderText('Password'), 'password123');
+    await userEv.type(screen.getByPlaceholderText('Repeat Password'), 'password123');
+    await userEv.click(screen.getByRole('button', { name: /register/i }));
+
+    expect(getGlobal().zephLoading).toBe('Creating your account');
+    resolveRegister({});
+  });
+
+  it('a second submit while the first is still in flight does not fire a duplicate login request (regression: caused the loader to restart mid-animation)', async () => {
+    loginAction.mockClear();
+    let resolveLogin;
+    loginAction.mockReturnValue(new Promise((resolve) => { resolveLogin = resolve; }));
+    const userEv = userEvent.setup();
+    renderLoginWithOverlay();
+
+    await userEv.type(screen.getByPlaceholderText('Username or email'), 'me@example.com');
+    await userEv.type(screen.getByPlaceholderText('Password'), 'password123');
+
+    const submitButton = screen.getByRole('button', { name: /log in/i });
+    await userEv.click(submitButton);
+    // The button is disabled once submitting, but even a raw fireEvent
+    // submit on the form (bypassing the disabled button) must still be a
+    // no-op — the actual guard is submittingRef, not the disabled attribute.
+    expect(submitButton).toBeDisabled();
+    await userEv.click(submitButton, { pointerEventsCheck: 0 });
+
+    expect(loginAction).toHaveBeenCalledTimes(1);
+
+    resolveLogin({ data: { token: 'fake' } });
+    await waitFor(() => expect(getGlobal().zephLoading).toBe(false));
+    expect(submitButton).not.toBeDisabled();
+  });
+
+  it('the submit button re-enables after a failed login, allowing a real retry', async () => {
+    loginAction.mockClear();
+    loginAction.mockRejectedValueOnce({ response: { data: { generic: 'Invalid credentials' } } });
+    const userEv = userEvent.setup();
+    renderLoginWithOverlay();
+
+    await userEv.type(screen.getByPlaceholderText('Username or email'), 'me@example.com');
+    await userEv.type(screen.getByPlaceholderText('Password'), 'wrong');
+    const submitButton = screen.getByRole('button', { name: /log in/i });
+    await userEv.click(submitButton);
+
+    await screen.findByText('Invalid credentials');
+    expect(submitButton).not.toBeDisabled();
+
+    loginAction.mockResolvedValueOnce({ data: { token: 'fake' } });
+    await userEv.click(submitButton);
+    expect(loginAction).toHaveBeenCalledTimes(2);
   });
 });

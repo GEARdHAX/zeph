@@ -75,6 +75,11 @@ const init = async () => {
     search: '',
     over: null,
     isPicker: false,
+    // Full-screen blocking loader (ZephLoadingOverlay) — either a bare
+    // boolean, or a string used as the accessible label instead of the
+    // component's "Loading" default (e.g. "Sending message"). See
+    // useZephLoader.js.
+    zephLoading: false,
     messages: [],
     streams: [],
     inCall: false,

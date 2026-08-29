@@ -5,6 +5,10 @@ import '@fontsource/space-grotesk/400.css';
 import '@fontsource/space-grotesk/500.css';
 import '@fontsource/space-grotesk/600.css';
 import '@fontsource/space-grotesk/700.css';
+// full.css (not the default wght-only import) — ZephSpinner's wordmark
+// needs the opsz/wdth/GRAD/ROND axes too, matching its own
+// font-variation-settings block. See components/ui/ZephSpinner.jsx.
+import '@fontsource-variable/google-sans-flex/full.css';
 import './index.css';
 import { Provider } from 'react-redux';
 import App from './App';

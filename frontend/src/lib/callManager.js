@@ -24,6 +24,7 @@ let screenProducer = null;
 let roomID = null;
 let unsubscribeFromProducers = null;
 let unsubscribeFromClosingState = null;
+let rejoinInFlight = false;
 
 const getIO = () => store.getState().io.io;
 
@@ -203,6 +204,96 @@ const join = async (targetRoomID) => {
   await produceVideo();
 };
 
+// Rejoins the mediasoup session after a socket reconnect mid-call (see
+// initIO.jsx's 'authenticated' handler with wasConnected true). The server
+// tore down this socket's transports/producers entirely on disconnect
+// (init.js's socket.on('disconnect', ...) — mediasoup sessions are
+// inherently per-connection, there's nothing cheaper to "resume"), so this
+// re-runs the same negotiation join() does. One thing it deliberately does
+// NOT do, unlike join(): it never calls getUserMedia() again — the browser
+// tab's camera/mic tracks are untouched by a network drop (only stopVideo/
+// stopAudio/leave() stop them), so audioStream/videoStream in globals are
+// still the same live tracks, just re-produced onto a new transport.
+// `streams` (remote peers' video tiles) IS reset to [] here, same as
+// join() — the old entries' producerIDs reference a transport the server
+// already discarded, so leaving them up would show frozen/dead tiles
+// instead of the honest brief gap the `reconnecting` banner already covers.
+const rejoin = async () => {
+  if (rejoinInFlight || !roomID || !device) return;
+  rejoinInFlight = true;
+  const targetRoomID = roomID;
+
+  try {
+    store.dispatch({ type: Actions.RTC_RECONNECTING, reconnecting: true });
+    window.consumers = [];
+    await setGlobal({ streams: [] });
+
+    // The old transport/producer objects reference a connection the server
+    // already discarded — close what's closeable, then null everything so
+    // onProducersChanged() (still subscribed) treats every remote producer
+    // as new-to-consume once RTC_PRODUCERS redispatches below.
+    try { sendTransport?.close(); } catch (e) { /* already gone */ }
+    try { window.transport?.close(); } catch (e) { /* already gone */ }
+    sendTransport = null;
+    audioProducer = null;
+    videoProducer = null;
+    screenProducer = null;
+    window.transport = null;
+
+    const io = getIO();
+    const { producers } = await io.request('join', { roomID: targetRoomID });
+
+    await subscribe(device);
+    store.dispatch({ type: Actions.RTC_PRODUCERS, producers: producers || [], replace: true });
+
+    const data = await io.request('createProducerTransport', {
+      forceTcp: false,
+      rtpCapabilities: device.rtpCapabilities,
+      roomID: targetRoomID,
+    });
+    if (data.error) {
+      console.error(data.error);
+      return;
+    }
+
+    sendTransport = device.createSendTransport(data);
+    sendTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+      io.request('connectProducerTransport', { dtlsParameters }).then(callback).catch(errback);
+    });
+    sendTransport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
+      try {
+        const { id } = await io.request('produce', {
+          transportId: sendTransport.id,
+          kind,
+          rtpParameters,
+          roomID: targetRoomID,
+          isScreen: appData && appData.isScreen,
+        });
+        callback({ id });
+      } catch (err) {
+        errback(err);
+      }
+    });
+    sendTransport.on('connectionstatechange', (state) => {
+      if (state === 'failed') sendTransport.close();
+    });
+
+    // Re-produce onto the new transport using whatever local tracks were
+    // already live — a track the user had already turned off (audio/video
+    // false) correctly stays off, produceAudio/produceVideo's own
+    // .getAudioTracks()[0]/.getVideoTracks()[0] on a null stream would throw,
+    // so each is skipped unless its stream still exists.
+    const { audioStream, videoStream } = getGlobal();
+    if (audioStream) await produceAudio(audioStream);
+    if (videoStream) await produceVideo(videoStream);
+  } catch (err) {
+    console.log('rejoin failed', err);
+  } finally {
+    rejoinInFlight = false;
+    store.dispatch({ type: Actions.RTC_RECONNECTING, reconnecting: false });
+  }
+};
+
 async function produceAudio(stream) {
   const useStream = stream || getGlobal().audioStream;
   await setGlobal({ audio: true });
@@ -374,6 +465,7 @@ const getDevice = () => device;
 
 export default {
   join,
+  rejoin,
   produceAudio,
   produceVideo,
   produceScreen,

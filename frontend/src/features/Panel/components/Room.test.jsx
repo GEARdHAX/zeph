@@ -4,7 +4,7 @@ import {
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setGlobal } from 'reactn';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
@@ -25,7 +25,14 @@ const makeRoom = (overrides = {}) => ({
   _id: 'room-1', isGroup: false, people: [{ _id: 'user-1' }, OTHER], ...overrides,
 });
 
-function renderRoom(room, initialRooms = [room]) {
+// Surfaces the current router path as text so a redirect can be asserted
+// on directly, instead of only inferring it from side effects.
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-probe">{location.pathname}</div>;
+}
+
+function renderRoom(room, initialRooms = [room], initialPath = '/') {
   const rootReducer = combineReducers({
     emoji, io, messages, rtc,
   });
@@ -33,8 +40,11 @@ function renderRoom(room, initialRooms = [room]) {
   store.dispatch({ type: Actions.SET_ROOMS, rooms: initialRooms });
   render(
     <Provider store={store}>
-      <MemoryRouter>
-        <Room room={room} />
+      <MemoryRouter initialEntries={[initialPath]}>
+        <LocationProbe />
+        <Routes>
+          <Route path="*" element={<Room room={room} />} />
+        </Routes>
       </MemoryRouter>
     </Provider>,
   );
@@ -101,6 +111,40 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
     await new Promise((resolve) => { setTimeout(resolve, 0); });
 
     expect(store.getState().io.rooms.map((r) => r._id)).toContain('room-1');
+  });
+
+  it('redirects to / when the deleted room is the one currently open', async () => {
+    axios.mockResolvedValue({ data: { status: 'success' } });
+    const user = userEvent.setup();
+    renderRoom(makeRoom(), [makeRoom()], '/room/room-1');
+
+    expect(screen.getByTestId('location-probe').textContent).toBe('/room/room-1');
+    await user.click(screen.getByRole('button', { name: 'Remove conversation' }));
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    expect(screen.getByTestId('location-probe').textContent).toBe('/');
+  });
+
+  it('does not redirect when a different room is currently open', async () => {
+    axios.mockResolvedValue({ data: { status: 'success' } });
+    const user = userEvent.setup();
+    renderRoom(makeRoom(), [makeRoom()], '/room/some-other-room');
+
+    await user.click(screen.getByRole('button', { name: 'Remove conversation' }));
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    expect(screen.getByTestId('location-probe').textContent).toBe('/room/some-other-room');
+  });
+
+  it('does not redirect when the delete request fails, even if this room is open', async () => {
+    axios.mockRejectedValue(new Error('network error'));
+    const user = userEvent.setup();
+    renderRoom(makeRoom(), [makeRoom()], '/room/room-1');
+
+    await user.click(screen.getByRole('button', { name: 'Remove conversation' }));
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    expect(screen.getByTestId('location-probe').textContent).toBe('/room/room-1');
   });
 
   it('does not render a remove button for a vault row', () => {

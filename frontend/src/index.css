@@ -112,6 +112,10 @@
   --radius-sm: calc(var(--radius) - 4px);
   --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
     'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  /* ZephSpinner's wordmark only — a deliberate one-off typeface for that
+     component, not a sitewide body-text swap. Never use this for regular
+     UI copy; --font-sans (Space Grotesk) stays the sitewide default. */
+  --font-zeph: 'Google Sans Flex Variable', 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 body {

@@ -17,6 +17,12 @@ const initialState = {
   counterpart: null,
   closingState: false,
   closed: true,
+  // True while callManager.rejoin() is renegotiating mediasoup transports
+  // after a socket reconnect mid-call — see callManager.js's rejoin(). Not
+  // reset by RTC_LEAVE's initialState spread issue since RTC_LEAVE already
+  // returns the whole initialState object fresh (reconnecting: false, as
+  // declared here).
+  reconnecting: false,
 };
 
 const reducer = (state = initialState, action) => {
@@ -35,7 +41,14 @@ const reducer = (state = initialState, action) => {
     case Actions.RTC_PRODUCERS:
       return {
         ...state,
-        producers: [...state.producers, ...action.producers],
+        // replace: true — used by callManager.rejoin() after a reconnect,
+        // where state.producers still holds stale entries from the
+        // connection the server already discarded (their producer IDs no
+        // longer exist server-side); appending the fresh list onto those
+        // would leave dead entries onProducersChanged() would try and fail
+        // to consume. join()'s normal call site never needs this: RTC_LEAVE
+        // already reset producers to [] before any new join() runs.
+        producers: action.replace ? [...action.producers] : [...state.producers, ...action.producers],
         closed: false,
       };
     case Actions.RTC_RESET_PRODUCERS:
@@ -91,6 +104,11 @@ const reducer = (state = initialState, action) => {
         ...state,
         counterpart: action.counterpart,
         closed: false,
+      };
+    case Actions.RTC_RECONNECTING:
+      return {
+        ...state,
+        reconnecting: action.reconnecting,
       };
     case Actions.RTC_LEAVE:
       return initialState;

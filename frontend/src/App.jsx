@@ -15,6 +15,8 @@ import setAuthToken from './actions/setAuthToken';
 import initIO from './actions/initIO';
 import PictureInPicture from './features/PictureInPicture';
 import { registerNavigate } from './lib/navigation';
+import { ZephLoadingOverlay } from './components/ui/zeph-loading-overlay';
+import useZephLoader from './lib/useZephLoader';
 
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -37,6 +39,7 @@ function App() {
   const token = useGlobal('token')[0];
   const setStartingPoint = useGlobal('entryPath')[1];
   const theme = useGlobal('theme')[0];
+  const zephLoader = useZephLoader();
 
   // CSS dark-mode overrides target :root (i.e. <html>), not this component's
   // own div — React can't render attributes onto <html> directly, so it's
@@ -117,6 +120,7 @@ function App() {
 
   return (
     <div className="fixed h-full w-full overflow-hidden bg-background">
+      <ZephLoadingOverlay isOpen={zephLoader.isLoading} label={zephLoader.label} />
       <ToastContainer
         position="bottom-right"
         autoClose={5000}

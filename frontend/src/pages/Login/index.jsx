@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import {
+  useEffect, useRef, useState,
+} from 'react';
 import { useGlobal } from 'reactn';
 import { Link, useNavigate } from 'react-router-dom';
 import jwtDecode from 'jwt-decode';
@@ -17,6 +19,7 @@ import setAuthToken from '../../actions/setAuthToken';
 import initIO from '../../actions/initIO';
 import getInfo from '../../actions/getInfo';
 import useTheme from '../../lib/useTheme';
+import useZephLoader from '../../lib/useZephLoader';
 import logo from '../../assets/logo.png';
 import Config from '../../config';
 
@@ -41,6 +44,23 @@ function Login() {
   const [tab, setTab] = useState('login');
   const [showCredits, setShowCredits] = useState(false);
   const { theme, toggle: toggleTheme } = useTheme();
+  const zephLoader = useZephLoader();
+  // A ref, not state — must be readable/settable synchronously the instant
+  // onLogin/onRegister runs, with zero re-render delay. A second submit
+  // (double-click, double-Enter, or just clicking again before the overlay
+  // has visually blocked the button on a slow first paint) previously fired
+  // a second in-flight request; that second request's own show()/finally
+  // hide() would then race the first one, and could leave zephLoading
+  // toggling on/off mid-cycle — which restarts ZephSpinner's animation
+  // loop from the beginning every time, looking exactly like "stuck on
+  // the dot" even though the sequencer itself was never broken.
+  const submittingRef = useRef(false);
+  // Reactive mirror of submittingRef, for disabling the submit buttons —
+  // the ref is what actually prevents a double-submit (see above), this is
+  // purely so the button reflects it visually/functionally too (belt-and-
+  // suspenders: disabled= alone isn't airtight against a fast double-Enter
+  // landing both keydowns before the first re-render commits).
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -71,6 +91,10 @@ function Login() {
 
   const onLogin = async (e) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    zephLoader.show('Logging in');
     try {
       const res = await login(email, password);
       if (keep) localStorage.setItem('token', res.data.token);
@@ -87,11 +111,19 @@ function Login() {
       if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Could not connect to server.';
       else errors = err.response.data;
       setLoginErrors(errors);
+    } finally {
+      zephLoader.hide();
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   const onRegister = async (e) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    zephLoader.show('Creating your account');
     try {
       await register({
         username: registerUsername,
@@ -132,6 +164,10 @@ function Login() {
       if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Could not connect to server.';
       else errors = err.response.data;
       setRegisterErrors(errors);
+    } finally {
+      zephLoader.hide();
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -342,6 +378,7 @@ function Login() {
                     <Button
                       type="submit"
                       size="lg"
+                      disabled={isSubmitting}
                       className="mt-1 h-11 w-full gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99]"
                     >
                       Log In
@@ -401,6 +438,7 @@ function Login() {
                     <Button
                       type="submit"
                       size="lg"
+                      disabled={isSubmitting}
                       className="mt-1 h-11 w-full gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99]"
                     >
                       Register

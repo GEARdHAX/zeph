@@ -40,6 +40,7 @@ function Meeting() {
   const lastLeaveType = useSelector((state) => state.rtc.lastLeaveType);
   const increment = useSelector((state) => state.rtc.increment);
   const closingState = useSelector((state) => state.rtc.closingState);
+  const reconnecting = useSelector((state) => state.rtc.reconnecting);
   const [streams, setStreams] = useGlobal('streams');
   const [localStream] = useGlobal('localStream');
   const [video] = useGlobal('video');
@@ -288,7 +289,12 @@ function Meeting() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="relative flex h-full w-full flex-col">
+      {reconnecting && (
+        <div className="absolute left-1/2 top-4 z-[1001] -translate-x-1/2 rounded-full border border-white/15 bg-black/75 px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-2xl">
+          Reconnecting…
+        </div>
+      )}
       {isGrid && <TopBarTransparent localStream={localStream} />}
       {!isGrid && topBar && <TopBar localStream={localStream} />}
       <Streams

@@ -138,6 +138,10 @@ function Room({ room, inVault, vaultToken }) {
       await deleteConversation(room._id);
       dispatch({ type: Actions.CONVERSATION_DELETED, conversationId: room._id });
       toast.success('Conversation removed from your inbox.');
+      // Only redirect if the deleted row is the one currently open — deleting
+      // a DIFFERENT row from the sidebar must not yank the user away from
+      // whatever conversation they're actively looking at.
+      if (isSelected) navigate('/', { replace: true });
     } catch (err) {
       toast.error('Could not remove this conversation.');
     } finally {
