@@ -14,6 +14,7 @@ import Config from '../../../config';
 import upload from '../../../actions/uploadImage';
 import createGroup from '../../../actions/createGroup';
 import { validateFile } from '../../../lib/mediaPolicy';
+import LazyFallback from '../../../components/LazyFallback';
 
 // Lazy-loaded so react-easy-crop is only fetched the first time a user
 // actually picks a group icon, same as the chat composer's editor.
@@ -147,7 +148,7 @@ function CreateGroupStepTwo() {
       </form>
 
       {editingFile && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<LazyFallback />}>
           <ImageEditorModal
             file={editingFile}
             aspect={1}

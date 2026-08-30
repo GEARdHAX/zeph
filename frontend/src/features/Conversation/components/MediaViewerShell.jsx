@@ -2,10 +2,11 @@ import {
   useState, useEffect, useMemo, useCallback, useRef,
 } from 'react';
 import {
-  X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RefreshCw, Loader2,
+  X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RefreshCw,
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { ZephSpinner } from '@/components/ui/zeph-spinner';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
 import getMediaCategory from '../../../lib/mediaType';
@@ -139,7 +140,20 @@ function MediaViewerShell({ messages, initialMessage, onClose }) {
       return <span className="text-sm text-white/70">Could not load this media.</span>;
     }
     if (mediaLoading || !resolvedUrl) {
-      return <Loader2 className="h-8 w-8 animate-spin text-white/60" />;
+      // Same brand spinner the Suspense fallback (LazyFallback) that got us
+      // here already showed for the chunk download — was a generic Loader2
+      // before, which read as two different loaders back-to-back for what a
+      // user experiences as one continuous "opening media" wait. This
+      // viewer is always black-background regardless of app theme (see
+      // DialogContent's bg-black above), so the wordmark's --foreground var
+      // (which follows the app's light/dark theme, not this dialog's own
+      // always-dark chrome) needs a local override here or it can render
+      // near-invisible dark-on-black in light mode.
+      return (
+        <div style={{ '--foreground': '0 0% 100%' }}>
+          <ZephSpinner size={28} />
+        </div>
+      );
     }
     switch (category) {
       case 'image':

@@ -4,12 +4,14 @@ import {
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
 import moment from 'moment';
+import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Message from './Message';
 import getMoreMessages from '../../../actions/getMoreMessages';
 import Actions from '../../../constants/Actions';
 import Picture from '../../../components/Picture';
 import Config from '../../../config';
+import LazyFallback from '../../../components/LazyFallback';
 
 // Lazy-loaded so the media viewer (and its five sub-viewers) never ship in
 // the initial chat bundle — only fetched the first time a user actually
@@ -184,13 +186,26 @@ function Messages() {
     >
       <div className="flex flex-col w-full mx-auto px-4 sm:px-6 md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
         {open && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<LazyFallback />}>
             <MediaViewerShell
               messages={mediaMessages}
               initialMessage={open}
               onClose={() => setOpen(null)}
             />
           </Suspense>
+        )}
+
+        {/* Pagination spinner — loading is also true on this room's very
+            first history fetch, but messages.length is 0 then, so this only
+            ever shows for a scroll-triggered "load older" fetch, not the
+            initial load (which already has its own full-pane spinner one
+            level up in Conversation/index.jsx). Without this, scrolling to
+            the top on a slow connection looked like nothing was happening
+            until older messages suddenly appeared. */}
+        {loading && messages.length > 0 && (
+          <div className="flex justify-center py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" role="status" aria-label="Loading older messages" />
+          </div>
         )}
 
         {messagesList}

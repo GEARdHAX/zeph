@@ -1,0 +1,21 @@
+#!/usr/bin/env bpftrace
+// ZEPH eBPF sensor — process exec/exit observation.
+// Hooks: tracepoint:sched:sched_process_exec, tracepoint:sched:sched_process_exit
+// (both standard, always-available scheduler tracepoints on any modern Linux
+// kernel with CONFIG_BPF enabled — no kprobe fragility, no kernel-version-
+// specific offsets). Output is one JSON line per event on stdout;
+// bpftraceRunner.js parses it line by line. Kept deliberately minimal: this
+// is an OBSERVATION feed, not a policy engine — no filtering/decision logic
+// belongs here (spec section 33: the backend decides, the sensor observes).
+
+tracepoint:sched:sched_process_exec
+{
+    printf("{\"kind\":\"exec\",\"pid\":%d,\"ppid\":%d,\"comm\":\"%s\",\"ts\":%llu}\n",
+        pid, curtask->real_parent->pid, comm, nsecs);
+}
+
+tracepoint:sched:sched_process_exit
+{
+    printf("{\"kind\":\"exit\",\"pid\":%d,\"ppid\":%d,\"comm\":\"%s\",\"ts\":%llu}\n",
+        pid, curtask->real_parent->pid, comm, nsecs);
+}

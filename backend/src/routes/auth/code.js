@@ -6,8 +6,9 @@ const config = require('../../../config');
 const randomstring = require('randomstring');
 const moment = require('moment');
 const isEmpty = require('../../utils/isEmpty');
-const logger = require('../../logger');
 const authCodeRateLimit = require('../../lib/authCodeRateLimit');
+const SecurityEventService = require('../../services/securityEventService');
+const securityEventContext = require('../../utils/securityEventContext');
 
 const allowRequest = authCodeRateLimit({ max: 5, windowMs: 60 * 60 * 1000 });
 
@@ -31,7 +32,17 @@ router.post('*', async (req, res) => {
 
   if (!allowRequest(email)) {
     // Same generic response even when rate-limited — a 429 here would tell
-    // an attacker the email is being actively targeted/exists.
+    // an attacker the email is being actively targeted/exists. The
+    // telemetry event still fires though (severity/type visible only
+    // server-side, same split as the HTTP response staying generic above).
+    SecurityEventService.record({
+      type: 'RATE_LIMIT_TRIGGERED',
+      severity: 'medium',
+      source: securityEventContext(req),
+      target: { resource: '/api/auth/code', action: 'request_reset_code' },
+      result: 'blocked',
+      metadata: { limiter: 'auth_code' },
+    });
     return res.status(200).json(GENERIC_RESPONSE);
   }
 
@@ -57,7 +68,14 @@ router.post('*', async (req, res) => {
   });
 
   await authCode.save();
-  logger.info({ userId: user._id.toString() }, 'PASSWORD_RESET_REQUESTED');
+  SecurityEventService.record({
+    type: 'PASSWORD_RESET_REQUESTED',
+    severity: 'medium',
+    actor: { userId: user._id.toString() },
+    source: securityEventContext(req),
+    target: { resource: '/api/auth/code', action: 'request_reset_code' },
+    result: 'success',
+  });
 
   const entry = Email({
     from: config.nodemailer.from,

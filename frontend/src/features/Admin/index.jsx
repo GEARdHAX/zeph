@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGlobal } from 'reactn';
+import { useNavigate } from 'react-router-dom';
 import DataTable from 'react-data-table-component';
 import {
-  Search, Plus, UserCheck, Shield, Edit2, Trash2, ArrowLeft,
+  Search, Plus, UserCheck, Shield, Edit2, Trash2, ArrowLeft, ShieldAlert, Radar, Cpu, Network,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useTheme from '../../lib/useTheme';
@@ -11,8 +12,10 @@ import Popup from './components/Popup';
 import Config from '../../config';
 
 function Admin() {
+  const navigate = useNavigate();
   const setOver = useGlobal('over')[1];
   const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   const searchInput = useRef();
   const setSearchResults = useGlobal('searchResults')[1];
   const [searchText, setSearch] = useGlobal('search');
@@ -29,10 +32,20 @@ function Admin() {
       .catch((err) => console.log(err));
   };
 
+  // No loading state previously existed here at all — a search-box
+  // keystroke re-fetches this whole (up to 10,000-row) table with no
+  // feedback, so on a slow connection the table just sits stale/unchanged
+  // until the response lands, indistinguishable from the keystroke having
+  // done nothing. progressPending below is react-data-table-component's own
+  // built-in prop for this — no separate skeleton/spinner needed.
   useEffect(() => {
-    search(searchText || null, 10000).then((res) => {
-      setUsers(res.data.users || []);
-    });
+    setUsersLoading(true);
+    search(searchText || null, 10000)
+      .then((res) => {
+        setUsers(res.data.users || []);
+      })
+      .catch((err) => console.log(err))
+      .finally(() => setUsersLoading(false));
   }, [searchText]);
 
   const back = () => setOver(false);
@@ -192,14 +205,52 @@ function Admin() {
           </div>
         </div>
 
-        <Button
-          size="sm"
-          className="gap-2 rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-          onClick={() => setPopup('create')}
-        >
-          <Plus className="h-4 w-4" />
-          Add User
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl text-xs font-semibold"
+            onClick={() => navigate('/admin/security-events')}
+          >
+            <ShieldAlert className="h-4 w-4" />
+            Security Events
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl text-xs font-semibold"
+            onClick={() => navigate('/admin/threat-intelligence')}
+          >
+            <Radar className="h-4 w-4" />
+            Threat Intelligence
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl text-xs font-semibold"
+            onClick={() => navigate('/admin/sensors')}
+          >
+            <Cpu className="h-4 w-4" />
+            Sensors
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl text-xs font-semibold"
+            onClick={() => navigate('/admin/network-intelligence')}
+          >
+            <Network className="h-4 w-4" />
+            Network
+          </Button>
+          <Button
+            size="sm"
+            className="gap-2 rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+            onClick={() => setPopup('create')}
+          >
+            <Plus className="h-4 w-4" />
+            Add User
+          </Button>
+        </div>
       </div>
 
       {/* Main Container */}
@@ -237,6 +288,8 @@ function Admin() {
             customStyles={customStyles}
             theme={isDark ? 'dark' : 'light'}
             noDataComponent={<div className="p-10 text-center text-xs text-muted-foreground">No users found.</div>}
+            progressPending={usersLoading}
+            progressComponent={<div className="p-10 text-center text-xs text-muted-foreground">Loading…</div>}
           />
         </div>
       </div>

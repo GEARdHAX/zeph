@@ -25,6 +25,7 @@ import Actions from '../../../constants/Actions';
 import getMediaCategory from '../../../lib/mediaType';
 import getFileIcon from '../../../lib/fileIcon';
 import useAuthorizedMediaUrl from '../../../lib/useAuthorizedMediaUrl';
+import LazyFallback from '../../../components/LazyFallback';
 
 // Lazy-loaded — same viewer used by the chat message list (Messages.jsx),
 // consolidating what used to be a separate react-modal-image lightbox here.
@@ -387,7 +388,7 @@ function Room() {
               onScroll={onScroll}
             >
               {open && (
-                <Suspense fallback={null}>
+                <Suspense fallback={<LazyFallback />}>
                   <MediaViewerShell
                     messages={roomImages}
                     initialMessage={open}

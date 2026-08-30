@@ -24,6 +24,7 @@ import deleteConversation from '../../../actions/deleteConversation';
 import useTheme from '../../../lib/useTheme';
 import { validateFile } from '../../../lib/mediaPolicy';
 import RichMessageInput from './RichMessageInput';
+import LazyFallback from '../../../components/LazyFallback';
 
 // Lazy-loaded so react-easy-crop is only fetched the first time a user
 // actually attaches an image, not bundled into the initial chat load.
@@ -58,6 +59,18 @@ function BottomBar({ aiEnabled }) {
   // from images since they use different editor modals with different
   // onDone shapes (video's onDone also carries a poster frame Blob).
   const [videoQueue, setVideoQueue] = useState([]);
+
+  // Upload progress — keyed by a locally-generated id so concurrent
+  // multi-file sends each get their own bar. Real-world-network-first: on a
+  // slow/unstable connection an image/video/file upload can take seconds to
+  // minutes, and until now uploadImage/uploadMedia's onProgress callback was
+  // silently discarded (both actions already report real byte progress via
+  // axios's onUploadProgress — see uploadImage.js/uploadMedia.js), so a user
+  // had zero feedback between picking a file and the message appearing.
+  const [uploadProgress, setUploadProgress] = useState([]);
+  const setProgressFor = (id, percent) => setUploadProgress((prev) => prev.map(
+    (item) => (item.id === id ? { ...item, percent } : item),
+  ));
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -265,28 +278,49 @@ function BottomBar({ aiEnabled }) {
 
   const sendImages = async (files) => {
     const tmpRefs = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      tmpRefs.push(ref + i);
-      const res = await uploadImage(file, ref + i);
-      const clientID = crypto.randomUUID();
-      const newMessage = {
-        clientID,
-        author: { ...user, _id: user.id },
-        content: res.data.image.shieldedID,
-        type: 'image',
-        date: moment(),
-      };
-      dispatch({ type: Actions.MESSAGE, message: newMessage });
-      // eslint-disable-next-line no-await-in-loop
-      const msgRes = await message({
-        roomID: room._id,
-        authorID: user.id,
-        content: res.data.image.shieldedID,
-        type: 'image',
-        imageID: res.data.image._id,
-      });
-      dispatch({ type: Actions.MESSAGE_UPDATE, clientID, patch: { _id: msgRes.data.message._id } });
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        tmpRefs.push(ref + i);
+        const progressId = crypto.randomUUID();
+        setUploadProgress((prev) => [...prev, { id: progressId, name: file.name, percent: 0 }]);
+        const onUploadProgress = (event) => {
+          if (!event.total) return;
+          setProgressFor(progressId, Math.round((event.loaded / event.total) * 100));
+        };
+        let res;
+        try {
+          res = await uploadImage(file, ref + i, onUploadProgress);
+        } finally {
+          setUploadProgress((prev) => prev.filter((item) => item.id !== progressId));
+        }
+        const clientID = crypto.randomUUID();
+        const newMessage = {
+          clientID,
+          author: { ...user, _id: user.id },
+          content: res.data.image.shieldedID,
+          type: 'image',
+          date: moment(),
+        };
+        dispatch({ type: Actions.MESSAGE, message: newMessage });
+        // eslint-disable-next-line no-await-in-loop
+        const msgRes = await message({
+          roomID: room._id,
+          authorID: user.id,
+          content: res.data.image.shieldedID,
+          type: 'image',
+          imageID: res.data.image._id,
+        });
+        dispatch({ type: Actions.MESSAGE_UPDATE, clientID, patch: { _id: msgRes.data.message._id } });
+      }
+    } catch (err) {
+      // Pre-existing gap this progress-bar pass also closes: an upload
+      // failure here used to throw from an un-awaited, un-caught call
+      // (finishImageEdit calls sendImages() fire-and-forget) — silently, no
+      // toast, nothing — a real problem on the flaky connections this app
+      // targets. Whatever succeeded before the failure (earlier files in a
+      // multi-select batch) stays sent; only the failure itself surfaces now.
+      toast.error('Could not send image. Check your connection and try again.');
     }
     addPictureRef([...pictureRefs, ...tmpRefs]);
     showPicker(false);
@@ -303,31 +337,49 @@ function BottomBar({ aiEnabled }) {
   // still calls it elsewhere, this is purely additive.
   const sendGenericMedia = async (files, posterBlob) => {
     const tmpRefs = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      tmpRefs.push(ref + i);
-      // eslint-disable-next-line no-await-in-loop
-      const res = await uploadMedia(file, () => {}, posterBlob);
-      const { media } = res.data;
-      const clientID = crypto.randomUUID();
-      const newMessage = {
-        clientID,
-        author: { ...user, _id: user.id },
-        content: media._id,
-        type: 'file',
-        date: moment(),
-        media,
-      };
-      dispatch({ type: Actions.MESSAGE, message: newMessage });
-      // eslint-disable-next-line no-await-in-loop
-      const msgRes = await message({
-        roomID: room._id,
-        authorID: user.id,
-        content: media._id,
-        type: 'file',
-        mediaID: media._id,
-      });
-      dispatch({ type: Actions.MESSAGE_UPDATE, clientID, patch: { _id: msgRes.data.message._id } });
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        tmpRefs.push(ref + i);
+        const progressId = crypto.randomUUID();
+        setUploadProgress((prev) => [...prev, { id: progressId, name: file.name, percent: 0 }]);
+        const onUploadProgress = (event) => {
+          if (!event.total) return;
+          setProgressFor(progressId, Math.round((event.loaded / event.total) * 100));
+        };
+        let res;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          res = await uploadMedia(file, onUploadProgress, posterBlob);
+        } finally {
+          setUploadProgress((prev) => prev.filter((item) => item.id !== progressId));
+        }
+        const { media } = res.data;
+        const clientID = crypto.randomUUID();
+        const newMessage = {
+          clientID,
+          author: { ...user, _id: user.id },
+          content: media._id,
+          type: 'file',
+          date: moment(),
+          media,
+        };
+        dispatch({ type: Actions.MESSAGE, message: newMessage });
+        // eslint-disable-next-line no-await-in-loop
+        const msgRes = await message({
+          roomID: room._id,
+          authorID: user.id,
+          content: media._id,
+          type: 'file',
+          mediaID: media._id,
+        });
+        dispatch({ type: Actions.MESSAGE_UPDATE, clientID, patch: { _id: msgRes.data.message._id } });
+      }
+    } catch (err) {
+      // Same pre-existing fire-and-forget gap as sendImages() above — both
+      // call sites (selectAttachments' straight-to-upload path, and
+      // finishVideoEdit) invoke this without a caller-side catch.
+      toast.error('Could not send file. Check your connection and try again.');
     }
     addPictureRef([...pictureRefs, ...tmpRefs]);
     showPicker(false);
@@ -363,6 +415,23 @@ function BottomBar({ aiEnabled }) {
 
   return (
     <div data-tour="message-composer" className="relative flex w-full items-center gap-2 border-t border-border/60 bg-card px-3.5 pt-3 pb-6 sm:py-2.5 text-card-foreground">
+      {uploadProgress.length > 0 && (
+        <div className="absolute -top-1.5 left-3.5 right-3.5 flex -translate-y-full flex-col gap-1.5 rounded-xl border border-border/60 bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+          {uploadProgress.map((item) => (
+            <div key={item.id} className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="min-w-0 flex-1 truncate">{item.name}</span>
+              <span className="shrink-0 tabular-nums">{`${item.percent}%`}</span>
+              <div className="h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-200"
+                  style={{ width: `${item.percent}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {isPicker && (
         <div ref={pickerRef} className="absolute bottom-[84px] left-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-border">
           <Picker
@@ -471,7 +540,7 @@ function BottomBar({ aiEnabled }) {
       </div>
 
       {editorQueue.length > 0 && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<LazyFallback />}>
           <ImageEditorModal
             file={editorQueue[0]}
             onCancel={cancelImageEditor}
@@ -481,7 +550,7 @@ function BottomBar({ aiEnabled }) {
       )}
 
       {videoQueue.length > 0 && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<LazyFallback />}>
           <VideoEditorModal
             file={videoQueue[0]}
             onCancel={cancelVideoEditor}

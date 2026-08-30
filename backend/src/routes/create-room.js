@@ -3,6 +3,8 @@ const Room = require('../models/Room');
 const User = require('../models/User');
 const xss = require('xss');
 const { authorizeAction, Actions, Decisions } = require('../authorization/policy');
+const SecurityEventService = require('../services/securityEventService');
+const securityEventContext = require('../utils/securityEventContext');
 
 module.exports = async (req, res, next) => {
   let { counterpart } = req.fields;
@@ -24,6 +26,18 @@ module.exports = async (req, res, next) => {
     targetLevel: counterpartUser.level,
   });
   if (authz.decision !== Decisions.ALLOW) {
+    SecurityEventService.record({
+      type: 'UNAUTHORIZED_ACCESS',
+      severity: authz.reason === 'admin_boundary' ? 'high' : 'medium',
+      actor: { userId: req.user.id },
+      source: securityEventContext(req),
+      target: { resource: 'room', action: 'start_conversation' },
+      result: 'blocked',
+      // reason is recorded even for admin_boundary — the response itself
+      // stays the indistinguishable-from-404 shape below (DECISIONS.md),
+      // this is server-side-only telemetry, not something the caller sees.
+      metadata: { reason: authz.reason },
+    });
     // admin_boundary must be indistinguishable from "counterpart doesn't
     // exist" — no reason field, same shape as the !counterpartUser 404
     // above. See DECISIONS.md.

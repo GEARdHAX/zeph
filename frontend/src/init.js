@@ -64,6 +64,11 @@ const init = async () => {
     user: user || (token ? jwtDecode(token) : {}),
     rooms: [],
     searchResults: [],
+    // Mirrors SearchBar.jsx's own useExplicitSearch loading state — lifted
+    // to a global so Panel/index.jsx (where the "People" results actually
+    // render) can show "Searching…" instead of nothing while a directory
+    // lookup is in flight, same pattern AddPeople.jsx already uses locally.
+    searchLoading: false,
     favorites: [],
     meetings: [],
     nav: 'rooms',

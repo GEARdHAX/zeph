@@ -1,5 +1,8 @@
 const Session = require('../../models/Session');
 const store = require('../../store');
+const SecurityEventService = require('../../services/securityEventService');
+const securityEventContext = require('../../utils/securityEventContext');
+const { invalidateRiskContext } = require('../../services/zeroTrust/riskCache');
 
 module.exports = async (req, res, next) => {
   const { id } = req.fields;
@@ -10,6 +13,22 @@ module.exports = async (req, res, next) => {
 
   session.revokedAt = new Date();
   await session.save();
+
+  // A distinct moment from any Zero Trust risk evaluation (lib/zeroTrust.js
+  // already records ZERO_TRUST_DENY the NEXT time the revoked session tries
+  // a sensitive action) — this is the revocation itself, worth its own
+  // event. Also drop the cached risk context so a request already in flight
+  // against this session doesn't ride out the rest of riskCache.js's TTL
+  // window before its session-revoked check kicks in.
+  SecurityEventService.record({
+    type: 'SESSION_REVOKED',
+    severity: 'medium',
+    actor: { userId: req.user.id, sessionId: id },
+    source: securityEventContext(req),
+    target: { resource: 'session', resourceId: id, action: 'revoke' },
+    result: 'success',
+  });
+  invalidateRiskContext(id).catch(() => {});
 
   // Disconnect any live socket authenticated under this session right away —
   // otherwise a revoked device stays connected until its next reconnect.

@@ -7,6 +7,8 @@ const forceLeaveGroupRoom = require('../../utils/forceLeaveGroupRoom');
 const broadcastToGroup = require('../../utils/broadcastToGroup');
 const postSystemMessage = require('../../utils/postSystemMessage');
 const logger = require('../../logger');
+const SecurityEventService = require('../../services/securityEventService');
+const securityEventContext = require('../../utils/securityEventContext');
 
 // Distinct from members-remove.js: a ban also blocks every future rejoin
 // path (join-requests/create.js, group/invites/join.js both check
@@ -29,6 +31,15 @@ module.exports = async (req, res) => {
   if (!groupPolicy.hasCapability(actorMembership.role, groupPolicy.Capabilities.BAN_MEMBER)
     || !groupPolicy.canRemoveMember({ actorRole: actorMembership.role, targetRole: targetMembership.role })) {
     logger.warn({ groupId: room._id, actorId, targetId: userId, reason: 'role_hierarchy' }, 'group_unauthorized_access_attempt');
+    SecurityEventService.record({
+      type: 'PERMISSION_DENIED',
+      severity: 'medium',
+      actor: { userId: actorId },
+      source: securityEventContext(req),
+      target: { resource: 'group', resourceId: room._id.toString(), action: 'ban_member' },
+      result: 'blocked',
+      metadata: { reason: 'role_hierarchy', targetUserId: userId },
+    });
     return res.status(403).json({ error: true });
   }
 

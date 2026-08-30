@@ -5,6 +5,8 @@ const store = require('../store');
 const config = require('../../config');
 const logger = require('../logger');
 const groupPolicy = require('../authorization/groupPolicy');
+const SecurityEventService = require('../services/securityEventService');
+const securityEventContext = require('../utils/securityEventContext');
 
 module.exports = async (req, res, next) => {
   const { roomID, messageID, forEveryone } = req.fields;
@@ -57,6 +59,15 @@ module.exports = async (req, res, next) => {
     const isModerator = room.isGroup && groupMembership
       && groupPolicy.hasCapability(groupMembership.role, groupPolicy.Capabilities.DELETE_MESSAGE);
     if (!isAuthor && !isModerator) {
+      SecurityEventService.record({
+        type: 'PERMISSION_DENIED',
+        severity: 'medium',
+        actor: { userId: userID },
+        source: securityEventContext(req),
+        target: { resource: 'message', resourceId: messageID, action: 'delete_for_everyone' },
+        result: 'blocked',
+        metadata: { reason: 'not_author' },
+      });
       return res.status(403).json({ error: true, reason: 'not_author' });
     }
 

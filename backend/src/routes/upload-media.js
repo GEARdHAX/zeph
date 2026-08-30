@@ -9,6 +9,8 @@ const logger = require('../logger');
 const mediaPolicy = require('../mediaPolicy');
 const { isConsistentWithCategory } = require('../utils/sniffFileCategory');
 const { inspectArchive } = require('../utils/inspectArchive');
+const SecurityEventService = require('../services/securityEventService');
+const securityEventContext = require('../utils/securityEventContext');
 
 // Unified upload endpoint for every media category EXCEPT profile/group
 // avatar images and legacy general files — those keep using upload.js /
@@ -23,8 +25,31 @@ const { inspectArchive } = require('../utils/inspectArchive');
 module.exports = async (req, res) => {
   const file = req.files.file;
   const poster = req.files.poster; // optional client-captured video poster frame
+  const context = securityEventContext(req);
+
+  // Never includes a filesystem path or the file itself (spec section 15) —
+  // only the display-safe originalName, declared mimeType, size, and
+  // extension, same fields the rejection branches below already had at
+  // hand for their own response/log.
+  const recordRejection = (reason, extra = {}) => SecurityEventService.record({
+    type: 'FILE_UPLOAD_REJECTED',
+    severity: reason === 'ARCHIVE_UNSAFE' || reason === 'FILE_CONTENT_MISMATCH' ? 'high' : 'medium',
+    actor: { userId: req.user.id },
+    source: context,
+    target: { resource: 'media_upload', action: 'upload' },
+    result: 'blocked',
+    metadata: {
+      reason,
+      fileName: file?.name || null,
+      mimeType: file?.type || null,
+      size: file?.size || null,
+      extension: extra.extension || null,
+      ...extra,
+    },
+  });
 
   if (!file) {
+    recordRejection('FILE_REQUIRED');
     return res.status(400).json({ status: 400, error: 'FILE_REQUIRED' });
   }
 
@@ -32,17 +57,20 @@ module.exports = async (req, res) => {
   const category = mediaPolicy.categorizeFile(originalExtension);
 
   if (!category) {
+    recordRejection('FILE_TYPE_NOT_ALLOWED', { extension: originalExtension });
     return res.status(415).json({ status: 415, error: 'FILE_TYPE_NOT_ALLOWED' });
   }
 
   const maxSize = mediaPolicy.getMaxSize(category);
   if (file.size > maxSize) {
+    recordRejection('FILE_TOO_LARGE', { extension: originalExtension, maxSize });
     return res.status(413).json({ status: 413, error: 'FILE_TOO_LARGE' });
   }
 
   // Never trust the client's declared MIME type — verify the actual header
   // bytes match what the extension/category claims.
   if (!isConsistentWithCategory(file.path, category)) {
+    recordRejection('FILE_CONTENT_MISMATCH', { extension: originalExtension, category });
     return res.status(415).json({ status: 415, error: 'FILE_CONTENT_MISMATCH' });
   }
 
@@ -50,6 +78,7 @@ module.exports = async (req, res) => {
     const inspection = inspectArchive(file.path, originalExtension);
     if (!inspection.safe) {
       logger.warn({ userId: req.user.id, reason: inspection.reason }, 'Rejected suspicious archive upload');
+      recordRejection('ARCHIVE_UNSAFE', { extension: originalExtension, validationRule: inspection.reason });
       return res.status(415).json({ status: 415, error: 'ARCHIVE_UNSAFE' });
     }
   }
@@ -122,6 +151,18 @@ module.exports = async (req, res) => {
     logger.error({ err, mediaId: media._id }, 'Failed to persist media metadata after upload');
     return res.status(500).json({ status: 500, error: 'DATABASE_ERROR' });
   }
+
+  SecurityEventService.record({
+    type: 'FILE_UPLOAD',
+    severity: 'low',
+    actor: { userId: req.user.id },
+    source: context,
+    target: { resource: 'media_upload', resourceId: media._id.toString(), action: 'upload' },
+    result: 'success',
+    metadata: {
+      category, mimeType: media.mimeType, size: media.size, extension: originalExtension,
+    },
+  });
 
   res.status(200).json({ status: 200, media });
 };

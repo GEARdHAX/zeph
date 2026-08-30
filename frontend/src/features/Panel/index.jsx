@@ -4,6 +4,7 @@ import {
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
+import { Clock } from 'lucide-react';
 import TopBar from './components/TopBar';
 import SearchBar from './components/SearchBar';
 import MeetingBar from './components/MeetingBar';
@@ -37,6 +38,7 @@ function Panel() {
   const rooms = useSelector((state) => state.io.rooms) || [];
   const roomsWithNewMessages = useSelector((state) => state.messages.roomsWithNewMessages) || [];
   const [searchResults] = useGlobal('searchResults');
+  const [searchLoading] = useGlobal('searchLoading');
   const [favorites, setFavorites] = useGlobal('favorites');
   const [meetings, setMeetings] = useGlobal('meetings');
   const [callStatus] = useGlobal('callStatus');
@@ -44,6 +46,16 @@ function Panel() {
   const refreshMeetings = useSelector((state) => state.io.refreshMeetings);
 
   const [activeFilter, setActiveFilter] = useState('All');
+
+  // Loading flags, local — rooms/favorites/meetings themselves live in
+  // Redux/reactn globals seeded as [] (see init.js), so an empty array is
+  // indistinguishable from "not fetched yet" on a slow connection: without
+  // this, "No conversations yet. Start a chat!" flashes for every user on
+  // every load, not just genuinely-empty accounts. Same rooms===null
+  // sentinel convention already used by VaultUnlock.jsx/RemovedConversations.jsx.
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [favoritesLoading, setFavoritesLoading] = useState(true);
+  const [meetingsLoading, setMeetingsLoading] = useState(true);
 
   const dispatch = useDispatch();
   const location = useLocation();
@@ -55,10 +67,12 @@ function Panel() {
   useEffect(() => {
     getRooms()
       .then((res) => dispatch({ type: Actions.SET_ROOMS, rooms: res.data.rooms }))
-      .catch((err) => console.log(err));
+      .catch((err) => console.log(err))
+      .finally(() => setRoomsLoading(false));
     getFavorites()
       .then((res) => setFavorites(res.data.favorites))
-      .catch((err) => console.log(err));
+      .catch((err) => console.log(err))
+      .finally(() => setFavoritesLoading(false));
   }, [setFavorites]);
 
   // Meetings: one effect covers both the initial mount fetch and every
@@ -68,7 +82,8 @@ function Panel() {
   useEffect(() => {
     getMeetings()
       .then((res) => setMeetings(res.data.meetings))
-      .catch((err) => console.log(err));
+      .catch((err) => console.log(err))
+      .finally(() => setMeetingsLoading(false));
   }, [refreshMeetings, setMeetings]);
 
   const filteredRooms = useMemo(() => {
@@ -97,6 +112,10 @@ function Panel() {
 
   function Notice({ text }) {
     return <div className="p-8 text-center text-xs text-muted-foreground">{text}</div>;
+  }
+
+  function Loading() {
+    return <div className="flex flex-1 items-center justify-center p-8 text-xs text-muted-foreground">Loading…</div>;
   }
 
   return (
@@ -129,13 +148,24 @@ function Panel() {
       {callStatus === 'in-call' && (!location.pathname.startsWith('/meeting') || over === false) && <MeetingBar />}
 
       <div data-tour="conversation-list" className="flex-1 overflow-y-auto pt-1">
-        {nav === 'rooms' && roomsList}
-        {nav === 'rooms' && filteredRooms.length === 0 && (
+        {nav === 'rooms' && roomsLoading && <Loading />}
+        {nav === 'rooms' && !roomsLoading && roomsList}
+        {nav === 'rooms' && !roomsLoading && filteredRooms.length === 0 && (
           <Notice text={activeFilter === 'All' ? 'No conversations yet. Start a chat!' : `No ${activeFilter.toLowerCase()} conversations.`} />
         )}
         {/* People to start a NEW conversation with — only while actively
-            searching, shown below your (locally-filtered) existing chats. */}
-        {nav === 'rooms' && searchText && searchResults && searchResults.length > 0 && (
+            searching, shown below your (locally-filtered) existing chats.
+            Same "Searching…" treatment AddPeople.jsx already uses for the
+            identical useExplicitSearch hook — without it, submitting a
+            people search on a slow connection showed nothing at all between
+            pressing Enter and results (or "no results") appearing. */}
+        {nav === 'rooms' && searchText && searchLoading && (
+          <div className="flex items-center justify-center gap-1.5 py-6 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            Searching…
+          </div>
+        )}
+        {nav === 'rooms' && searchText && !searchLoading && searchResults && searchResults.length > 0 && (
           <>
             <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               People
@@ -143,12 +173,14 @@ function Panel() {
             {searchResultsList}
           </>
         )}
-        {nav === 'favorites' && favoritesList}
-        {nav === 'favorites' && (!favorites || favorites.length === 0) && (
+        {nav === 'favorites' && favoritesLoading && <Loading />}
+        {nav === 'favorites' && !favoritesLoading && favoritesList}
+        {nav === 'favorites' && !favoritesLoading && (!favorites || favorites.length === 0) && (
           <Notice text="No favorites yet. Star a conversation to reach them faster!" />
         )}
-        {nav === 'meetings' && meetingsList}
-        {nav === 'meetings' && (!meetings || meetings.length === 0) && (
+        {nav === 'meetings' && meetingsLoading && <Loading />}
+        {nav === 'meetings' && !meetingsLoading && meetingsList}
+        {nav === 'meetings' && !meetingsLoading && (!meetings || meetings.length === 0) && (
           <Notice text="No meetings yet. Create or schedule a meeting!" />
         )}
         {nav === 'settings' && <Settings />}

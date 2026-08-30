@@ -1,3 +1,6 @@
+const SecurityEventService = require('../services/securityEventService');
+const securityEventContext = require('../utils/securityEventContext');
+
 // ponytail: in-memory fixed-window counter, single-instance only — fine for
 // zeph's current single-process deployment. If the app ever runs multiple
 // instances, replace the Map with Redis INCR+EXPIRE (same key shape) since
@@ -25,6 +28,15 @@ const inviteRateLimit = ({ max, windowMs, keyPrefix }) => (req, res, next) => {
   }
   bucket.count += 1;
   if (bucket.count > max) {
+    SecurityEventService.record({
+      type: 'RATE_LIMIT_TRIGGERED',
+      severity: 'medium',
+      actor: req.user ? { userId: req.user.id } : {},
+      source: securityEventContext(req),
+      target: { resource: req.originalUrl, action: keyPrefix },
+      result: 'blocked',
+      metadata: { limiter: keyPrefix },
+    });
     return res.status(429).json({ error: true, reason: 'RATE_LIMITED' });
   }
   return next();

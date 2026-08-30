@@ -19,6 +19,46 @@ module.exports = {
   aiProvider: process.env.AI_PROVIDER || 'none',
   ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'llama3.2:1b',
+  // Threat Intelligence (Phase 3) — AbuseIPDB IP reputation, disabled
+  // (safely no-op — see services/threatIntel/provider.js) unless BOTH the
+  // flag and a real key are set, same "enabled + key both required" gate
+  // security/init.js's own provider-selection convention doesn't have but
+  // arguably should — kept deliberately conservative here since an
+  // enabled-but-keyless config would otherwise silently 401 on every call.
+  abuseIpDbEnabled: process.env.ABUSEIPDB_ENABLED === 'true',
+  abuseIpDbApiKey: process.env.ABUSEIPDB_API_KEY || null,
+  abuseIpDbBaseUrl: process.env.ABUSEIPDB_BASE_URL || 'https://api.abuseipdb.com',
+  abuseIpDbTimeoutMs: Number(process.env.ABUSEIPDB_TIMEOUT_MS) || 5000,
+  // ZEPH's own OPERATIONAL budget, not AbuseIPDB's account-wide daily quota
+  // (currently 1000/day on the Standard free tier) — deliberately defaults
+  // BELOW that so normal account/dashboard usage of the same key never
+  // collides with it. See threatIntel/quota.js.
+  abuseIpDbDailyBudget: Number(process.env.ABUSEIPDB_DAILY_BUDGET) || 800,
+  threatIntelCacheTtlSeconds: Number(process.env.THREAT_INTEL_CACHE_TTL_SECONDS) || 6 * 60 * 60, // 6 hours
+  // Phase 5 — Network Intelligence (spec section 49). The backend never
+  // needs to know a sensor is "network" vs "ebpf" flavored to accept its
+  // events (same ingestion endpoint/credential — see routes/index.js) — all
+  // of these govern the backend-SIDE detection engine
+  // (services/networkIntel/), which is what spec section 36 requires: the
+  // backend computes anomaly verdicts, never trusts a sensor's own.
+  networkSensorEnabled: process.env.NETWORK_SENSOR_ENABLED !== 'false', // detection itself is cheap Redis counter work; "enabled" gates whether NETWORK_* events are even accepted/processed, not a paid resource like AbuseIPDB
+  networkFlowWindowMs: Number(process.env.NETWORK_FLOW_WINDOW_MS) || 60 * 1000, // spec section 27 — the sliding window port-scan/host-scan/beacon detection aggregates over
+  networkMaxEventsPerBatch: Number(process.env.NETWORK_MAX_EVENTS_PER_BATCH) || 500, // matches Phase 4's MAX_EVENTS_PER_BATCH default — same ingestion endpoint, same bound
+  networkMaxBufferSize: Number(process.env.NETWORK_MAX_BUFFER_SIZE) || 5000, // sensor-side config, documented here for the same reason Phase 4's ZEPH_MAX_BUFFER_SIZE is — the backend doesn't enforce this, the sensor process reads it directly
+  networkEventRateLimit: Number(process.env.NETWORK_EVENT_RATE_LIMIT) || 200, // sensor-side self-throttle, same role as Phase 4's ZEPH_EVENT_RATE_LIMIT
+  networkDnsAnalysisEnabled: process.env.NETWORK_DNS_ANALYSIS_ENABLED !== 'false',
+  networkTlsMetadataEnabled: process.env.NETWORK_TLS_METADATA_ENABLED === 'true', // OFF by default AND not implemented this phase — see network-sensor/README.md's scope note; the flag exists now so a future phase adding it doesn't need a new config key
+  networkBaselineEnabled: process.env.NETWORK_BASELINE_ENABLED !== 'false',
+  // Comma-separated destinationIp or destinationIp:port entries (spec
+  // section 41) — MongoDB/Redis/Cloudflare/Brevo/R2/etc, whatever this
+  // deployment's own infra actually is. Deliberately NOT hardcoded (spec:
+  // "do not hardcode assumptions if the environment varies") — empty by
+  // default, meaning every destination looks "new" until an operator
+  // configures this.
+  networkBaselineTrusted: process.env.NETWORK_BASELINE_TRUSTED || '',
+  networkScanThreshold: Number(process.env.NETWORK_SCAN_THRESHOLD) || 15, // distinct ports/hosts within networkFlowWindowMs before PORT_SCAN_ANOMALY/HOST_SCAN_ANOMALY fires
+  networkBeaconThreshold: Number(process.env.NETWORK_BEACON_THRESHOLD) || 5, // consecutive same-interval connections to the same destination before POSSIBLE_BEACONING fires
+  networkExfilThresholdBytes: Number(process.env.NETWORK_EXFIL_THRESHOLD) || 50 * 1024 * 1024, // 50MB — a single outbound flow above this to a non-baseline destination is POSSIBLE_DATA_EXFILTRATION-eligible
   // "Delete for everyone" window — how long after sending a message its
   // author can still delete it for every participant, not just themselves.
   // 1 hour by default: generous enough for normal "wrong chat/typo" use,

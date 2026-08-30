@@ -39,6 +39,15 @@ passport.use(
         if (payload.deviceId) {
           const session = await Session.findById(payload.deviceId);
           if (!session || session.revokedAt) return done(null, false);
+          // Mirrors init.js's real JWT strategy exactly (Phase 2 addition —
+          // see its own comment) — without this, req.user.deviceId is
+          // always undefined in every test using buildApp(), which means
+          // Zero Trust's session-resolution path (services/zeroTrust/
+          // sessionContext.js's resolveSession) can never actually find a
+          // Session even when tokenForDevice() below creates one and embeds
+          // its id in the JWT. Tests that need REAL known-device/session-age
+          // behavior (not just the no-session fallback) depend on this.
+          user.deviceId = payload.deviceId;
         }
 
         return done(null, user);

@@ -1,0 +1,39 @@
+#!/usr/bin/env bpftrace
+// ZEPH eBPF sensor — DNS query metadata observation (Phase 5 spec section
+// 10). Hook: uprobe on libc's getaddrinfo() — reads the hostname argument
+// (arg0, a plain C string) the calling process ALREADY resolved into its
+// own memory before calling the function; this is metadata already present
+// in-process, not packet/payload inspection (spec section 3's own
+// boundary — the DNS wire protocol itself is never touched, no port-53
+// packet is parsed). This is the well-documented "watch what a process
+// asks the resolver for" technique — the DNS-equivalent of Phase 4's own
+// sched_process_exec tracepoint watching what a process execs.
+//
+// Deliberately does NOT hook the matching uretprobe to read the resolved
+// IP/NXDOMAIN status — the return value of getaddrinfo() is an integer
+// error code (0 = success, EAI_NONAME = NXDOMAIN, etc.), which IS also
+// pure metadata and a natural future addition, but is left out of this
+// pass to keep the hook surface minimal and because nxdomain detection
+// this way needs care around getaddrinfo's own retry/fallback behavior
+// across libc versions — see the final report's honest scope note. The
+// dns field's nxdomain flag ebpf-sensor/src/dns.js sets is therefore
+// always absent from THIS script's own output; it exists in the schema for
+// a future pass to populate.
+//
+// Path is HARDCODED to the standard glibc location on Debian/Ubuntu (ZEPH's
+// actual target distros — see infra/serv00.md, infra/render.md). bpftrace
+// resolves a uprobe's target path at PARSE time, not runtime, so it cannot
+// be templated from a CLI argument or env var the way scripts/network.bt's
+// numeric fields are decoded in Node instead — this is a real bpftrace
+// constraint, not a shortcut. A host with libc somewhere else (musl/
+// Alpine, a non-standard install) needs this ONE line edited directly;
+// config.js's NETWORK_SENSOR_LIBC_PATH exists to document the intent and
+// is read by a future templating pass if this becomes a real deployment
+// need, but is NOT currently wired into this file — see
+// ebpf-sensor/README.md's own note on this exact limitation.
+
+uprobe:/lib/x86_64-linux-gnu/libc.so.6:getaddrinfo
+{
+    printf("{\"kind\":\"dns\",\"pid\":%d,\"comm\":\"%s\",\"domain\":\"%s\",\"ts\":%llu}\n",
+        pid, comm, str(arg0), nsecs);
+}

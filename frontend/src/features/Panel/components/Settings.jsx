@@ -22,6 +22,8 @@ import DeleteAccountPopup from './DeleteAccountPopup';
 import { validateFile } from '../../../lib/mediaPolicy';
 import useTour from '../../../tours/useTour';
 import { clearAllTourStateForUser } from '../../../tours/tourStorage';
+import LazyFallback from '../../../components/LazyFallback';
+import { ZephLoadingOverlay } from '../../../components/ui/zeph-loading-overlay';
 
 // Lazy-loaded so react-easy-crop is only fetched the first time a user
 // actually picks a new profile picture, same as the chat composer's editor.
@@ -42,6 +44,10 @@ function Settings() {
 
   const fileInput = useRef(null);
   const [editingFile, setEditingFile] = useState(null);
+  // change()/remove() were both fire-and-forget with zero feedback — the
+  // avatar circle stayed clickable throughout (inviting a duplicate upload
+  // mid-flight) and a failure on a flaky connection threw silently.
+  const [pictureBusy, setPictureBusy] = useState(false);
 
   // "Take a tour" / restart entry point (spec §7, §19, §22) — the one place
   // in the app a user can explicitly re-trigger onboarding. start() always
@@ -53,11 +59,18 @@ function Settings() {
   const { start: startOnboardingTour } = useTour('onboarding');
 
   const change = async (image) => {
-    const picture = await upload(image, null, () => {}, 'square');
-    await changePicture(picture.data.image._id);
-    const newUser = { ...user, picture: picture.data.image };
-    localStorage.setItem('user', JSON.stringify(newUser));
-    await setUser(newUser);
+    setPictureBusy(true);
+    try {
+      const picture = await upload(image, null, () => {}, 'square');
+      await changePicture(picture.data.image._id);
+      const newUser = { ...user, picture: picture.data.image };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      await setUser(newUser);
+    } catch (err) {
+      toast.error('Could not update your profile picture. Check your connection and try again.');
+    } finally {
+      setPictureBusy(false);
+    }
   };
 
   const selectPicture = (file) => {
@@ -71,10 +84,17 @@ function Settings() {
   };
 
   const remove = async () => {
-    await changePicture();
-    const newUser = { ...user, picture: undefined };
-    localStorage.setItem('user', JSON.stringify(newUser));
-    await setUser(newUser);
+    setPictureBusy(true);
+    try {
+      await changePicture();
+      const newUser = { ...user, picture: undefined };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      await setUser(newUser);
+    } catch (err) {
+      toast.error('Could not remove your profile picture. Check your connection and try again.');
+    } finally {
+      setPictureBusy(false);
+    }
   };
 
   const logout = async () => {
@@ -119,7 +139,7 @@ function Settings() {
       {/* Profile Picture & Hover edit */}
       <div
         className="group relative mx-auto my-2 h-[120px] w-[120px] cursor-pointer"
-        onClick={() => fileInput?.current?.click()}
+        onClick={() => !pictureBusy && fileInput?.current?.click()}
       >
         {user.picture ? (
           <img
@@ -196,6 +216,7 @@ function Settings() {
         variant="outline"
         className="w-full justify-start gap-2.5 rounded-xl border border-border bg-card/40 text-xs font-semibold hover:bg-muted"
         onClick={remove}
+        disabled={pictureBusy}
       >
         <ImageMinus className="h-4 w-4 text-muted-foreground" />
         Remove Profile Picture
@@ -258,7 +279,7 @@ function Settings() {
       {deleteAccountPopup && <DeleteAccountPopup onClose={() => showDeleteAccountPopup(false)} />}
 
       {editingFile && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<LazyFallback />}>
           <ImageEditorModal
             file={editingFile}
             aspect={1}
@@ -270,6 +291,8 @@ function Settings() {
           />
         </Suspense>
       )}
+
+      <ZephLoadingOverlay isOpen={pictureBusy} label="Updating profile picture" />
     </div>
   );
 }

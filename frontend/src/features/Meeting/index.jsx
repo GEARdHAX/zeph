@@ -20,6 +20,7 @@ import {
 import { useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGlobal } from 'reactn';
+import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import Join from './components/Join';
@@ -58,6 +59,15 @@ function Meeting() {
   const setOver = useGlobal('over')[1];
   const setMeeting = useGlobal('meetingID')[1];
   const [addPeers, setAddPeers] = useState(false);
+  // No loading state previously covered the initial join at all — only a
+  // mid-call socket drop ("Reconnecting…" below) did. onJoin flips `joined`
+  // true synchronously and this component falls straight through to the
+  // full call UI while callManager.join()'s socket handshake/mediasoup
+  // negotiation is still in flight (fire-and-forget, no caught rejection
+  // either) — on a slow/unstable connection that's empty/black video tiles
+  // with no "something is happening" cue, and a failure (denied camera
+  // permission, dropped handshake) threw silently with zero user feedback.
+  const [connecting, setConnecting] = useState(false);
 
   const answerIncrement = useSelector((state) => state.rtc.answerIncrement);
   const answerData = useSelector((state) => state.rtc.answerData);
@@ -67,7 +77,14 @@ function Meeting() {
 
   const navigate = useNavigate();
 
-  const init = () => callManager.join(roomID);
+  const init = () => {
+    setConnecting(true);
+    callManager.join(roomID)
+      .catch(() => {
+        toast.error('Could not connect to the call. Check your connection and try again.');
+      })
+      .finally(() => setConnecting(false));
+  };
 
   useEffect(() => {
     if (!answerData) return;
@@ -290,7 +307,12 @@ function Meeting() {
 
   return (
     <div className="relative flex h-full w-full flex-col">
-      {reconnecting && (
+      {connecting && (
+        <div className="absolute left-1/2 top-4 z-[1001] -translate-x-1/2 rounded-full border border-white/15 bg-black/75 px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-2xl">
+          Connecting…
+        </div>
+      )}
+      {!connecting && reconnecting && (
         <div className="absolute left-1/2 top-4 z-[1001] -translate-x-1/2 rounded-full border border-white/15 bg-black/75 px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-2xl">
           Reconnecting…
         </div>

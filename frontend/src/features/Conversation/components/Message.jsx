@@ -24,6 +24,7 @@ import createRoom from '../../../actions/createRoom';
 import Actions from '../../../constants/Actions';
 import Config from '../../../config';
 import formatFileSize from '../../../lib/formatFileSize';
+import LazyFallback from '../../../components/LazyFallback';
 
 // Lazy-loaded so the profile viewer never ships in the initial chat bundle —
 // only fetched the first time a user actually clicks a message author's
@@ -471,7 +472,7 @@ function Message({
       </Dialog>
 
       {previewUsername && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<LazyFallback />}>
           <ProfileView
             username={previewUsername}
             onClose={() => setPreviewUsername(null)}

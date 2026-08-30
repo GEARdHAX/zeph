@@ -186,6 +186,26 @@ describe('older-history loading preserves scroll position (does not jump to bott
     await waitFor(() => expect(getMoreMessages).toHaveBeenCalledWith({ roomID: 'room-1', firstMessageID: 'm-1' }));
   });
 
+  it('shows a spinner while older messages are being fetched, and clears it once they land', async () => {
+    let resolveFetch;
+    getMoreMessages.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    renderMessages([makeMessage({ _id: 'm-1' })]);
+    const scrollEl = screen.getByText('hello').closest('[class*="overflow-y-auto"]');
+
+    setScrollMetrics(scrollEl, { scrollTop: 150, scrollHeight: 2000 });
+    fireEvent.scroll(scrollEl);
+
+    expect(await screen.findByRole('status', { name: /loading older messages/i })).toBeInTheDocument();
+
+    resolveFetch({ data: { messages: [], hasMore: false } });
+    await waitFor(() => expect(screen.queryByRole('status', { name: /loading older messages/i })).not.toBeInTheDocument());
+  });
+
+  it('does not show the pagination spinner during the room-load loading state (only messages.length===0 uses that)', () => {
+    renderMessages([]);
+    expect(screen.queryByRole('status', { name: /loading older messages/i })).not.toBeInTheDocument();
+  });
+
   it('does not request history when scrollTop is beyond the trigger distance', () => {
     renderMessages([makeMessage({ _id: 'm-1' })]);
     const scrollEl = screen.getByText('hello').closest('[class*="overflow-y-auto"]');

@@ -20,6 +20,11 @@ function ChangePasswordPopup({ onClose }) {
   const [password, setPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
   const [errors, setErrors] = useState(null);
+  // Unlike its sibling popups (EditBioPopup, ChangeUsernamePopup,
+  // DeleteAccountPopup — all already have this), this one had no busy state
+  // at all: the submit button stayed enabled and unlabeled through the
+  // whole request, so a double-submit on a slow connection was possible.
+  const [busy, setBusy] = useState(false);
 
   const onChangePassword = async (e) => {
     e.preventDefault();
@@ -29,6 +34,7 @@ function ChangePasswordPopup({ onClose }) {
       return;
     }
 
+    setBusy(true);
     try {
       await changeUserPassword(password);
       onClose();
@@ -38,6 +44,8 @@ function ChangePasswordPopup({ onClose }) {
       if (!err.response || typeof err.response.data !== 'object') nextErrors.generic = 'Could not connect to server.';
       else nextErrors = err.response.data;
       setErrors(nextErrors);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -66,8 +74,8 @@ function ChangePasswordPopup({ onClose }) {
             onChange={(e) => setRepeatPassword(e.target.value)}
             error={errors && errors.repeatPassword}
           />
-          <Button type="submit">Change Password</Button>
-          <Button type="button" variant="secondary" onClick={() => onClose()}>
+          <Button type="submit" disabled={busy}>{busy ? 'Changing…' : 'Change Password'}</Button>
+          <Button type="button" variant="secondary" onClick={() => onClose()} disabled={busy}>
             Cancel
           </Button>
         </form>

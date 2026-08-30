@@ -1,5 +1,6 @@
 const store = require('./store');
 const logger = require('./logger');
+const pinoHttp = require('pino-http');
 const events = require('./events');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -19,6 +20,8 @@ const Meeting = require('./models/Meeting');
 const Room = require('./models/Room');
 const GroupMember = require('./models/GroupMember');
 const { broadcastPresence } = require('./presence');
+const SecurityEventService = require('./services/securityEventService');
+const securityEventContext = require('./utils/securityEventContext');
 
 // Wires the Socket.IO connection/auth lifecycle onto store.io. Split out from the default
 // export so tests can boot just the socket layer without also connecting to Mongo / mounting
@@ -139,21 +142,64 @@ module.exports = (mediasoupEnabled) => {
   // real health signal) since it was added. See routes/health.js.
   store.app.get('/healthz', require('./routes/health'));
 
+  // Trust exactly one hop — production sits behind exactly one proxy layer
+  // in front of Express (Cloudflare -> Fly.io's edge -> this process; see
+  // fly.toml/docker-compose.prod.yml — infra/nginx.conf is a SEPARATE host,
+  // the mediasoup box, not in front of the API). `1` (not `true`) is
+  // deliberate: `true` trusts every hop in X-Forwarded-For including any a
+  // client could forge by chaining fake entries in front of the real one,
+  // which is exactly the IP-spoofing vector the security-telemetry work
+  // this enables needs to avoid. Configurable since a different deployment
+  // topology (more/fewer proxy layers) would need a different hop count.
+  store.app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
+
+  // Correlation ID — pino-http was already an installed dependency but
+  // never actually wired in (logger.js's own header comment claimed it was
+  // — it wasn't). req.id is now available to every route/middleware after
+  // this point, and req.log is a request-scoped child logger that
+  // automatically includes it, so nothing downstream needs to remember to
+  // pass requestId around by hand.
+  // autoLogging:false — this only adds req.id/req.log for correlation; the
+  // app has no existing HTTP access-log convention, and turning one on as a
+  // side effect of adding correlation IDs would be a silent behavior/volume
+  // change outside this task's scope.
+  store.app.use(pinoHttp({ logger, quietReqLogger: true, autoLogging: false }));
+
   store.app.use(cors({ origin: store.config.corsOrigin }));
+
+  // Shared 429 handler — express-rate-limit's `handler` option fully
+  // replaces its own default response-sending, so this both records a
+  // RATE_LIMIT_TRIGGERED event AND sends the same JSON body every limiter
+  // below previously produced via `message:` (that option becomes inert
+  // once `handler` is set, so the body is reproduced here explicitly rather
+  // than left to silently change). limiterName identifies which budget was
+  // hit — useful once more than one limiter exists, which is already true.
+  const rateLimitHandler = (limiterName, body) => (req, res) => {
+    SecurityEventService.record({
+      type: 'RATE_LIMIT_TRIGGERED',
+      severity: 'medium',
+      actor: req.user ? { userId: req.user.id } : {},
+      source: securityEventContext(req),
+      target: { resource: req.originalUrl, action: limiterName },
+      result: 'blocked',
+      metadata: { limiter: limiterName },
+    });
+    res.status(429).json(body);
+  };
 
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 20,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { status: 'error', message: 'Too many requests, please try again later.' },
+    handler: rateLimitHandler('auth', { status: 'error', message: 'Too many requests, please try again later.' }),
   });
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 300,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { status: 'error', message: 'Too many requests, please try again later.' },
+    handler: rateLimitHandler('api', { status: 'error', message: 'Too many requests, please try again later.' }),
   });
   // AI calls are slow and resource-intensive (even against a local model) — a much
   // tighter budget than general API traffic.
@@ -162,7 +208,7 @@ module.exports = (mediasoupEnabled) => {
     limit: 15,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { status: 'error', message: 'AI request limit reached, please try again later.' },
+    handler: rateLimitHandler('ai', { status: 'error', message: 'AI request limit reached, please try again later.' }),
   });
   // Username search/profile-resolution/friend-requests/new-conversation-with-a-
   // stranger are the enumeration + unsolicited-contact abuse surface (username
@@ -174,7 +220,7 @@ module.exports = (mediasoupEnabled) => {
     limit: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { status: 'error', message: 'Too many requests, please try again later.' },
+    handler: rateLimitHandler('discovery', { status: 'error', message: 'Too many requests, please try again later.' }),
   });
   // Deletion is a mutation on data that already exists (not spam-creation),
   // so this is deliberately looser than discoveryLimiter — but still bounded
@@ -185,7 +231,7 @@ module.exports = (mediasoupEnabled) => {
     limit: 60,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { status: 'error', message: 'Too many requests, please try again later.' },
+    handler: rateLimitHandler('delete', { status: 'error', message: 'Too many requests, please try again later.' }),
   });
   // PIN brute-force is the real risk on vault unlock — a 4-12 digit PIN has
   // far less entropy than a password, so this is materially tighter than
@@ -197,7 +243,7 @@ module.exports = (mediasoupEnabled) => {
     limit: 8,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { status: 'error', message: 'Too many vault unlock attempts, please try again later.' },
+    handler: rateLimitHandler('vault_unlock', { status: 'error', message: 'Too many vault unlock attempts, please try again later.' }),
   });
   store.app.use(
     ['/api/login', '/api/register', '/api/auth/change', '/api/auth/code', '/api/auth/verify', '/api/check-user'],
@@ -243,6 +289,16 @@ module.exports = (mediasoupEnabled) => {
             if (!session || session.revokedAt) return done(null, false);
             Session.updateOne({ _id: session._id }, { $set: { lastSeenAt: new Date() } }).catch((err) =>
               logger.warn({ err, sessionId: session._id }, 'Failed to update session lastSeenAt'));
+            // Stashed directly on the User document passport hands back —
+            // NOT a schema field, never persisted, just carries the
+            // already-verified deviceId through to req.user for the rest of
+            // the request. Phase 1's securityEventContext.js had this
+            // hardcoded null specifically because nothing set it here; Zero
+            // Trust's session/risk context (zeroTrust/sessionContext.js) is
+            // the first real consumer. A legacy pre-device-session token
+            // (payload.deviceId absent, branch above skipped) simply leaves
+            // this unset — same "same trust level as today" treatment.
+            user.deviceId = payload.deviceId;
           }
 
           return done(null, user);

@@ -1,0 +1,51 @@
+#!/usr/bin/env bpftrace
+// ZEPH eBPF sensor — outbound TCP connection + flow-summary observation
+// (Phase 4's single-moment NETWORK_CONNECTION event, Phase 5's aggregated
+// NETWORK_FLOW summary — spec section 7/30: "favor useful summaries over
+// enormous event volume," ONE line per closed connection, not per packet).
+//
+// Hooks:
+//   kprobe:tcp_connect — fires once per outbound TCP connection attempt
+//     (the standard, widely-documented bpftrace one-liner for this; see
+//     bpftrace's own tcpconnect.bt reference tool).
+//   kprobe:tcp_close   — fires once per connection teardown; at this point
+//     the socket's OWN byte counters (bytes_acked = bytes actually sent and
+//     acknowledged, bytes_received) are read directly from struct
+//     tcp_sock — no packet capture, no payload access, just counters the
+//     kernel already maintains for TCP's own bookkeeping (same technique
+//     bpftrace's own tcplife.bt reference tool uses for exactly this
+//     "one line per flow" summary shape).
+//
+// IPv4 only in this pass (skc_daddr) — IPv6 deferred, same "smallest real
+// scope first" judgment as dropping file monitoring from Phase 4 entirely
+// (see the final report's scope notes). bpftrace has no built-in
+// inet_ntop; ZEPH ships raw big-endian u32 addresses/ports and lets
+// events.js (Node) do the decode — keeping this .bt file free of manual
+// bit-twiddling that would only obscure the hooks themselves.
+
+kprobe:tcp_connect
+{
+    $sk = (struct sock *)arg0;
+    if ($sk->__sk_common.skc_family == AF_INET) {
+        printf("{\"kind\":\"connect\",\"pid\":%d,\"comm\":\"%s\",\"daddr\":%u,\"dport\":%d,\"ts\":%llu}\n",
+            pid, comm, $sk->__sk_common.skc_daddr, $sk->__sk_common.skc_dport, nsecs);
+        // Connect time, keyed by the socket pointer itself — tcp_close
+        // below reads this back to compute flow duration. Bounded by
+        // construction: one entry exists per currently-open socket this
+        // process has, cleaned up in tcp_close, never grows unbounded.
+        @connect_ts[$sk] = nsecs;
+    }
+}
+
+kprobe:tcp_close
+{
+    $sk = (struct sock *)arg0;
+    if ($sk->__sk_common.skc_family == AF_INET && @connect_ts[$sk] != 0) {
+        $tp = (struct tcp_sock *)$sk;
+        $duration_ns = nsecs - @connect_ts[$sk];
+        printf("{\"kind\":\"flow\",\"pid\":%d,\"comm\":\"%s\",\"daddr\":%u,\"dport\":%d,\"bytes_sent\":%llu,\"bytes_received\":%llu,\"duration_ms\":%llu,\"ts\":%llu}\n",
+            pid, comm, $sk->__sk_common.skc_daddr, $sk->__sk_common.skc_dport,
+            $tp->bytes_acked, $tp->bytes_received, $duration_ns / 1000000, nsecs);
+        delete(@connect_ts[$sk]);
+    }
+}

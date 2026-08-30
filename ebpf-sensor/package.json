@@ -1,0 +1,20 @@
+{
+  "name": "zeph-ebpf-sensor",
+  "version": "0.1.0",
+  "description": "Independently-deployable Linux eBPF runtime security sensor for ZEPH — spawns bpftrace, normalizes observations, ships them to the ZEPH backend's sensor ingestion API. NOT part of the backend/ Express app; runs as a separate process on a separate host.",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "dotenv": "16.4.4"
+  },
+  "devDependencies": {
+    "jest": "^30.4.2"
+  },
+  "engines": {
+    "node": "18.x.x"
+  }
+}

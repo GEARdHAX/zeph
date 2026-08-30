@@ -23,6 +23,7 @@ vi.mock('../../../actions/typing', () => ({ default: () => () => {} }));
 vi.mock('../../../actions/uploadImage', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/uploadMedia', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/deleteConversation', () => ({ default: vi.fn() }));
+vi.mock('react-toastify', () => ({ toast: { warn: vi.fn(), error: vi.fn(), success: vi.fn() } }));
 // @emoji-mart/react needs a peer `emoji-mart` package that Vite's browser bundling
 // resolves but Vitest's Node module resolution doesn't — not exercised by this test.
 vi.mock('@emoji-mart/react', () => ({ default: () => null }));
@@ -76,6 +77,8 @@ import uploadImage from '../../../actions/uploadImage';
 import uploadMedia from '../../../actions/uploadMedia';
 // eslint-disable-next-line import/first
 import deleteConversation from '../../../actions/deleteConversation';
+// eslint-disable-next-line import/first
+import { toast } from 'react-toastify';
 
 const ROOM = { _id: 'room-1', people: ['user-1', 'user-2'] };
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
@@ -109,6 +112,7 @@ beforeEach(async () => {
   message.mockResolvedValue({ data: { message: { _id: 'server-id' } } });
   uploadImage.mockReset();
   uploadMedia.mockReset();
+  toast.error.mockClear();
 });
 
 afterEach(() => {
@@ -306,6 +310,60 @@ describe('BottomBar image editor queue', () => {
 
     expect(screen.queryByText(/Editing/)).not.toBeInTheDocument();
     expect(uploadImage).not.toHaveBeenCalled();
+  });
+});
+
+describe('BottomBar upload progress (real-world network buffering)', () => {
+  function getImageInput(container) {
+    return container.querySelector('input[type="file"][accept="image/*"]');
+  }
+
+  it('shows a live percentage while uploadImage reports progress, then clears it once the send completes', async () => {
+    const userEv = userEvent.setup();
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    let capturedOnProgress;
+    let resolveUpload;
+    uploadImage.mockImplementation((_file, _token, onProgress) => {
+      capturedOnProgress = onProgress;
+      return new Promise((resolve) => { resolveUpload = resolve; });
+    });
+    const { container } = render(
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
+    );
+
+    await userEv.upload(getImageInput(container), file);
+    await userEv.click(await screen.findByText('Done editing'));
+
+    await waitFor(() => expect(uploadImage).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('edited-photo.png')).toBeInTheDocument();
+    expect(screen.getByText('0%')).toBeInTheDocument();
+
+    act(() => { capturedOnProgress({ loaded: 42, total: 100 }); });
+    expect(await screen.findByText('42%')).toBeInTheDocument();
+
+    resolveUpload({ data: { image: { _id: 'img-1', shieldedID: 'shielded-1' } } });
+    await waitFor(() => expect(screen.queryByText('edited-photo.png')).not.toBeInTheDocument());
+  });
+
+  it('clears the progress bar even when the upload fails', async () => {
+    const userEv = userEvent.setup();
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    uploadImage.mockRejectedValue(new Error('network error'));
+    const { container } = render(
+      <Provider store={makeStore()}><MemoryRouter><BottomBar /></MemoryRouter></Provider>,
+    );
+
+    await userEv.upload(getImageInput(container), file);
+    await userEv.click(await screen.findByText('Done editing'));
+
+    await waitFor(() => expect(uploadImage).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText('edited-photo.png')).not.toBeInTheDocument());
+    // Regression: sendImages() used to be called fire-and-forget with no
+    // caller-side catch — an upload failure threw uncaught and silently, no
+    // toast, nothing visible to the user at all.
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Could not send image'),
+    ));
   });
 });
 

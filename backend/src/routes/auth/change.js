@@ -6,7 +6,8 @@ const Session = require('../../models/Session');
 const config = require('../../../config');
 const moment = require('moment');
 const argon2 = require('argon2');
-const logger = require('../../logger');
+const SecurityEventService = require('../../services/securityEventService');
+const securityEventContext = require('../../utils/securityEventContext');
 
 // Same generic error for every rejection reason (missing/unknown/expired/
 // already-used code) — don't let an attacker distinguish them.
@@ -17,6 +18,22 @@ router.post('*', async (req, res) => {
 
   let user;
   let authCode;
+  const context = securityEventContext(req);
+
+  // Same PASSWORD_RESET_FAILED type/severity for every rejection branch
+  // below (unknown email, invalid code, expired code, lost-the-race on
+  // consume) — same enumeration-safety reasoning as login.js's
+  // LOGIN_FAILED: the reason is metadata-only telemetry, never surfaced in
+  // the (already-generic) HTTP response.
+  const recordFailure = (reason) => SecurityEventService.record({
+    type: 'PASSWORD_RESET_FAILED',
+    severity: 'medium',
+    actor: user ? { userId: user._id.toString() } : {},
+    source: context,
+    target: { resource: '/api/auth/change', action: 'reset_password' },
+    result: 'failure',
+    metadata: { reason },
+  });
 
   if (!email) {
     return res.status(404).json({ status: 'error', code: 'email required' });
@@ -31,24 +48,29 @@ router.post('*', async (req, res) => {
   try {
     user = await User.findOne({ email });
   } catch (e) {
+    recordFailure('lookup_error');
     return res.status(404).json(INVALID_CODE_RESPONSE);
   }
 
   if (!user || user.accountStatus !== 'ACTIVE') {
+    recordFailure('account_not_found_or_inactive');
     return res.status(404).json(INVALID_CODE_RESPONSE);
   }
 
   try {
     authCode = await AuthCode.findOne({ code, user, valid: true });
   } catch (e) {
+    recordFailure('lookup_error');
     return res.status(404).json(INVALID_CODE_RESPONSE);
   }
 
   if (!authCode) {
+    recordFailure('invalid_code');
     return res.status(404).json(INVALID_CODE_RESPONSE);
   }
 
   if (moment(authCode.expires).isBefore(moment())) {
+    recordFailure('expired_code');
     return res.status(404).json(INVALID_CODE_RESPONSE);
   }
 
@@ -64,6 +86,7 @@ router.post('*', async (req, res) => {
     { $set: { valid: false } },
   );
   if (!consumed) {
+    recordFailure('code_already_consumed');
     return res.status(404).json(INVALID_CODE_RESPONSE);
   }
 
@@ -74,7 +97,14 @@ router.post('*', async (req, res) => {
   // already enforced by the JWT strategy's revokedAt check in init.js.
   await Session.updateMany({ user: user._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
 
-  logger.info({ userId: user._id.toString() }, 'PASSWORD_RESET_SUCCESS');
+  SecurityEventService.record({
+    type: 'PASSWORD_RESET_SUCCESS',
+    severity: 'medium',
+    actor: { userId: user._id.toString() },
+    source: context,
+    target: { resource: '/api/auth/change', action: 'reset_password' },
+    result: 'success',
+  });
 
   const entry = Email({
     from: config.nodemailer.from,

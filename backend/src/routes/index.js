@@ -2,11 +2,54 @@ const router = require('express').Router();
 const passport = require('passport');
 const Config = require('../../config');
 const inviteRateLimit = require('../lib/inviteRateLimit');
+const zeroTrust = require('../lib/zeroTrust');
+const { sensorAuth } = require('../lib/sensorAuth');
+const sensorRateLimit = require('../lib/sensorRateLimit');
 
 const jwtAuth = passport.authenticate('jwt', { session: false }, null);
 const inviteCreateLimit = inviteRateLimit({ max: 20, windowMs: 60 * 60 * 1000, keyPrefix: 'invite:create' });
 const invitePreviewLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'invite:preview' });
 const inviteAcceptLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'invite:accept' });
+// Phase 4 — one sensor can send at most 60 batches/min (a bpftrace-backed
+// sensor batches on a several-second interval per spec section 17, so this
+// is generous headroom, not a tight budget); globally, 20 sensors' worth of
+// that same rate — matches spec section 55's "1/10/100 sensors" load shape
+// without pre-provisioning for 100 on day one (raise if real fleet size
+// approaches it).
+const sensorEventsLimit = sensorRateLimit({ perSensorMax: 60, globalMax: 1200, windowMs: 60 * 1000 });
+
+// Zero Trust (Phase 2) — mounted AFTER jwtAuth, same middleware-chain
+// position every rate limiter already occupies. Only on the routes
+// policies.js's POLICY_CATEGORIES table actually names as SENSITIVE/
+// ADMINISTRATIVE (spec section 16: "only implement policies for operations
+// that actually exist").
+//
+// rbacCheck is deliberately OMITTED everywhere below (defaults to
+// authenticated-only) — every one of these routes ALREADY does its own
+// complete RBAC/business-rule validation inline (groupPolicy.hasCapability
+// + canChangeRole/canRemoveMember, self-target checks, role-hierarchy,
+// returning the specific 400/403/404 each failure mode needs — see
+// group/members-role.js, group/members-ban.js). An earlier version of this
+// wiring gave ztChangeRole/ztBanMember their own coarser rbacCheck
+// (hasCapability alone, no hierarchy/self-target nuance) — that ran BEFORE
+// the handler and pre-empted its correct, specific response with a generic
+// 403 zero_trust_denied, breaking groups.test.js's privilege-escalation
+// assertions (expected 400, got 403; expected 404, got 403). The fix:
+// RBAC stays exactly where it already lived and is already correct — Zero
+// Trust here ONLY adds its risk-based STEP_UP/DENY layer on top of
+// "authenticated," never attempts to re-derive a permission decision the
+// handler already owns. See lib/zeroTrust.js's own comment on rbacCheck.
+const ztChangePassword = zeroTrust({ resource: 'account', action: 'change_password' });
+const ztDeleteAccount = zeroTrust({ resource: 'account', action: 'delete_account' });
+const ztManageSessions = zeroTrust({ resource: 'account', action: 'manage_sessions' });
+const ztCreateGroup = zeroTrust({ resource: 'group', action: 'create' });
+const ztChangeRole = zeroTrust({ resource: 'group', action: 'change_role' });
+const ztBanMember = zeroTrust({ resource: 'group', action: 'ban_member' });
+const ztViewSecurityEvents = zeroTrust({ resource: 'security_events', action: 'view' });
+// Threat-intel admin routes reuse the SAME policy key as the security-
+// events viewer — both are the same "view internal security telemetry"
+// admin surface, not a separate category worth its own policies.js entry.
+const ztViewThreatIntel = zeroTrust({ resource: 'security_events', action: 'view' });
 
 // Same handler as the unauthenticated /healthz mount in init.js (for
 // docker-compose.yml's healthcheck) — this /api-prefixed alias is for
@@ -47,7 +90,7 @@ router.post('/message/read', passport.authenticate('jwt', { session: false }, nu
 router.post('/message/delete', passport.authenticate('jwt', { session: false }, null), require('./message-delete'));
 router.post('/messages/more', passport.authenticate('jwt', { session: false }, null), require('./more-messages'));
 router.post('/messages/sync', passport.authenticate('jwt', { session: false }, null), require('./sync-messages'));
-router.post('/group/create', passport.authenticate('jwt', { session: false }, null), require('./create-group'));
+router.post('/group/create', passport.authenticate('jwt', { session: false }, null), ztCreateGroup, require('./create-group'));
 router.post('/group/get', passport.authenticate('jwt', { session: false }, null), require('./group/get'));
 router.post('/group/update', passport.authenticate('jwt', { session: false }, null), require('./group/update'));
 router.post('/group/members', passport.authenticate('jwt', { session: false }, null), require('./group/members-list'));
@@ -69,11 +112,12 @@ router.post(
 router.post(
   '/group/members/role',
   passport.authenticate('jwt', { session: false }, null),
+  ztChangeRole,
   require('./group/members-role'),
 );
 router.post('/group/leave', passport.authenticate('jwt', { session: false }, null), require('./group/leave'));
 router.post('/group/delete', passport.authenticate('jwt', { session: false }, null), require('./group/delete'));
-router.post('/group/members/ban', passport.authenticate('jwt', { session: false }, null), require('./group/members-ban'));
+router.post('/group/members/ban', passport.authenticate('jwt', { session: false }, null), ztBanMember, require('./group/members-ban'));
 router.post(
   '/group/ownership/transfer',
   passport.authenticate('jwt', { session: false }, null),
@@ -135,6 +179,7 @@ router.post('/auth/verify', require('./auth/verify'));
 router.post(
   '/users/change-password',
   passport.authenticate('jwt', { session: false }, null),
+  ztChangePassword,
   require('./users/change-password'),
 );
 router.post(
@@ -150,6 +195,7 @@ router.post(
 router.post(
   '/users/delete-account',
   passport.authenticate('jwt', { session: false }, null),
+  ztDeleteAccount,
   require('./users/delete-account'),
 );
 
@@ -159,7 +205,7 @@ router.post('/ai/draft-reply', passport.authenticate('jwt', { session: false }, 
 
 router.post('/logout', passport.authenticate('jwt', { session: false }, null), require('./logout'));
 router.get('/sessions', passport.authenticate('jwt', { session: false }, null), require('./sessions/list'));
-router.post('/sessions/revoke', passport.authenticate('jwt', { session: false }, null), require('./sessions/revoke'));
+router.post('/sessions/revoke', passport.authenticate('jwt', { session: false }, null), ztManageSessions, require('./sessions/revoke'));
 
 router.get('/users/:username', passport.authenticate('jwt', { session: false }, null), require('./users/resolve'));
 
@@ -199,5 +245,51 @@ router.post('/group/invites/create', jwtAuth, inviteCreateLimit, require('./grou
 router.get('/group/invites/:token', invitePreviewLimit, require('./group/invites/preview'));
 router.post('/group/invites/:token/join', jwtAuth, inviteAcceptLimit, require('./group/invites/join'));
 router.post('/group/invites/:token/revoke', jwtAuth, require('./group/invites/revoke'));
+
+// Admin-only security telemetry query API (spec section 17) — RBAC enforced
+// inside each handler via isPrivileged(req.user), same pattern the
+// admin-privacy-boundary code already uses elsewhere (see
+// authorization/policy.js), rather than a route-level middleware, so a
+// denial can return the same indistinguishable-from-"doesn't exist" 404
+// that convention already establishes. ztViewSecurityEvents is mounted
+// WITHOUT an rbacCheck deliberately — Zero Trust's own DENY returns 403,
+// which would leak "this route exists" to a non-admin BEFORE the handler's
+// isPrivileged 404 ever runs. RBAC stays exactly where it already is (the
+// handler); Zero Trust only adds its risk-based STEP_UP/DENY layer on top,
+// for callers RBAC has already let through — spec section 14's ordering
+// (RBAC, then risk) applied literally, not just in spirit.
+router.get('/security/events', jwtAuth, ztViewSecurityEvents, require('./security/events-list'));
+router.get('/security/events/:eventId', jwtAuth, ztViewSecurityEvents, require('./security/events-get'));
+router.post('/security/step-up', jwtAuth, require('./security/step-up'));
+
+// Phase 3 — Threat Intelligence admin API (spec sections 28-29/36).
+router.get('/security/threat-intelligence', jwtAuth, ztViewThreatIntel, require('./security/threat-intelligence-list'));
+router.get('/security/threat-intelligence/status', jwtAuth, ztViewThreatIntel, require('./security/threat-intelligence-status'));
+router.get('/security/threat-intelligence/:indicator', jwtAuth, ztViewThreatIntel, require('./security/threat-intelligence-get'));
+
+// Phase 4 — eBPF sensor ingestion (spec section 29). Deliberately NOT
+// jwtAuth/passport — sensorAuth is a completely separate, least-privilege
+// credential universe (req.sensor, never req.user) that can never touch
+// admin/user/DB access. sensorRateLimit runs AFTER sensorAuth since it
+// keys on req.sensor.sensorId.
+router.post('/security/sensor/events', sensorAuth, sensorEventsLimit, require('./security/sensor-events'));
+
+// Admin-only sensor registration (spec sections 11-13) — mints sensorId +
+// one-time-reveal credential. Reuses the same "view internal security
+// telemetry" admin policy as the other security admin routes above.
+router.post('/security/sensor/register', jwtAuth, ztViewThreatIntel, require('./security/sensor-register'));
+
+// Admin sensor status view (spec sections 38-39/46) — sensor/host/status/
+// version/last-heartbeat/events, deliberately minimal.
+router.get('/security/sensor/status', jwtAuth, ztViewThreatIntel, require('./security/sensor-status'));
+
+// Phase 5 — Network Intelligence admin summary (spec section 47-48).
+// Deliberately the ONLY new network-specific admin API this phase adds —
+// raw event listing/filtering (spec's own "GET /api/security/network/events"
+// suggestion) is already fully covered by the existing GET /api/security/
+// events?type=... from Phase 1 (every Phase 5 event type is a real
+// SecurityEventTypes entry that route already validates/returns); building
+// a second, narrower listing endpoint here would be pure duplication.
+router.get('/security/network/summary', jwtAuth, ztViewThreatIntel, require('./security/network-summary'));
 
 module.exports = router;

@@ -16,6 +16,11 @@ import Meeting from '../../features/Meeting';
 import Welcome from '../../features/Welcome';
 import NotFound from '../../features/NotFound';
 import Admin from '../../features/Admin';
+import RequireAdmin from '../../features/Admin/RequireAdmin';
+import SecurityEvents from '../../features/Admin/SecurityEvents';
+import ThreatIntelligence from '../../features/Admin/ThreatIntelligence';
+import Sensors from '../../features/Admin/Sensors';
+import NetworkIntelligence from '../../features/Admin/NetworkIntelligence';
 import NavRail from '../../features/Shell/components/NavRail';
 import BottomNav from '../../features/Shell/components/BottomNav';
 import NotificationsPlaceholder from '../../features/Shell/components/NotificationsPlaceholder';
@@ -102,7 +107,11 @@ function Home() {
             <Route path="/settings" element={<div className="h-full w-full"><div className="block md:hidden h-full"><Settings /></div><div className="hidden md:block h-full"><Welcome /></div></div>} />
             <Route path="/notifications" element={<NotificationsPlaceholder />} />
             <Route path="/profile" element={<div className="h-full w-full"><div className="block md:hidden h-full"><Settings /></div><div className="hidden md:block h-full"><Welcome /></div></div>} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
+            <Route path="/admin/security-events" element={<RequireAdmin><SecurityEvents /></RequireAdmin>} />
+            <Route path="/admin/threat-intelligence" element={<RequireAdmin><ThreatIntelligence /></RequireAdmin>} />
+            <Route path="/admin/sensors" element={<RequireAdmin><Sensors /></RequireAdmin>} />
+            <Route path="/admin/network-intelligence" element={<RequireAdmin><NetworkIntelligence /></RequireAdmin>} />
             <Route path="/meeting/:id" element={<Meeting />} />
             <Route path="/room/:id" element={<Conversation />} />
             <Route path="/room/:id/info" element={<Details />} />

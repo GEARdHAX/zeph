@@ -3,12 +3,14 @@
 /backend/node_modules
 /frontend/node_modules
 /scripts/node_modules
+/ebpf-sensor/node_modules
 /frontend/dist
 
 # Environment variables
 .env
 backend/.env
 frontend/.env
+ebpf-sensor/.env
 
 # Logs
 npm-debug.log*
