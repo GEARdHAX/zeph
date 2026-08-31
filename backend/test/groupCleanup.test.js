@@ -64,6 +64,22 @@ describeIfRedis('enqueueGroupCleanup — real Redis', () => {
 
     await job.remove();
   });
+
+  // Phase 7 audit finding: this queue previously had no
+  // removeOnComplete/removeOnFail — completed/failed job records
+  // accumulated in Redis indefinitely, unlike security-ai-analysis's
+  // queue, which already bounded both.
+  it('bounds removeOnComplete/removeOnFail so job records do not accumulate forever', async () => {
+    const groupId = new mongoose.Types.ObjectId().toString();
+    await enqueueGroupCleanup(groupId);
+
+    const q = getQueue();
+    const job = await q.getJob(groupId);
+    expect(job.opts.removeOnComplete).toEqual({ age: 24 * 60 * 60 });
+    expect(job.opts.removeOnFail).toEqual({ age: 24 * 60 * 60 });
+
+    await job.remove();
+  });
 });
 
 describe('processGroupCleanup — the actual cleanup work', () => {

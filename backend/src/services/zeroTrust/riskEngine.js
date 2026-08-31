@@ -12,6 +12,9 @@ const { getCachedRiskContext } = require('./riskCache');
 // pattern is kept consistent across every Phase 3 integration point rather
 // than mixing top-level and deferred requires arbitrarily).
 const getThreatIntelLookup = () => require('../threatIntel/threatIntelService').lookup; // eslint-disable-line global-require
+// Phase 6 — AI authentication-anomaly signal (spec section 24). Deferred,
+// same reasoning as the threat-intel require above.
+const getAiCache = () => require('../securityAi/cache'); // eslint-disable-line global-require
 
 // How far back "recent" looks for behavioral signals (failed logins,
 // permission denials, rate-limit trips) — long enough to catch a real
@@ -88,6 +91,54 @@ const computeRiskFactors = async ({ userId, session, ip }) => {
     }
     if (countByType.RATE_LIMIT_TRIGGERED >= 1) {
       addFactor('RATE_LIMIT_TRIGGERED', RISK_WEIGHTS.RATE_LIMIT_TRIGGERED, { count: countByType.RATE_LIMIT_TRIGGERED });
+    }
+
+    // Phase 6 — AI authentication-anomaly signal. Cache-read ONLY (spec
+    // section 21: AI must never be triggered live from a code path that
+    // runs on every sensitive request — same resource-exhaustion concern
+    // the threat-intel LOW-priority-only rule further below already
+    // addresses for AbuseIPDB, applied identically to Ollama). This reads
+    // whatever securityAiService.js's own short-TTL Redis cache
+    // (securityAi/cache.js) ALREADY holds for this exact context —
+    // populated by an earlier ANOMALY-type analysis the BullMQ worker or
+    // an admin's manual POST /api/security/ai/analyze call already ran —
+    // and simply never contributes if nothing is cached (the
+    // overwhelmingly common case). No new AI call is ever made from inside
+    // computeRiskFactors.
+    //
+    // Deliberately scoped to userId-attributed data ONLY (the exact same
+    // per-user aggregate already computed above), matching the honest
+    // attribution boundary this function has drawn since Phase 4: AI's
+    // analysis of HOST-level data (process/network/threat-intel
+    // correlation) is not folded in here for the identical reason
+    // PROCESS_ANOMALY/NETWORK_ANOMALY aren't — see the Phase 4/5 comment
+    // block further below.
+    try {
+      const aiContext = {
+        timeWindow: '5m',
+        scope: 'user',
+        failedLoginCount: countByType.LOGIN_FAILED || 0,
+        rateLimitCount: countByType.RATE_LIMIT_TRIGGERED || 0,
+      };
+      // scopeId:userId — see securityAi/cache.js's own comment on the bug
+      // this fixes (two different users with identical aggregate counts
+      // must never share one cached AI verdict). userId itself is never
+      // part of aiContext (never sent to the model), only mixed into the
+      // Redis key.
+      const cachedAiResult = await getAiCache().getCachedAnalysis('ANOMALY', aiContext, userId);
+      // Confidence threshold (spec section 24: "AI anomaly confidence >
+      // threshold -> bounded risk contribution") — a low-confidence "maybe"
+      // contributes nothing; only a confident anomaly signal counts at
+      // all, and even then only ever the ONE fixed, capped weight (never
+      // scaled by confidence, never compounded by calling this twice —
+      // spec section 25's "prevent AI risk amplification").
+      if (cachedAiResult && cachedAiResult.anomalous && cachedAiResult.confidence >= 70) {
+        addFactor('AI_AUTH_ANOMALY', RISK_WEIGHTS.AI_AUTH_ANOMALY, {
+          confidence: cachedAiResult.confidence, analysisId: cachedAiResult.analysisId,
+        });
+      }
+    } catch (err) {
+      logger.warn({ err, userId }, 'risk_engine_ai_signal_read_failed');
     }
   }
 

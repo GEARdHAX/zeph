@@ -91,6 +91,21 @@ const SecurityEventTypes = Object.freeze({
   POSSIBLE_BEACONING: 'POSSIBLE_BEACONING',
   POSSIBLE_DATA_EXFILTRATION: 'POSSIBLE_DATA_EXFILTRATION',
   THREAT_INTEL_NETWORK_MATCH: 'THREAT_INTEL_NETWORK_MATCH',
+
+  // Phase 6 — AI Security Risk Engine (spec section 44). sourceSystem:
+  // 'security_ai' (see securityAiService.js). AI_SECURITY_ANALYSIS is the
+  // routine "an analysis ran" record (any mode, any verdict);
+  // AI_ANOMALY_DETECTED is a SEPARATE, additional event only when the
+  // structured result actually says anomalous:true — so an admin filtering
+  // for AI_ANOMALY_DETECTED sees only the events worth their attention,
+  // without wading through routine "checked, nothing found" analyses (spec
+  // section 44: "do not emit events for every internal cache hit" — same
+  // reasoning extended to "every analysis," not just cache hits).
+  AI_SECURITY_ANALYSIS: 'AI_SECURITY_ANALYSIS',
+  AI_ANOMALY_DETECTED: 'AI_ANOMALY_DETECTED',
+  AI_ANALYSIS_FAILED: 'AI_ANALYSIS_FAILED',
+  AI_PROVIDER_UNAVAILABLE: 'AI_PROVIDER_UNAVAILABLE',
+  AI_CIRCUIT_OPEN: 'AI_CIRCUIT_OPEN',
 });
 
 const SecurityEventSeverities = Object.freeze(['low', 'medium', 'high', 'critical']);

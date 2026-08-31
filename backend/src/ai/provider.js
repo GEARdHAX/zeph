@@ -15,11 +15,30 @@ const disabledProvider = {
 
 const buildOllamaProvider = (config) => ({
   enabled: true,
-  async generate(prompt) {
+  async generate(prompt, options = {}) {
+    // options.model lets a caller (securityAi/modelRouter.js) route a
+    // single request to a different installed model than config.model's
+    // default (e.g. a larger model for complex multi-signal correlation) —
+    // additive, so every existing caller that never passes options keeps
+    // using config.model exactly as before. options.timeoutMs/signal let a
+    // caller enforce its own deadline (securityAiService.js's
+    // SECURITY_AI_TIMEOUT_MS) without every caller needing to know Ollama
+    // specifically supports AbortSignal.
     const res = await fetch(`${config.url}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: config.model, prompt, stream: false }),
+      body: JSON.stringify({
+        model: options.model || config.model,
+        prompt,
+        stream: false,
+        // Ollama's documented JSON-mode constraint (spec section 11: "do
+        // not depend on free-form model responses for security logic") —
+        // only set when the caller asks for it; the chat assistant
+        // (summarize/translate/draftReply) wants free-form prose and never
+        // passes this.
+        ...(options.format ? { format: options.format } : {}),
+      }),
+      signal: options.signal,
     });
 
     if (!res.ok) {

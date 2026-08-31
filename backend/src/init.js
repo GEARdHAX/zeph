@@ -1,6 +1,5 @@
 const store = require('./store');
 const logger = require('./logger');
-const pinoHttp = require('pino-http');
 const events = require('./events');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -70,15 +69,22 @@ const initSocketAuth = (mediasoupEnabled) => {
     socket.emit('authenticated');
 
     socket.on('disconnect', () => {
-      if (store.roomIDs[socket.id]) {
-        let roomID = store.roomIDs[socket.id];
-        store.consumerUserIDs[roomID].splice(store.consumerUserIDs[roomID].indexOf(socket.id), 1);
-        socket.to(roomID).emit('consumers', { content: store.consumerUserIDs[roomID], timestamp: Date.now() });
-        socket.to(roomID).emit('leave', { socketID: socket.id });
-      }
-
-      Meeting.update({}, { $pull: { peers: socket.id } }, { multi: true });
-
+      // Phase 7 audit finding: the mediasoup-specific cleanup that used to
+      // live here (consumerUserIDs bookkeeping + a Meeting update) was both
+      // incomplete — it never closed/removed this socket's actual
+      // transports/producers/consumers — and buggy on its own terms:
+      // store.consumerUserIDs[roomID].splice(...) had no guard (throws if
+      // that room was never populated), and
+      // Meeting.update({}, { $pull: ... }, { multi: true }) updated EVERY
+      // Meeting document in the database on every disconnect, not just the
+      // one this socket was actually in. mediasoup/index.js's own
+      // 'disconnect' handler now does all of that correctly, guarded, and
+      // scoped to the one meeting/room this socket was in — removed from
+      // here. store.peers.remove below stays regardless: it's cheap,
+      // idempotent (a second remove of already-removed docs is a no-op),
+      // and this handler runs even when MEDIASOUP_ENABLED=false (in which
+      // case mediasoup/index.js's own handler never registers at all, so
+      // this is the only cleanup store.peers gets in that mode).
       store.peers.remove({ socketID: socket.id }, { multi: true });
       logger.info({ socketId: socket.id, userId: id }, `Socket disconnected: ${email}`);
       store.socketIds.splice(store.socketIds.indexOf(socket.id), 1);
@@ -153,17 +159,17 @@ module.exports = (mediasoupEnabled) => {
   // topology (more/fewer proxy layers) would need a different hop count.
   store.app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
 
-  // Correlation ID — pino-http was already an installed dependency but
-  // never actually wired in (logger.js's own header comment claimed it was
-  // — it wasn't). req.id is now available to every route/middleware after
-  // this point, and req.log is a request-scoped child logger that
-  // automatically includes it, so nothing downstream needs to remember to
-  // pass requestId around by hand.
-  // autoLogging:false — this only adds req.id/req.log for correlation; the
-  // app has no existing HTTP access-log convention, and turning one on as a
-  // side effect of adding correlation IDs would be a silent behavior/volume
-  // change outside this task's scope.
-  store.app.use(pinoHttp({ logger, quietReqLogger: true, autoLogging: false }));
+  // Phase 7 audit finding: this was a SECOND pino-http mount on the exact
+  // same Express app (store.app === the `app` index.js already assigns to
+  // store.app right after ITS OWN pino-http mount, index.js:14-17) —
+  // req.id/req.log were already available to every route/middleware from
+  // that first mount, which also already does real access logging with
+  // /healthz excluded. This second instance's own req.id assignment
+  // silently overwrote the first one's on every request, and its
+  // autoLogging:false comment's claim that "pino-http was never actually
+  // wired in" was incorrect — it already was, one file earlier in the
+  // require chain. Removed as a duplicate, not a deliberate two-stage
+  // design.
 
   store.app.use(cors({ origin: store.config.corsOrigin }));
 

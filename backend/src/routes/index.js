@@ -17,6 +17,20 @@ const inviteAcceptLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPre
 // without pre-provisioning for 100 on day one (raise if real fleet size
 // approaches it).
 const sensorEventsLimit = sensorRateLimit({ perSensorMax: 60, globalMax: 1200, windowMs: 60 * 1000 });
+// Phase 6 — manual AI analysis is admin-only already, but still rate-
+// limited per admin (spec section 48: "do not let users submit arbitrary
+// massive data... use rate limiting") — an LLM call is expensive
+// (latency, resource contention with the automated BullMQ pipeline), so
+// even a trusted admin is bounded to a modest rate, not unlimited.
+const aiAnalyzeLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'security-ai:analyze' });
+// Phase 7 audit finding: message-send previously had no dedicated rate
+// limiter — only the generic apiLimiter fallback (300 req/15min, shared
+// across every /api route not otherwise covered), which is far too loose
+// a budget for spam-messaging abuse specifically. 60/min is generous for
+// any real conversational pace (a burst of rapid replies, pasting a long
+// message split by the client, etc.) while still bounding a scripted
+// flood.
+const messageSendLimit = inviteRateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'message:send' });
 
 // Zero Trust (Phase 2) — mounted AFTER jwtAuth, same middleware-chain
 // position every rate limiter already occupies. Only on the routes
@@ -51,11 +65,16 @@ const ztViewSecurityEvents = zeroTrust({ resource: 'security_events', action: 'v
 // admin surface, not a separate category worth its own policies.js entry.
 const ztViewThreatIntel = zeroTrust({ resource: 'security_events', action: 'view' });
 
-// Same handler as the unauthenticated /healthz mount in init.js (for
+// Same handler as the unauthenticated /healthz mount in index.js (for
 // docker-compose.yml's healthcheck) — this /api-prefixed alias is for
 // external uptime monitors/manual checks against the hosted API origin,
-// where /api/health is the more discoverable convention.
-router.get('/health', require('./health'));
+// where /api/health is the more discoverable convention. /health stays an
+// alias of the readiness check for backward compatibility; /health/live
+// and /health/ready are the Phase 7 liveness/readiness split.
+const healthRoute = require('./health');
+router.get('/health', healthRoute);
+router.get('/health/live', healthRoute.live);
+router.get('/health/ready', healthRoute.ready);
 
 router.get('/images/:id', require('./images'));
 router.get('/files/:id', require('./files'));
@@ -85,7 +104,7 @@ router.post('/room/create', passport.authenticate('jwt', { session: false }, nul
 router.post('/room/join', passport.authenticate('jwt', { session: false }, null), require('./join-room'));
 router.post('/room/remove', passport.authenticate('jwt', { session: false }, null), require('./remove-room'));
 router.post('/search', passport.authenticate('jwt', { session: false }, null), require('./search'));
-router.post('/message', passport.authenticate('jwt', { session: false }, null), require('./message'));
+router.post('/message', passport.authenticate('jwt', { session: false }, null), messageSendLimit, require('./message'));
 router.post('/message/read', passport.authenticate('jwt', { session: false }, null), require('./message-read'));
 router.post('/message/delete', passport.authenticate('jwt', { session: false }, null), require('./message-delete'));
 router.post('/messages/more', passport.authenticate('jwt', { session: false }, null), require('./more-messages'));
@@ -291,5 +310,13 @@ router.get('/security/sensor/status', jwtAuth, ztViewThreatIntel, require('./sec
 // SecurityEventTypes entry that route already validates/returns); building
 // a second, narrower listing endpoint here would be pure duplication.
 router.get('/security/network/summary', jwtAuth, ztViewThreatIntel, require('./security/network-summary'));
+
+// Phase 6 — AI Security Risk Engine admin API (spec section 47-48). Same
+// "view internal security telemetry" admin policy every other security
+// admin route already uses — AI incident data is exactly that, an
+// analyst-facing view, never a mutation of anything authoritative.
+router.get('/security/ai/incidents', jwtAuth, ztViewThreatIntel, require('./security/ai-incidents-list'));
+router.get('/security/ai/incidents/:incidentId', jwtAuth, ztViewThreatIntel, require('./security/ai-incidents-get'));
+router.post('/security/ai/analyze', jwtAuth, ztViewThreatIntel, aiAnalyzeLimit, require('./security/ai-analyze'));
 
 module.exports = router;

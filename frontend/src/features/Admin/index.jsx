@@ -3,7 +3,7 @@ import { useGlobal } from 'reactn';
 import { useNavigate } from 'react-router-dom';
 import DataTable from 'react-data-table-component';
 import {
-  Search, Plus, UserCheck, Shield, Edit2, Trash2, ArrowLeft, ShieldAlert, Radar, Cpu, Network,
+  Search, Plus, UserCheck, Shield, Edit2, Trash2, ArrowLeft, ShieldAlert, Radar, Cpu, Network, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useTheme from '../../lib/useTheme';
@@ -241,6 +241,15 @@ function Admin() {
           >
             <Network className="h-4 w-4" />
             Network
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl text-xs font-semibold"
+            onClick={() => navigate('/admin/ai-incidents')}
+          >
+            <Sparkles className="h-4 w-4" />
+            AI Incidents
           </Button>
           <Button
             size="sm"

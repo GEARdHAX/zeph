@@ -19,6 +19,28 @@ module.exports = {
   aiProvider: process.env.AI_PROVIDER || 'none',
   ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'llama3.2:1b',
+  // Phase 6 — AI Security Risk Engine (spec section 49/62). Reuses
+  // aiProvider/ollamaUrl/ollamaModel above entirely — AI_SECURITY_ENABLED
+  // is a SEPARATE flag from AI_PROVIDER because the chat-assistant
+  // features (summarize/translate/draftReply) and security analysis are
+  // different privacy/risk surfaces an operator may want to enable
+  // independently (e.g. chat AI on, security AI off, or vice versa) even
+  // though both ultimately call the same underlying provider.
+  aiSecurityEnabled: process.env.AI_SECURITY_ENABLED === 'true',
+  // Optional larger model for complex multi-signal correlation (spec
+  // section 17/62) — unset by default; modelRouter.js falls back to
+  // ollamaModel for every analysis when this isn't configured, never a
+  // hard failure. NOT a claim that ZEPH ships with a "1B -> 7B" pipeline
+  // out of the box — see modelRouter.js's own comment and the Phase 6
+  // final report's honest AI Runtime section.
+  aiSecurityLargeModel: process.env.AI_SECURITY_LARGE_MODEL || null,
+  securityAiTimeoutMs: Number(process.env.SECURITY_AI_TIMEOUT_MS) || 8000,
+  securityAiCacheTtlSeconds: Number(process.env.SECURITY_AI_CACHE_TTL_SECONDS) || 60,
+  // Priority gate (spec section 23) — below this many non-zero signal
+  // categories, an analysis is skipped entirely rather than spent on a
+  // single ordinary event (e.g. one normal login). See queues/
+  // securityAiAnalysisWorker.js.
+  securityAiMinSignalCategories: Number(process.env.SECURITY_AI_MIN_SIGNAL_CATEGORIES) || 1,
   // Threat Intelligence (Phase 3) — AbuseIPDB IP reputation, disabled
   // (safely no-op — see services/threatIntel/provider.js) unless BOTH the
   // flag and a real key are set, same "enabled + key both required" gate

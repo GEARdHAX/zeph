@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const logger = require('./src/logger');
 const pinoHttp = require('pino-http');
+const helmet = require('helmet');
 
 logger.info('zeph server starting');
 
@@ -15,12 +16,34 @@ app.use(pinoHttp({
   logger,
   autoLogging: { ignore: (req) => req.url === '/healthz' },
 }));
+// Phase 7 audit finding: no security-headers middleware existed at all
+// (X-Content-Type-Options, X-Frame-Options, HSTS, etc. were all absent).
+// helmet's DEFAULT Content-Security-Policy is for apps that SERVE HTML —
+// this backend never does (it's a JSON API + binary media/file server for
+// a separately-hosted React frontend), so a script/style CSP has nothing
+// to protect here and is disabled to avoid a false sense of protection
+// for a threat model that doesn't apply. crossOriginResourcePolicy is
+// relaxed to 'cross-origin' (helmet's default is 'same-origin', which
+// would break /images/:id and /files/:id — this API's frontend is a
+// DIFFERENT origin, Cloudflare Pages, loading these directly into <img>/
+// <a> tags; CORS (see below) is the actual access-control boundary for
+// this API, not CORP).
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 // gzip/br response compression — meaningful payload savings on slow/metered mobile connections.
 app.use(compression());
 const http = require('http');
 const io = require('socket.io');
+// Same mongoose singleton init.js's own mongooseConnect() uses (Node's
+// require cache means this is the identical connection object, not a
+// second one) — needed here only for gracefulShutdown()'s
+// mongoose.connection.close() call.
+const mongoose = require('mongoose');
 const setupRedisAdapter = require('./src/setupRedisAdapter');
 const { startGroupCleanupWorker } = require('./src/queues/groupCleanupWorker');
+const { startSecurityAiWorker } = require('./src/queues/securityAiWorker');
 const store = require('./src/store');
 const init = require('./src/init');
 // MEDIASOUP_ENABLED controls whether the WebRTC SFU is loaded.
@@ -32,9 +55,20 @@ const mediasoup = mediasoupEnabled ? require('./src/mediasoup') : null;
 
 Config = require('./config');
 
-// Health check — registered BEFORE the DB-availability gate so it always responds.
-// Used by Docker Compose healthchecks and load balancers.
-app.use('/healthz', require('./src/routes/health'));
+// Health checks — registered BEFORE the DB-availability gate so they always
+// respond. Used by Docker Compose healthchecks and load balancers.
+// /healthz is kept as an alias of /health/ready for backward compatibility
+// with docker-compose.yml/docker-compose.prod.yml's existing healthcheck
+// commands, which curl this exact path — Phase 7 audit finding: previously
+// this WAS the readiness check (Mongo-ping) with no separate liveness-only
+// endpoint, so any orchestrator/monitor pointed at it already gets the
+// readiness semantics it always had; /health/live is new, genuinely cheap
+// (never touches Mongo/Redis), for callers that specifically want "is the
+// process alive" without readiness's dependency checks.
+const health = require('./src/routes/health');
+app.get('/health/live', health.live);
+app.get('/health/ready', health.ready);
+app.use('/healthz', health);
 
 app.use((req, res, next) => (store.connected ? next() : res.status(500).send('Database not available.')));
 
@@ -54,6 +88,13 @@ store.config = Config;
 // logic runs, and every socket silently fails to connect in a browser.
 store.io = io(server, { cors: { origin: Config.corsOrigin, credentials: true } });
 
+// Phase 7 — populated once startServer() actually creates them, so
+// gracefulShutdown() below has real handles to close. Module-level (not
+// function-locals) for the same reason setupRedisAdapter.js's pubClient/
+// subClient were just promoted to module scope: shutdown needs to reach them.
+let groupCleanupWorker = null;
+let securityAiWorker = null;
+
 const startServer = async () => {
   await setupRedisAdapter(store.io, Config.redisUrl);
   init(mediasoupEnabled);
@@ -66,7 +107,8 @@ const startServer = async () => {
   // Best-effort, same posture as the Redis adapter above — no worker means
   // enqueued cleanup jobs simply wait in Redis until a worker process picks
   // them up, never a boot crash or lost job.
-  startGroupCleanupWorker();
+  groupCleanupWorker = startGroupCleanupWorker();
+  securityAiWorker = startSecurityAiWorker();
 };
 
 const listen = () => server.listen(Config.port, () => logger.info(`Server listening on port ${Config.port}`));
@@ -137,3 +179,94 @@ if (Config.nodemailerEnabled) {
       schedulerDone = false;
     });
 }
+
+// ── Graceful shutdown (Phase 7) ──────────────────────────────────────────
+// Audit finding: no SIGTERM/SIGINT handler existed anywhere — on every
+// deploy/restart, none of the 9 independent Redis connections were closed,
+// Mongo was never explicitly closed, BullMQ workers were killed mid-job
+// rather than drained, the HTTP server was never .close()d, and Mediasoup
+// workers were never closed. This handler closes everything this process
+// opened, in dependency order (stop taking new work first, then drain,
+// then close each backing store), with a bounded timeout so a stuck
+// close() can never hang the process indefinitely — same "never allow
+// shutdown to hang" requirement the security/reliability work in earlier
+// phases already applies to individual operations (AI timeouts, circuit
+// breakers), now applied to the process lifecycle itself.
+const SHUTDOWN_TIMEOUT_MS = Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10000;
+let shuttingDown = false;
+
+const gracefulShutdown = async (signal) => {
+  if (shuttingDown) return; // a second SIGTERM/SIGINT while already shutting down is a no-op, not a re-entrant shutdown
+  shuttingDown = true;
+  logger.info({ signal }, 'Shutdown signal received, closing gracefully');
+
+  const forceExitTimer = setTimeout(() => {
+    logger.error({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, 'Graceful shutdown exceeded timeout, forcing exit');
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+  forceExitTimer.unref();
+
+  try {
+    // 1. Stop the mailer cron from picking up new work.
+    if (scheduler) scheduler.cancel();
+
+    // 2. Stop accepting new HTTP connections (existing in-flight requests
+    // still complete — http.Server.close() waits for those).
+    await new Promise((resolve) => server.close(() => resolve()));
+
+    // 3. Stop accepting new Socket.IO connections and close existing ones.
+    // Socket.IO's own close() also stops the underlying engine.io server.
+    await new Promise((resolve) => store.io.close(() => resolve()));
+
+    // 4. Stop BullMQ workers — .close() waits for any in-flight job in that
+    // worker to finish (up to BullMQ's own internal grace period) rather
+    // than killing it mid-processing.
+    await Promise.all([
+      groupCleanupWorker ? groupCleanupWorker.close() : Promise.resolve(),
+      securityAiWorker ? securityAiWorker.close() : Promise.resolve(),
+    ]);
+
+    // 5. Close every independent Redis connection this process opened —
+    // the BullMQ connection, the Socket.IO adapter's pub/sub pair, and
+    // every Phase 2-6 cache/dedup client. All of these already export a
+    // close*Connection() that was previously only ever called from tests.
+    const { closeQueueConnection } = require('./src/queues/connection');
+    const { closeRedisAdapterConnections } = require('./src/setupRedisAdapter');
+    const { closeProfileCacheConnection } = require('./src/userProfileCache');
+    const { closeThreatIntelCacheConnection } = require('./src/services/threatIntel/cache');
+    const { closeRiskCacheConnection } = require('./src/services/zeroTrust/riskCache');
+    const { closeSensorDedupConnection } = require('./src/services/ebpf/sensorEventDedup');
+    const { closeNetworkIntelConnection } = require('./src/services/networkIntel/cache');
+    const { closeSecurityAiCacheConnection } = require('./src/services/securityAi/cache');
+    await Promise.all([
+      closeQueueConnection(),
+      closeRedisAdapterConnections(),
+      closeProfileCacheConnection(),
+      closeThreatIntelCacheConnection(),
+      closeRiskCacheConnection(),
+      closeSensorDedupConnection(),
+      closeNetworkIntelConnection(),
+      closeSecurityAiCacheConnection(),
+    ]);
+
+    // 6. Close Mongo.
+    await mongoose.connection.close();
+
+    // 7. Close Mediasoup, if it was ever started — closing the worker
+    // cascades to close every router/transport/producer/consumer it owns.
+    if (mediasoupEnabled && mediasoup && mediasoup.close) {
+      await mediasoup.close();
+    }
+
+    clearTimeout(forceExitTimer);
+    logger.info('Graceful shutdown complete');
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, 'Error during graceful shutdown');
+    clearTimeout(forceExitTimer);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

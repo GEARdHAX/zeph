@@ -20,6 +20,19 @@ const RISK_WEIGHTS = Object.freeze({
   // HIGH -> STEP_UP, matching "Threat Intelligence provides evidence, not
   // authority" (Phase 3 spec section 2) — RBAC/Zero Trust still decide.
   MALICIOUS_IP: 40,
+  // Phase 6 — AI authentication-anomaly signal (spec section 24-25).
+  // Deliberately the SMALLEST non-trivial weight in this table — AI is
+  // advisory, never authoritative (spec section 2/70), so its maximum
+  // possible contribution to a user's own risk score must be meaningfully
+  // less than a single deterministic factor like RECENT_FAILED_LOGINS(25)
+  // or MALICIOUS_IP(40). This is the ENTIRE bounded contribution — see
+  // riskEngine.js's own comment for why it's capped, deduplicated (one
+  // cached AI result per riskCache.js TTL window, same anti-amplification
+  // property MALICIOUS_IP already has), and scoped ONLY to AI's
+  // authentication-pattern analysis (never host/network/process analysis
+  // — see riskEngine.js's Phase 4/5 non-integration comment, which applies
+  // identically to AI's analysis of that same host-level data).
+  AI_AUTH_ANOMALY: 15,
 });
 
 // Score is clamped to [0, 100] after summing every applicable factor's

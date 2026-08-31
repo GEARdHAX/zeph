@@ -122,6 +122,20 @@ const record = (event) => {
     enrichSecurityEvent(saved).catch((err) => {
       logger.warn({ err, type, eventId }, 'security_event_enrichment_dispatch_failed');
     });
+
+    // Phase 6 — AI incident correlation (spec sections 22/31/33). Same
+    // deferred-require reasoning as the enrichment hook above (this module
+    // -> securityAiQueue.js -> back to this module for AI_* events). The
+    // correlation write itself is cheap synchronous-ish Mongo work (an
+    // upsert), done here; the actual AI analysis is queued through BullMQ
+    // (securityAiQueue.js), never called directly from this hot path — a
+    // security-event write must never wait on, or be coupled to, an LLM
+    // call's latency/availability.
+    // eslint-disable-next-line global-require
+    const { onSecurityEventForCorrelation } = require('./securityAi/correlationHook');
+    onSecurityEventForCorrelation(saved).catch((err) => {
+      logger.warn({ err, type, eventId }, 'security_event_correlation_dispatch_failed');
+    });
   }).catch((err) => {
     logger.error({ err, type, eventId }, 'security_event_persist_failed');
   });

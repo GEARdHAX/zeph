@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useGlobal, setGlobal } from 'reactn';
 import Div100vh from 'react-div-100vh';
 import {
@@ -15,18 +15,27 @@ import Conversation from '../../features/Conversation';
 import Meeting from '../../features/Meeting';
 import Welcome from '../../features/Welcome';
 import NotFound from '../../features/NotFound';
-import Admin from '../../features/Admin';
 import RequireAdmin from '../../features/Admin/RequireAdmin';
-import SecurityEvents from '../../features/Admin/SecurityEvents';
-import ThreatIntelligence from '../../features/Admin/ThreatIntelligence';
-import Sensors from '../../features/Admin/Sensors';
-import NetworkIntelligence from '../../features/Admin/NetworkIntelligence';
+import LazyFallback from '../../components/LazyFallback';
 import NavRail from '../../features/Shell/components/NavRail';
 import BottomNav from '../../features/Shell/components/BottomNav';
 import NotificationsPlaceholder from '../../features/Shell/components/NotificationsPlaceholder';
 import PendingFriendInviteDialog from '../../features/Shell/components/PendingFriendInviteDialog';
 import useNavSync from '../../features/Shell/useNavSync';
 import FirstLoginTourSuggestion from '../../tours/FirstLoginTourSuggestion';
+
+// Phase 7 audit finding: Admin + its 5 sub-pages (security events, threat
+// intel, sensors, network intel, AI incidents) were all statically
+// imported into Home, so every regular user's initial bundle paid for
+// admin-only code they can never reach (RequireAdmin gates the ROUTE, not
+// the download). Lazy-loaded so that JS only ships to admins who actually
+// navigate there.
+const Admin = lazy(() => import('../../features/Admin'));
+const SecurityEvents = lazy(() => import('../../features/Admin/SecurityEvents'));
+const ThreatIntelligence = lazy(() => import('../../features/Admin/ThreatIntelligence'));
+const Sensors = lazy(() => import('../../features/Admin/Sensors'));
+const NetworkIntelligence = lazy(() => import('../../features/Admin/NetworkIntelligence'));
+const SecurityAiIncidents = lazy(() => import('../../features/Admin/SecurityAiIncidents'));
 
 function Home() {
   const location = useLocation();
@@ -107,11 +116,12 @@ function Home() {
             <Route path="/settings" element={<div className="h-full w-full"><div className="block md:hidden h-full"><Settings /></div><div className="hidden md:block h-full"><Welcome /></div></div>} />
             <Route path="/notifications" element={<NotificationsPlaceholder />} />
             <Route path="/profile" element={<div className="h-full w-full"><div className="block md:hidden h-full"><Settings /></div><div className="hidden md:block h-full"><Welcome /></div></div>} />
-            <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
-            <Route path="/admin/security-events" element={<RequireAdmin><SecurityEvents /></RequireAdmin>} />
-            <Route path="/admin/threat-intelligence" element={<RequireAdmin><ThreatIntelligence /></RequireAdmin>} />
-            <Route path="/admin/sensors" element={<RequireAdmin><Sensors /></RequireAdmin>} />
-            <Route path="/admin/network-intelligence" element={<RequireAdmin><NetworkIntelligence /></RequireAdmin>} />
+            <Route path="/admin" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><Admin /></Suspense></RequireAdmin>} />
+            <Route path="/admin/security-events" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><SecurityEvents /></Suspense></RequireAdmin>} />
+            <Route path="/admin/threat-intelligence" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><ThreatIntelligence /></Suspense></RequireAdmin>} />
+            <Route path="/admin/sensors" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><Sensors /></Suspense></RequireAdmin>} />
+            <Route path="/admin/network-intelligence" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><NetworkIntelligence /></Suspense></RequireAdmin>} />
+            <Route path="/admin/ai-incidents" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><SecurityAiIncidents /></Suspense></RequireAdmin>} />
             <Route path="/meeting/:id" element={<Meeting />} />
             <Route path="/room/:id" element={<Conversation />} />
             <Route path="/room/:id/info" element={<Details />} />

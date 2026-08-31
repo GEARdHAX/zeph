@@ -48,6 +48,16 @@ const enqueueGroupCleanup = async (groupId) => {
       jobId: groupId,
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },
+      // Phase 7 audit finding: unlike security-ai-analysis's queue (which
+      // already bounds both), this queue had no removeOnComplete/
+      // removeOnFail at all — completed/failed job records accumulated in
+      // Redis indefinitely. Same 24h bound as security-ai-analysis; a
+      // completed/failed group-cleanup job has no ongoing value past that
+      // window (the actual cleanup effect — deleted Messages/Media/R2
+      // objects — already happened or didn't; the job record itself is
+      // just an audit trail with a short useful life).
+      removeOnComplete: { age: 24 * 60 * 60 },
+      removeOnFail: { age: 24 * 60 * 60 },
     });
     logger.info({ groupId, delayMs: CLEANUP_DELAY_MS }, 'Group cleanup job enqueued');
   } catch (err) {

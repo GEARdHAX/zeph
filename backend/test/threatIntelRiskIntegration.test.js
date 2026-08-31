@@ -12,6 +12,8 @@ const { getProvider } = require('../src/services/threatIntel/provider');
 const threatIntelService = require('../src/services/threatIntel/threatIntelService');
 // eslint-disable-next-line import/order
 const { closeThreatIntelCacheConnection } = require('../src/services/threatIntel/cache');
+// eslint-disable-next-line import/order
+const { closeSecurityAiCacheConnection } = require('../src/services/securityAi/cache'); // Phase 6 — riskEngine.js's computeRiskFactors() now also opens this connection whenever userId is set (its own short-TTL AI-signal cache read); must be closed here too or this suite leaves an open Redis handle past the test run
 
 beforeAll(async () => {
   await db.connect();
@@ -20,6 +22,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.closeDatabase();
   await closeThreatIntelCacheConnection();
+  await closeSecurityAiCacheConnection();
 });
 
 beforeEach(() => {

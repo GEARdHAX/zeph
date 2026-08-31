@@ -2,6 +2,14 @@ const { createAdapter } = require('@socket.io/redis-adapter');
 const Redis = require('ioredis');
 const logger = require('./logger');
 
+// Module-level (not function-local) so closeRedisAdapterConnections() below
+// can reach them — Phase 7 audit finding: these were previously
+// function-local `const`s, the only pair of the app's independent Redis
+// clients with NO exported close function at all, so graceful shutdown had
+// no way to close them even if it wanted to.
+let pubClient = null;
+let subClient = null;
+
 // Every group/DM delivery in this app is a targeted
 // `store.io.to(userId).emit(...)` (see broadcastToGroup.js, message.js),
 // never a Socket.IO room join. Without this adapter, that targeting only
@@ -23,10 +31,10 @@ const setupRedisAdapter = async (io, redisUrl) => {
   // still benefit from ioredis's normal reconnect behavior for a
   // Redis blip after boot — that's separate client state, not overridden here.
   try {
-    const pubClient = new Redis(redisUrl, {
+    pubClient = new Redis(redisUrl, {
       lazyConnect: true, maxRetriesPerRequest: 3, connectTimeout: 5000, retryStrategy: () => null,
     });
-    const subClient = pubClient.duplicate();
+    subClient = pubClient.duplicate();
     await Promise.all([pubClient.connect(), subClient.connect()]);
     // Reconnect behavior for the adapter's actual lifetime (post-boot) —
     // restored now that the initial connection succeeded, so a transient
@@ -44,4 +52,16 @@ const setupRedisAdapter = async (io, redisUrl) => {
   }
 };
 
+// Phase 7 — graceful shutdown. Same close-then-null pattern every other
+// Redis client module in this codebase already uses.
+const closeRedisAdapterConnections = async () => {
+  await Promise.all([
+    pubClient ? pubClient.quit().catch(() => pubClient.disconnect()) : Promise.resolve(),
+    subClient ? subClient.quit().catch(() => subClient.disconnect()) : Promise.resolve(),
+  ]);
+  pubClient = null;
+  subClient = null;
+};
+
 module.exports = setupRedisAdapter;
+module.exports.closeRedisAdapterConnections = closeRedisAdapterConnections;

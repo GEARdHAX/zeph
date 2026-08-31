@@ -200,11 +200,16 @@ const initSocket = (socket) => {
       const obj = await createConsumer(producer, data.rtpCapabilities, consumerTransport);
       if (!obj) throw new Error('Cannot consume this producer (incompatible rtpCapabilities)');
 
+      // Phase 7 audit finding: closeConsumer looked up consumers[socketId]
+      // by consumer.id, but consumers[socketId] is actually keyed by
+      // data.producerID (see the assignment 2 lines below) — the two
+      // never matched, so this cleanup was a silent no-op on every real
+      // transportclose/producerclose. Pass the actual storage key.
       obj.consumer.on('transportclose', () => {
-        closeConsumer(obj.consumer, socket.id);
+        closeConsumer(data.producerID, socket.id);
       });
       obj.consumer.on('producerclose', () => {
-        closeConsumer(obj.consumer, socket.id);
+        closeConsumer(data.producerID, socket.id);
       });
 
       !consumers[socket.id] && (consumers[socket.id] = {});
@@ -291,34 +296,28 @@ const initSocket = (socket) => {
   });
 
   socket.on('leave', async (data, callback) => {
-    await socket.leave(data.roomID || 'general');
-    await store.peers.asyncRemove({ socketID: socket.id }, { multi: true });
-    store.io.to(data.roomID || 'general').emit('leave', { socketID: socket.id });
-    if (producerTransports[socket.id]) producerTransports[socket.id].close();
-    if (consumerTransports[socket.id]) consumerTransports[socket.id].close();
-
-    store.roomIDs[socket.id] = null;
-
-    await Meeting.findOneAndUpdate({ _id: data.roomID }, { lastLeave: Date.now(), $pull: { peers: socket.id } })
-      .then((meeting) => {
-        // Same string-vs-ObjectId fix as the join handler above.
-        (meeting.users || []).forEach((user) => {
-          socket.to(user.toString()).emit('refresh-meetings', { timestamp: Date.now() });
-        });
-      })
-      .catch((err) => logger.error({ err, meetingId: data.roomID }, 'Failed to update meeting on leave'));
-
-    if (store.consumerUserIDs[data.roomID])
-      store.consumerUserIDs[data.roomID].splice(store.consumerUserIDs[data.roomID].indexOf(socket.id), 1);
-    socket.to(data.roomID).emit('consumers', { content: store.consumerUserIDs[data.roomID], timestamp: Date.now() });
-
-    socket.to(data.roomID).emit('leave', { socketID: socket.id });
-
-    store.onlineUsers.delete(socket);
-    store.onlineUsers.set(socket, { id: socket.decoded_token.id, status: 'online', level: socket.decoded_token.level });
-    broadcastPresence().catch((err) => logger.error({ err }, 'Failed to broadcast presence'));
-
+    await leaveRoom(socket, data.roomID);
     if (callback) callback();
+  });
+
+  // Phase 7 audit finding: this handler did not exist — a client that
+  // disconnects WITHOUT first emitting 'leave' (network loss, tab close,
+  // crash) never ran ANY of the leave cleanup below. Its transports/
+  // producers/consumers (real mediasoup UDP transports and C++ resources)
+  // stayed open on the worker until the whole process restarted, and the
+  // meeting/room bookkeeping (store.peers, store.consumerUserIDs,
+  // Meeting.peers) never got pruned either. Reuses the exact same
+  // leaveRoom() cleanup 'leave' already used, keyed off whatever room this
+  // socket was last known to be in (store.roomIDs, set on join).
+  socket.on('disconnect', async () => {
+    const roomID = store.roomIDs[socket.id];
+    if (roomID) {
+      await leaveRoom(socket, roomID).catch((err) => logger.error({ err, socketId: socket.id }, 'Failed to clean up mediasoup state on disconnect'));
+    } else {
+      // Never joined a room (e.g. dropped mid-handshake) — still clear any
+      // transports/producers/consumers this socket may have created.
+      cleanupSocketResources(socket.id);
+    }
   });
 
   socket.on('remove', async (data, callback) => {
@@ -328,23 +327,114 @@ const initSocket = (socket) => {
   });
 };
 
+// Phase 7 audit finding: producerTransports[socket.id]/consumerTransports[
+// socket.id]/producers[socket.id]/consumers[socket.id] were only ever
+// .close()d, never delete()d — every socket that ever connected left a
+// permanent (closed-but-still-referenced) entry in these module-level
+// objects for the life of the process. This is the one place all four
+// maps actually get their keys removed.
+const cleanupSocketResources = (socketId) => {
+  if (producerTransports[socketId]) {
+    producerTransports[socketId].close();
+    delete producerTransports[socketId];
+  }
+  if (consumerTransports[socketId]) {
+    consumerTransports[socketId].close();
+    delete consumerTransports[socketId];
+  }
+  delete producers[socketId];
+  delete consumers[socketId];
+};
+
+// Shared by the explicit 'leave' event and the new 'disconnect' handler
+// above — same cleanup either way, so a client that leaves cleanly and one
+// that just drops the connection are handled identically.
+const leaveRoom = async (socket, roomID) => {
+  await socket.leave(roomID || 'general');
+  await store.peers.asyncRemove({ socketID: socket.id }, { multi: true });
+  store.io.to(roomID || 'general').emit('leave', { socketID: socket.id });
+  cleanupSocketResources(socket.id);
+
+  store.roomIDs[socket.id] = null;
+
+  await Meeting.findOneAndUpdate({ _id: roomID }, { lastLeave: Date.now(), $pull: { peers: socket.id } })
+    .then((meeting) => {
+      // Same string-vs-ObjectId fix as the join handler above.
+      (meeting?.users || []).forEach((user) => {
+        socket.to(user.toString()).emit('refresh-meetings', { timestamp: Date.now() });
+      });
+    })
+    .catch((err) => logger.error({ err, meetingId: roomID }, 'Failed to update meeting on leave'));
+
+  if (store.consumerUserIDs[roomID])
+    store.consumerUserIDs[roomID].splice(store.consumerUserIDs[roomID].indexOf(socket.id), 1);
+  socket.to(roomID).emit('consumers', { content: store.consumerUserIDs[roomID], timestamp: Date.now() });
+
+  socket.to(roomID).emit('leave', { socketID: socket.id });
+
+  store.onlineUsers.delete(socket);
+  store.onlineUsers.set(socket, { id: socket.decoded_token.id, status: 'online', level: socket.decoded_token.level });
+  broadcastPresence().catch((err) => logger.error({ err }, 'Failed to broadcast presence'));
+};
+
+// Phase 7 audit finding: these only ever called .close() on the tracked
+// producer/consumer, never deleted its key — same "map entries never
+// shrink" bug cleanupSocketResources() above fixes for the transport
+// maps. Guarded against producers[socketID]/consumers[socketID] already
+// being gone entirely (e.g. cleanupSocketResources already ran via
+// leave/disconnect before this mediasoup-internal event fired).
 async function closeProducer(producer, socketID) {
+  const bucket = producers[socketID];
+  if (!bucket || !bucket[producer.id]) return;
   try {
-    await producers[socketID][producer.id].close();
+    await bucket[producer.id].close();
   } catch (e) {
     logger.debug({ err: e, producerId: producer.id }, 'closeProducer no-op (already closed)');
+  } finally {
+    delete bucket[producer.id];
   }
 }
 
-async function closeConsumer(consumer, socketID) {
+// producerID is the actual storage key (see the 'consume' handler above —
+// consumers[socketID] is keyed by data.producerID, not by the consumer's
+// own .id), not the consumer object itself.
+async function closeConsumer(producerID, socketID) {
+  const bucket = consumers[socketID];
+  if (!bucket || !bucket[producerID]) return;
   try {
-    await consumers[socketID][consumer.id].close();
+    await bucket[producerID].close();
   } catch (e) {
-    logger.debug({ err: e, consumerId: consumer.id }, 'closeConsumer no-op (already closed)');
+    logger.debug({ err: e, producerID }, 'closeConsumer no-op (already closed)');
+  } finally {
+    delete bucket[producerID];
   }
 }
+
+// Phase 7 — graceful shutdown. Closing the worker cascades to close every
+// router/transport/producer/consumer it owns (mediasoup's own documented
+// behavior), so this alone releases all real UDP transports and C++
+// resources without needing to iterate producerTransports/
+// consumerTransports/producers/consumers by hand. No-op if init() was
+// never called (MEDIASOUP_ENABLED=false — Render's own current config).
+const close = async () => {
+  if (worker) {
+    worker.close();
+    worker = null;
+  }
+};
 
 module.exports = {
   init,
   initSocket,
+  close,
+  // Test-only exports — cleanupSocketResources/closeProducer/closeConsumer
+  // are pure enough to unit test without a real mediasoup worker (they
+  // only touch the module-level tracking objects, never the native
+  // mediasoup bindings directly in a way that requires one — the
+  // transport/producer/consumer objects themselves are provided by the
+  // caller/test, not created here). __testHelpers is not used by any
+  // production code path.
+  __testHelpers: {
+    cleanupSocketResources, closeProducer, closeConsumer, producerTransports, consumerTransports, producers, consumers,
+  },
 };

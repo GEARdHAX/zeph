@@ -28,7 +28,16 @@ const getQueueConnection = () => {
 // shutdown regardless of whether a connection was ever actually opened.
 const closeQueueConnection = async () => {
   if (connection) {
-    await connection.quit().catch(() => connection.disconnect());
+    // ioredis's quit() only sends QUIT once the socket reaches "ready" —
+    // for a client stuck retrying a dead/unreachable address it never gets
+    // there, so quit() neither resolves NOR rejects and the .catch()
+    // fallback below never runs. Race it against a hard disconnect() so a
+    // never-connected client can't hang shutdown/test-teardown forever.
+    const conn = connection;
+    await Promise.race([
+      conn.quit().catch(() => {}),
+      new Promise((resolve) => { setTimeout(() => { conn.disconnect(); resolve(); }, 500); }),
+    ]);
     connection = null;
   }
 };

@@ -1,6 +1,12 @@
 const db = require('./helpers/db');
 const SecurityEvent = require('../src/models/SecurityEvent');
 const { computeRiskFactors, NEW_SESSION_THRESHOLD_MS } = require('../src/services/zeroTrust/riskEngine');
+// Phase 6 — computeRiskFactors() now also opens securityAi/cache.js's own
+// Redis connection whenever userId is set (its short-TTL AI-signal cache
+// read) — close it here too, same as every other suite exercising a
+// Redis-backed path this test file's own helpers/app.js doesn't already
+// stub to redisUrl:null.
+const { closeSecurityAiCacheConnection } = require('../src/services/securityAi/cache');
 
 beforeAll(async () => {
   await db.connect();
@@ -8,6 +14,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.closeDatabase();
+  await closeSecurityAiCacheConnection();
 });
 
 afterEach(async () => {

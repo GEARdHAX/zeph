@@ -177,3 +177,23 @@ describe('POST /api/auth/change — consume a reset code', () => {
     expect(session.revokedAt).toBeNull();
   });
 });
+
+// Phase 7 audit finding: AuthCode had zero indexes at all — every
+// verification query (findOne({ code, user, valid: true })) did a full
+// collection scan, and there was no TTL cleanup despite having an expiry
+// field (unlike GroupInvite/StepUpToken, which both already TTL-clean
+// themselves). Verifies the fix is actually declared on the schema.
+describe('AuthCode indexes', () => {
+  it('has a {user,valid} compound index covering the verification and invalidate-previous queries', () => {
+    const indexes = AuthCode.schema.indexes();
+    const hasUserValidIndex = indexes.some(([fields]) => fields.user === 1 && fields.valid === 1);
+    expect(hasUserValidIndex).toBe(true);
+  });
+
+  it('has a TTL index on expires so old codes are automatically cleaned up', () => {
+    const indexes = AuthCode.schema.indexes();
+    const ttlIndex = indexes.find(([fields]) => Object.prototype.hasOwnProperty.call(fields, 'expires'));
+    expect(ttlIndex).toBeDefined();
+    expect(ttlIndex[1].expireAfterSeconds).toBe(0);
+  });
+});

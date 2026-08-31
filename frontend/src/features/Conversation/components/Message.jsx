@@ -1,5 +1,5 @@
 import {
-  useState, useRef, useEffect, lazy, Suspense,
+  memo, useState, useRef, useEffect, lazy, Suspense,
 } from 'react';
 import moment from 'moment';
 import emojiRegex from 'emoji-regex';
@@ -31,6 +31,11 @@ import LazyFallback from '../../../components/LazyFallback';
 // avatar. Mirrors ImageEditorModal/MediaViewerShell's established pattern.
 const ProfileView = lazy(() => import('../../Panel/components/ProfileView'));
 
+// Phase 7 audit finding: rendered once per message in an unvirtualized
+// list with zero memoization — any parent re-render (new message arriving,
+// typing indicator, unrelated global state) re-rendered every bubble in
+// the conversation, not just the changed one. memo() skips a re-render
+// when this message's own props are referentially unchanged.
 function Message({
   message, previous, next, onOpen, roomID,
 }) {
@@ -484,4 +489,4 @@ function Message({
   );
 }
 
-export default Message;
+export default memo(Message);
