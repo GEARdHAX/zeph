@@ -78,7 +78,8 @@ describe('zeroTrust middleware — low risk allows a sensitive action through', 
     const res = await request(app)
       .post('/api/users/change-password')
       .set('Authorization', `Bearer ${token}`)
-      .field('password', 'newpassword123');
+      .field('password', 'newpassword123')
+      .field('currentPassword', 'password123');
     expect(res.status).toBe(200);
   });
 });
@@ -154,7 +155,8 @@ describe('zeroTrust middleware — step-up flow end to end', () => {
       .post('/api/users/change-password')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Step-Up-Token', stepUp.body.token)
-      .field('password', 'newpassword123');
+      .field('password', 'newpassword123')
+      .field('currentPassword', 'correct-password-123');
     expect(retried.status).toBe(200);
   });
 
@@ -187,7 +189,8 @@ describe('zeroTrust middleware — step-up flow end to end', () => {
       .post('/api/users/change-password')
       .set('Authorization', `Bearer ${token}`)
       .set('X-Step-Up-Token', stepUp.body.token)
-      .field('password', 'newpassword123');
+      .field('password', 'newpassword123')
+      .field('currentPassword', 'correct-password-123');
     expect(first.status).toBe(200);
 
     // Same risk conditions still hold (3 failed logins still within
@@ -237,7 +240,8 @@ describe('zeroTrust middleware — every decision is telemetered (spec section 2
     await request(app)
       .post('/api/users/change-password')
       .set('Authorization', `Bearer ${token}`)
-      .field('password', 'newpassword123');
+      .field('password', 'newpassword123')
+      .field('currentPassword', 'password123');
 
     await new Promise((resolve) => { setTimeout(resolve, 100); });
     const event = await SecurityEvent.findOne({ type: 'ZERO_TRUST_ALLOW', 'actor.userId': user._id.toString() });

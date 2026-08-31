@@ -31,8 +31,22 @@ const setupRedisAdapter = async (io, redisUrl) => {
   // still benefit from ioredis's normal reconnect behavior for a
   // Redis blip after boot — that's separate client state, not overridden here.
   try {
+    // maxRetriesPerRequest is intentionally NOT set here (defaults to
+    // unlimited, same reasoning queues/connection.js's BullMQ client
+    // already documents with maxRetriesPerRequest:null). Phase 8 failure-
+    // injection finding: with a bounded value (3), a mid-operation Redis
+    // outage exhausts that budget on the FIRST in-flight command and
+    // rejects it — and @socket.io/redis-adapter's internal
+    // pubClient.publish(...) calls (dist/index.js) are fire-and-forget,
+    // no .catch() of their own — so that rejection became an unhandled
+    // promise rejection and crashed the entire process. Reproduced and
+    // confirmed via a real local Redis kill mid-request: the backend died
+    // outright, not a graceful degradation. Unlimited retries here means a
+    // publish during an outage just queues/retries against reconnect
+    // instead of ever rejecting — connectTimeout+retryStrategy:null below
+    // still bounds the INITIAL connect attempt so boot never hangs.
     pubClient = new Redis(redisUrl, {
-      lazyConnect: true, maxRetriesPerRequest: 3, connectTimeout: 5000, retryStrategy: () => null,
+      lazyConnect: true, connectTimeout: 5000, retryStrategy: () => null,
     });
     subClient = pubClient.duplicate();
     await Promise.all([pubClient.connect(), subClient.connect()]);

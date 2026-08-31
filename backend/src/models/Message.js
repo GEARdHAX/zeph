@@ -32,11 +32,39 @@ const MessageSchema = new Schema({
   deletedForEveryone: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
   deletedFor: [{ type: Schema.ObjectId, ref: 'users' }],
+  // Phase 8: client-generated UUID (BottomBar.jsx already makes one for
+  // local optimistic-UI reconciliation, it just never reached the server
+  // before this). Lets message.js treat a retried send (retryWithBackoff
+  // firing again after a lost response, or a double-tap) as "return the
+  // message that already exists" instead of inserting a second row.
+  // No `default` — a message sent without one must leave the field
+  // genuinely ABSENT, not explicitly null. Mongo's sparse index option
+  // only excludes documents missing the field entirely; an explicit `null`
+  // is a real indexed value, so every no-clientID message would otherwise
+  // collide with every other no-clientID message in the same room/author.
+  clientID: { type: String },
 });
 
 // Every message list/pagination/sync query filters by room first, then ranges on _id
 // (already indexed as the primary key) — a single index on room covers all of them.
 MessageSchema.index({ room: 1 });
+
+// Idempotency guard for retried sends — unique per (room, author, clientID)
+// rather than globally unique, so a colliding UUID from two different rooms/
+// authors (astronomically unlikely, but not the actual guarantee this needs)
+// can never cross-block unrelated sends.
+//
+// partialFilterExpression, NOT sparse:true — a compound sparse index only
+// excludes a document if EVERY indexed field is missing; system messages
+// (postSystemMessage.js) have no `author`, so they'd still be indexed with
+// {author: null, clientID: null} and collide with every other system
+// message in the same room. A partial index expresses the actual intent
+// directly: only enforce uniqueness on rows that genuinely opted in by
+// setting a real clientID string.
+MessageSchema.index(
+  { room: 1, author: 1, clientID: 1 },
+  { unique: true, partialFilterExpression: { clientID: { $type: 'string' } } },
+);
 
 // Strips the real content once a message is tombstoned, applied wherever a
 // Message document is serialized to JSON (res.json(), Socket.IO's own

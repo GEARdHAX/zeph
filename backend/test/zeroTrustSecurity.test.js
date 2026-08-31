@@ -53,6 +53,7 @@ describe('Zero Trust — client cannot manipulate its own security posture (spec
       .post('/api/users/change-password')
       .set('Authorization', `Bearer ${token}`)
       .field('password', 'newpassword123')
+      .field('currentPassword', 'password123')
       .field('riskScore', '0')
       .field('zeroTrustRiskScore', '0');
     // Still evaluated on the SERVER's own computed risk (a fresh session
@@ -194,11 +195,16 @@ describe('Zero Trust — session isolation (spec section 35: cannot access anoth
 
     // userB tries to use userA's step-up token against userB's own
     // change-password call — must fail; the token is bound to userA.
+    // currentPassword is userB's REAL password (Phase 9's current-password
+    // check, independent of Zero Trust) — so if the low-risk path DOES
+    // ALLOW outright, this proves it wasn't userA's stolen token/password
+    // that let it through.
     const res = await request(app)
       .post('/api/users/change-password')
       .set('Authorization', `Bearer ${tokenB}`)
       .set('X-Step-Up-Token', stepUpA.body.token)
-      .field('password', 'newpassword-for-b');
+      .field('password', 'newpassword-for-b')
+      .field('currentPassword', 'password-b');
     // Even without prior bad history userB might be ALLOWed outright (low
     // risk) — the meaningful assertion is that userA's password was NOT
     // used to authorize userB's change via the stolen token when risk DOES

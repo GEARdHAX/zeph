@@ -5,6 +5,18 @@ const logger = require('./src/logger');
 const pinoHttp = require('pino-http');
 const helmet = require('helmet');
 
+// Phase 8 failure-injection finding: a Redis outage mid-request could crash
+// the ENTIRE process — traced to an unhandled promise rejection from a
+// dependency's fire-and-forget internal call (see setupRedisAdapter.js's
+// comment for the exact mechanism and root-cause fix). That specific cause
+// is fixed at the source; this is the defense-in-depth backstop so any
+// OTHER unhandled rejection (this app's own code, or a future dependency)
+// logs and keeps running instead of silently killing the process the way
+// Node's default behavior does. Never crashes by itself — only logs.
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled promise rejection — see stack for origin');
+});
+
 logger.info('zeph server starting');
 
 const express = require('express');
@@ -18,16 +30,31 @@ app.use(pinoHttp({
 }));
 // Phase 7 audit finding: no security-headers middleware existed at all
 // (X-Content-Type-Options, X-Frame-Options, HSTS, etc. were all absent).
-// helmet's DEFAULT Content-Security-Policy is for apps that SERVE HTML —
-// this backend never does (it's a JSON API + binary media/file server for
-// a separately-hosted React frontend), so a script/style CSP has nothing
-// to protect here and is disabled to avoid a false sense of protection
-// for a threat model that doesn't apply. crossOriginResourcePolicy is
-// relaxed to 'cross-origin' (helmet's default is 'same-origin', which
-// would break /images/:id and /files/:id — this API's frontend is a
-// DIFFERENT origin, Cloudflare Pages, loading these directly into <img>/
-// <a> tags; CORS (see below) is the actual access-control boundary for
-// this API, not CORP).
+// crossOriginResourcePolicy is relaxed to 'cross-origin' (helmet's default
+// is 'same-origin', which would break /images/:id and /files/:id — the
+// documented current deployment (Cloudflare Pages, a DIFFERENT origin)
+// loads these directly into <img>/<a> tags; CORS is the actual access-
+// control boundary for this API, not CORP).
+//
+// Phase 9 audit finding, correcting Phase 7's own rationale here: this
+// backend is NOT purely a JSON API — express.static(frontend/dist) below
+// DOES serve the built frontend's HTML/JS whenever a deployment relies on
+// that fallback (Serv00/Render/local Docker without a separately-hosted
+// frontend origin — see infra/serv00.md, infra/render.md,
+// frontend/Dockerfile's own "served by the backend's static middleware OR
+// Cloudflare Pages" comment). In the documented current topology
+// (Cloudflare Pages serves the frontend — PHASE8-BASELINE.md), this static
+// mount is unreached and CSP genuinely has nothing to protect; on any
+// deployment that falls back to it, serving that HTML with NO CSP at all
+// means zero defense-in-depth against a future XSS bug (the app's actual
+// current XSS posture is strong — no dangerouslySetInnerHTML anywhere,
+// confirmed by this same audit pass — but CSP is exactly the backstop for
+// the day that stops being true). Left disabled rather than shipping an
+// unverified policy blind: a wrong CSP silently breaks the one deployment
+// path that would actually need it, which is worse than no CSP at this
+// moment. Enabling this correctly requires testing a real production Vite
+// build against a real candidate policy — tracked as a known gap (see
+// docs/PHASE9-SECURITY-REPORT.md) rather than guessed at here.
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },

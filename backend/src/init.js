@@ -317,6 +317,26 @@ module.exports = (mediasoupEnabled) => {
   );
   store.app.use('/api', router);
 
+  // Phase 9 audit finding: no global Express error-handling middleware
+  // existed anywhere — every route already wraps its own logic in
+  // try/catch (verified: no route echoes err.message/err.stack to the
+  // client), but that leaves a genuinely uncaught synchronous throw inside
+  // a route with no app-level backstop, falling through to Express's own
+  // default handler — which DOES include a stack trace unless
+  // NODE_ENV=='production' is correctly set on every real deployment (an
+  // externally-configured value this app doesn't itself enforce). This is
+  // the backstop: catches anything that reaches here, logs the real error
+  // server-side only, and always returns the same generic body regardless
+  // of NODE_ENV — never dependent on external config being right.
+  // 4-arg signature is required for Express to recognize this as
+  // error-handling middleware (not optional here).
+  // eslint-disable-next-line no-unused-vars
+  store.app.use((err, req, res, next) => {
+    logger.error({ err, path: req.path, method: req.method }, 'Unhandled error reached the global error handler');
+    if (res.headersSent) return next(err);
+    return res.status(500).json({ error: true, status: 'error', message: 'Internal server error.' });
+  });
+
   const mongooseConnect = () => {
     let connecting = setTimeout(() => logger.info('Connecting to DB...'), 1000);
 

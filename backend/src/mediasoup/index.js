@@ -6,6 +6,7 @@ const Meeting = require('../models/Meeting');
 const mongoose = require('mongoose');
 const logger = require('../logger');
 const { broadcastPresence } = require('../presence');
+const groupPolicy = require('../authorization/groupPolicy');
 
 let worker;
 let mediasoupRouter;
@@ -93,6 +94,42 @@ async function createConsumer(producer, rtpCapabilities, consumerTransport) {
   };
 }
 
+// Phase 9 audit finding, CRITICAL: the mediasoup `join` handler previously
+// trusted `data.roomID` (actually a Meeting._id) unconditionally — any
+// authenticated socket could join, consume every existing participant's
+// media, and produce its own into ANY meeting merely by knowing/guessing
+// the id. meeting/call.js (the HTTP route that sends the "incoming call"
+// socket event) already does real Room-membership + admin-boundary
+// authorization, but that check was never re-applied at the point that
+// actually matters: the media-plane socket handlers, which are reachable
+// directly regardless of whether meeting/call.js ever ran. This closes
+// that gap at its root — one check, called from every socket handler that
+// grants access to a meeting's media, rather than one per handler.
+//
+// A caller is authorized if they are the 1:1 call's caller/callee, already
+// a recorded participant (Meeting.users — covers rejoining after a drop),
+// or — for a group call — a CURRENT member of the group the meeting
+// belongs to (re-checked live via groupPolicy, not just Meeting.group's
+// historical reference, so someone removed from the group after the call
+// started is correctly denied on their next join attempt).
+const authorizeMeetingJoin = async (meetingId, userId) => {
+  if (!meetingId) return { ok: false, reason: 'no_meeting_id' };
+  const meeting = await Meeting.findById(meetingId).select('caller callee group users').catch(() => null);
+  if (!meeting) return { ok: false, reason: 'meeting_not_found' };
+
+  const userIdStr = userId.toString();
+  if (meeting.caller && meeting.caller.toString() === userIdStr) return { ok: true };
+  if (meeting.callee && meeting.callee.toString() === userIdStr) return { ok: true };
+  if ((meeting.users || []).some((u) => u.toString() === userIdStr)) return { ok: true };
+
+  if (meeting.group) {
+    const membership = await groupPolicy.getMembershipWithFallback(meeting.group, userIdStr);
+    if (membership) return { ok: true };
+  }
+
+  return { ok: false, reason: 'not_a_participant' };
+};
+
 const initSocket = (socket) => {
   socket.on('getRouterRtpCapabilities', (data, callback) => {
     callback(mediasoupRouter.rtpCapabilities);
@@ -146,6 +183,16 @@ const initSocket = (socket) => {
 
   socket.on('produce', async (data, callback) => {
     try {
+      // Same authorization gate as 'join' — a client that never legitimately
+      // joined a meeting must not be able to inject its own media into that
+      // meeting's room merely by naming its id in a direct 'produce' call.
+      const authz = await authorizeMeetingJoin(data.roomID, socket.decoded_token.id);
+      if (!authz.ok) {
+        logger.warn({ meetingId: data.roomID, userId: socket.decoded_token.id, reason: authz.reason }, 'Unauthorized mediasoup produce attempt rejected');
+        callback({ error: 'unauthorized' });
+        return;
+      }
+
       const { kind, rtpParameters, isScreen } = data;
       const transport = producerTransports[socket.id];
       if (!transport) throw new Error('No producer transport for this socket — call createProducerTransport first');
@@ -239,6 +286,16 @@ const initSocket = (socket) => {
   });
 
   socket.on('join', async (data, callback) => {
+    const authz = await authorizeMeetingJoin(data.roomID, socket.decoded_token.id).catch((err) => {
+      logger.error({ err, meetingId: data.roomID, userId: socket.decoded_token.id }, 'Meeting join authorization check failed');
+      return { ok: false, reason: 'authorization_check_failed' };
+    });
+    if (!authz.ok) {
+      logger.warn({ meetingId: data.roomID, userId: socket.decoded_token.id, reason: authz.reason }, 'Unauthorized mediasoup join attempt rejected');
+      if (typeof callback === 'function') callback({ error: 'unauthorized' });
+      return;
+    }
+
     const user = await User.findOne({ _id: socket.decoded_token.id }, { password: 0 }).populate([
       { path: 'picture', strictPopulate: false },
     ]);
@@ -321,6 +378,19 @@ const initSocket = (socket) => {
   });
 
   socket.on('remove', async (data, callback) => {
+    // Phase 9 audit finding: previously trusted data.producerID with no
+    // ownership check at all — any authenticated socket could remove ANY
+    // producer in ANY room merely by naming its id (kicking an arbitrary
+    // participant's audio/video out of a call they have no relation to).
+    // A client only ever legitimately removes a producer IT created (see
+    // callManager.js's three call sites — always its own audio/video/screen
+    // producer), so ownership is exactly "is this producerID one of mine."
+    const ownsProducer = !!(producers[socket.id] && producers[socket.id][data.producerID]);
+    if (!ownsProducer) {
+      logger.warn({ producerId: data.producerID, socketId: socket.id }, 'Unauthorized mediasoup remove attempt rejected — not the producer owner');
+      if (typeof callback === 'function') callback({ error: 'unauthorized' });
+      return;
+    }
     await store.peers.asyncRemove({ producerID: data.producerID }, { multi: true });
     store.io.to(data.roomID || 'general').emit('remove', { producerID: data.producerID, socketID: socket.id });
     callback();
@@ -436,5 +506,6 @@ module.exports = {
   // production code path.
   __testHelpers: {
     cleanupSocketResources, closeProducer, closeConsumer, producerTransports, consumerTransports, producers, consumers,
+    authorizeMeetingJoin,
   },
 };

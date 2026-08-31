@@ -62,4 +62,21 @@ UserSchema.pre('save', function preSave(next) {
   next();
 });
 
+// Phase 8 audit finding: list-rooms.js's admin-privacy-boundary check runs
+// `User.find({level: {$ne: 'standard'}})` on EVERY inbox load for every
+// standard user — confirmed via a real explain() against seeded data:
+// COLLSCAN, examining every user document to find the handful of
+// privileged ones. A partialFilterExpression excluding level:'standard'
+// would be the tightest fix, but MongoDB's partial-index expressions don't
+// support $ne/$not (confirmed via a real CannotCreateIndex error) — and
+// `level` has no fixed enum in this schema (isPrivileged() just checks
+// !== 'standard', so any future level value must keep working without
+// updating this index), so a hardcoded $in of today's known values
+// ('root') would silently stop covering a new level added later. A plain
+// full index on this low-cardinality field is still a real win: an
+// index-only scan replacing a full collection scan, index size bounded by
+// distinct level values (not total user count) same as any other field
+// this small.
+UserSchema.index({ level: 1 });
+
 module.exports = User = mongoose.model('users', UserSchema);

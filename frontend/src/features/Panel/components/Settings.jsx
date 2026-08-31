@@ -12,6 +12,7 @@ import upload from '../../../actions/uploadImage';
 import Config from '../../../config';
 import changePicture from '../../../actions/changePicture';
 import logoutAction from '../../../actions/logout';
+import { disconnectIO } from '../../../actions/initIO';
 import useTheme from '../../../lib/useTheme';
 import BioText from '../../../components/BioText';
 import Popup from './Popup';
@@ -101,7 +102,16 @@ function Settings() {
     const { username } = user;
     const userId = user.id || user._id;
     logoutAction().catch(() => {});
+    // Phase 9 audit finding: only the token was ever cleared here.
+    // localStorage.getItem('user') (init.js reads it on next boot) still
+    // held the previous account's profile JSON after logout, sessionStorage's
+    // token (set when "keep me logged in" was unchecked at login) was never
+    // touched, and the live authenticated Socket.IO connection stayed open
+    // in memory until the NEXT login implicitly disconnected it.
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    disconnectIO();
     // Tour progress is user-scoped (spec §26) — clear it on logout so a
     // different account on the same shared browser never inherits this
     // user's completed/dismissed onboarding state.

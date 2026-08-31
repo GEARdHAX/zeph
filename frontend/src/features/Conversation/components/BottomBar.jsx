@@ -151,7 +151,13 @@ function BottomBar({ aiEnabled }) {
     // does (previewText in initIO.jsx) — undefined !== 'file' made
     // getMediaCategory() default every text message to the 'file'
     // category, showing "Sent a file" instead of the real text.
-    const sendRequest = () => message({ roomID: room._id, content: text, type: 'text' });
+    // clientID travels to the server now (Phase 8) — if retryWithBackoff
+    // below fires again because a response was lost but the first attempt
+    // actually saved, the server recognizes the same clientID and returns
+    // the existing message instead of creating a duplicate.
+    const sendRequest = () => message({
+      roomID: room._id, content: text, type: 'text', clientID,
+    });
 
     retryWithBackoff(sendRequest)
       .then((res) => {

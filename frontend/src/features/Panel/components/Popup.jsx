@@ -17,6 +17,7 @@ function FormField({ id, label, type, value, onChange, required, error }) {
 }
 
 function ChangePasswordPopup({ onClose }) {
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
   const [errors, setErrors] = useState(null);
@@ -36,7 +37,7 @@ function ChangePasswordPopup({ onClose }) {
 
     setBusy(true);
     try {
-      await changeUserPassword(password);
+      await changeUserPassword(password, currentPassword);
       onClose();
       toast.success('Password changed!');
     } catch (err) {

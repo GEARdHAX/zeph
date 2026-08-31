@@ -11,7 +11,7 @@ const logger = require('../logger');
 
 module.exports = async (req, res, next) => {
   const {
-    roomID, content, type, fileID, mediaID,
+    roomID, content, type, fileID, mediaID, clientID,
   } = req.fields;
   const authorID = req.user.id;
 
@@ -109,8 +109,28 @@ module.exports = async (req, res, next) => {
     type,
     file: fileID,
     media: mediaID,
+    // Omit entirely (not `null`) when absent — see Message.js's schema
+    // comment on why an explicit null would defeat the sparse index.
+    ...(clientID ? { clientID } : {}),
   })
     .save()
+    .catch((err) => {
+      // Retried send (retryWithBackoff firing again after a lost response,
+      // or a double-tap) — the {room,author,clientID} unique index caught a
+      // genuine duplicate. Re-throw a tagged error so the outer .catch()
+      // below can tell "already sent, return what exists" apart from a real
+      // failure, instead of the client seeing a spurious 500 and retrying
+      // forever. clientID is required for this path — without one, two
+      // concurrent identical inserts are just two real messages (matches
+      // this route's pre-existing behavior for every message sent before
+      // this field existed).
+      if (err.code === 11000 && clientID) {
+        const dupErr = new Error('duplicate_send');
+        dupErr.isDuplicateSend = true;
+        throw dupErr;
+      }
+      throw err;
+    })
     .then((message) => {
       Message.findById(message._id)
         .populate({
@@ -170,7 +190,25 @@ module.exports = async (req, res, next) => {
           return res.status(500).json({ error: true });
         });
     })
-    .catch((err) => {
+    .catch(async (err) => {
+      if (err.isDuplicateSend) {
+        // The original attempt already saved, updated the room, and
+        // broadcast to every recipient — this retry just needs to hand the
+        // client the same message back, not repeat any of that.
+        const existing = await Message.findOne({ room: roomID, author: authorID, clientID })
+          .populate({
+            path: 'author',
+            select: '-email -password -friends -__v -vaultPinHash',
+            populate: [{ path: 'picture' }],
+          })
+          .populate([{ path: 'file', strictPopulate: false }])
+          .populate([{ path: 'media', strictPopulate: false }])
+          .catch(() => null);
+        if (existing) {
+          const room2 = await Room.findById(roomID).catch(() => null);
+          return res.status(200).json({ message: existing, room: room2 });
+        }
+      }
       return res.status(500).json({ error: true });
     });
 };

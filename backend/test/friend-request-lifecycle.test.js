@@ -210,3 +210,41 @@ describe('GET /api/friends annotates every result as accepted', () => {
     expect(res.body.users[0].username).toBe('Rohan6');
   });
 });
+
+// Phase 8 audit finding: accept.js used findOne-then-save, not an atomic
+// CAS — two concurrent accept requests (double-tap, a retried request)
+// could both pass the findOne status:'pending' check before either wrote,
+// both save() successfully, and both fire the realtime
+// friend-request:accepted emit. Fixed via findOneAndUpdate with the same
+// status:'pending' filter as the actual concurrency guard.
+describe('Concurrent accept requests do not double-fire', () => {
+  it('only one of two simultaneous accept requests succeeds; the relationship ends up accepted exactly once', async () => {
+    const me = await createUser({ username: 'Priya' });
+    const requester = await createUser({ username: 'Arjun' });
+
+    const sendRes = await request(app)
+      .post('/api/friend-requests')
+      .set('Authorization', `Bearer ${tokenFor(requester)}`)
+      .field('username', 'Priya');
+    expect(sendRes.status).toBe(200);
+    const relationshipId = sendRes.body.relationship._id;
+
+    const [first, second] = await Promise.all([
+      request(app)
+        .post(`/api/friend-requests/${relationshipId}/accept`)
+        .set('Authorization', `Bearer ${tokenFor(me)}`),
+      request(app)
+        .post(`/api/friend-requests/${relationshipId}/accept`)
+        .set('Authorization', `Bearer ${tokenFor(me)}`),
+    ]);
+
+    const statuses = [first.status, second.status].sort();
+    // Exactly one 200 (the request that won the CAS) and one 404 (the
+    // status:'pending' filter no longer matches on the loser's attempt) —
+    // never two 200s, which is what the pre-fix findOne-then-save allowed.
+    expect(statuses).toEqual([200, 404]);
+
+    const relationship = await Relationship.findById(relationshipId);
+    expect(relationship.status).toBe('accepted');
+  });
+});

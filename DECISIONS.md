@@ -5,6 +5,71 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-045: Azure B1s VM adopted as active backend host — explicitly time-boxed, 12-month clock — 2026-09-01
+
+**Context:** D-011 (2026-07-18) left Render as the active backend host with
+Serv00 as the documented migration target once registration reopened.
+Serv00 has shown no sign of reopening; there is no reopening ETA and no
+notification mechanism — the only way to know is to periodically check
+https://www.serv00.com/register/. Render's free tier works but sleeps
+after 15 min idle (mitigated with a cron-job.org keepalive) and has no
+SSH/native-build access, so Mediasoup has remained disabled in production
+since D-011.
+
+**Decision:** Adopt an **Azure B1s VM** (via the Azure for Students
+benefit) as the new active backend host, replacing Render.
+
+**Why this, not the other Student Pack offers:** Nearly every free-tier
+offer surfaced in the GitHub Student Developer Pack is SaaS tooling
+(Sentry, JetBrains, Datadog, Codecov, feature-flag services) — useful in
+its own right, but none of them are a compute host. Azure's own page
+(fetched directly, not assumed) lists two separate free allowances:
+- The **$100 credit**, valid 12 months — burns down per-hour on any paid
+  resource; NOT what this decision uses.
+- **"Free for 12 months" services**, a separate, non-credit allowance —
+  includes **750 hours/month of a B1s burstable VM**. 750 hours ≈ one
+  full always-on month, so a single B1s VM run continuously is entirely
+  covered by this allowance at $0, independent of the $100 credit.
+
+A B1s VM (not Azure App Service — App Service's free F1 tier caps out at
+1 CPU-hour/day and has no SSH/native-build access, the same shape of
+limitation Render already has) gives the same real capability Serv00 was
+chosen for in D-010: full SSH, a real Linux environment (gcc/python3/make
+available), and therefore the ability to actually compile Mediasoup's
+native addon — re-opening the door D-011 left closed.
+
+**Honest tradeoff, stated plainly, not glossed over:** this is a
+**time-boxed free tier**, the exact pattern CLAUDE.md's Zero-Cost
+Architecture section warns against depending on ("do NOT make the project
+dependent on ... temporary free tiers") — Glitch shut down (D-010), Serv00
+filled up (D-011), and this Azure allowance will, on its own terms,
+either convert to pay-as-you-go or require a fresh signup after 12
+months. CLAUDE.md's zero-cost section has been amended with an explicit,
+narrow carve-out for this one case rather than silently violated.
+
+**Mitigation — the same discipline D-011 already established for Serv00
+capacity-checking:** track the 12-month clock explicitly (VM created
+2026-09; review no later than **2027-07-01**, i.e. month 10, to decide
+the next move) and re-check Serv00 registration status at the same time.
+Options at that checkpoint, in order of preference: (1) Serv00 has
+reopened → migrate back, it remains strictly better (no time limit at
+all); (2) Azure's post-trial pay-as-you-go cost for a single B1s VM is
+low enough to accept as a rare, explicit, user-approved exception to
+₹0-forever; (3) migrate to whatever the best available always-on
+free-forever host is at that time, repeating this same evaluation.
+
+**Mediasoup on this host:** same SSH-based compile path Serv00's guide
+already documented (`MEDIASOUP_ENABLED=true`, native build via
+gcc/python3/make) — not yet re-enabled in production as of this decision;
+tracked as a follow-up once the migration itself is verified stable.
+
+**New file:** `infra/azure.md` (deployment guide, mirrors
+`infra/serv00.md`'s structure).
+**Unchanged:** `infra/serv00.md` remains the documented preferred target
+if/when it reopens — this decision does not retire it.
+
+---
+
 ## D-044: zeph. rebrand — second rename, config-centralized, no infra/DB renames this time — 2026-08-29
 
 **Decision:** Renamed the product from Chitcx to **zeph.** (lowercase, period

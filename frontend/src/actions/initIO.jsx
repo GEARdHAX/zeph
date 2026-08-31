@@ -247,6 +247,19 @@ export function RemovedFromGroupToast({
 // call more than once, instead of relying on every call site never doing so.
 let activeSocket = null;
 
+// Phase 9 audit finding: logout (Settings.jsx) cleared token/user state
+// but never disconnected the live socket — it stayed connected and
+// authenticated as the logged-out user until the NEXT initIO() call
+// (next login) implicitly disconnected it via the check below. Between an
+// explicit logout and any next login, a real authenticated connection for
+// that account remained open in memory.
+export const disconnectIO = () => {
+  if (activeSocket) {
+    activeSocket.disconnect();
+    activeSocket = null;
+  }
+};
+
 const initIO = (token) => (dispatch) => {
   if (activeSocket) activeSocket.disconnect();
 

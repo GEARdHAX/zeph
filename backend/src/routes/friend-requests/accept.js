@@ -6,13 +6,20 @@ const logger = require('../../logger');
 module.exports = async (req, res, next) => {
   const { id } = req.params;
 
-  const relationship = await Relationship.findOne({ _id: id, recipient: req.user.id, status: 'pending' });
+  // Atomic CAS, not findOne-then-save — two concurrent accept requests
+  // (double-tap, retry-after-timeout) previously could both pass the
+  // findOne check before either wrote, both save() successfully, and both
+  // fire the realtime emit below. The status:'pending' filter here is the
+  // actual concurrency guard: only the request that flips pending->accepted
+  // gets a non-null result back.
+  const relationship = await Relationship.findOneAndUpdate(
+    { _id: id, recipient: req.user.id, status: 'pending' },
+    { $set: { status: 'accepted', respondedAt: new Date() } },
+    { new: true },
+  );
   if (!relationship) return res.status(404).json({ error: true });
 
-  relationship.status = 'accepted';
-  relationship.respondedAt = new Date();
   try {
-    await relationship.save();
     // Tell the original requester in realtime — without this they only find
     // out by re-opening the now-friend's profile or noticing a DM appear.
     // Same store.io.to(personId) idiom as friend-requests/send.js.

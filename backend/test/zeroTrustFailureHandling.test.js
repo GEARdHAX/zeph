@@ -74,7 +74,13 @@ describe('riskCache — Redis unavailable (spec section 30: fail safely, never s
     const res = await request(app)
       .post('/api/users/change-password')
       .set('Authorization', `Bearer ${token}`)
-      .field('password', 'newpassword123');
+      .field('password', 'newpassword123')
+      // Phase 9: change-password now requires current-password
+      // re-verification (see users/change-password.js's audit comment) —
+      // every call here supplies createUser()'s real password so these
+      // ZERO TRUST-focused assertions aren't accidentally testing the
+      // (unrelated) current-password check instead.
+      .field('currentPassword', 'password123');
     // Redis unavailable (test default) never changes the OUTCOME — risk is
     // still correctly computed (fresh, uncached) and still STEP_UPs.
     expect(res.status).toBe(428);
@@ -98,7 +104,13 @@ describe('zeroTrust middleware — malformed/missing session context (spec secti
     const res = await request(app)
       .post('/api/users/change-password')
       .set('Authorization', `Bearer ${token}`)
-      .field('password', 'newpassword123');
+      .field('password', 'newpassword123')
+      // Phase 9: change-password now requires current-password
+      // re-verification (see users/change-password.js's audit comment) —
+      // every call here supplies createUser()'s real password so these
+      // ZERO TRUST-focused assertions aren't accidentally testing the
+      // (unrelated) current-password check instead.
+      .field('currentPassword', 'password123');
     // No session -> UNKNOWN_DEVICE (score 20) -> below SENSITIVE's
     // allowBelow:50 -> ALLOW. The important thing is it doesn't 500.
     expect(res.status).toBe(200);
@@ -126,7 +138,13 @@ describe('zeroTrust middleware — evaluation error fails CLOSED (spec section 3
       const res = await request(app)
         .post('/api/users/change-password')
         .set('Authorization', `Bearer ${token}`)
-        .field('password', 'newpassword123');
+        .field('password', 'newpassword123')
+      // Phase 9: change-password now requires current-password
+      // re-verification (see users/change-password.js's audit comment) —
+      // every call here supplies createUser()'s real password so these
+      // ZERO TRUST-focused assertions aren't accidentally testing the
+      // (unrelated) current-password check instead.
+      .field('currentPassword', 'password123');
       // resolveSession's own .catch(() => null) already handles this
       // gracefully (degrades to null session, still evaluates, doesn't
       // throw) — confirming the fail-safe explicitly rather than assuming.

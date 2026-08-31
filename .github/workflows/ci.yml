@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [master, main, develop]
 
 # Cancel in-progress runs for the same branch/PR to save minutes
 concurrency:
@@ -57,6 +57,20 @@ jobs:
       - name: Check formatting (Prettier)
         run: npm run format:check
 
+      # Phase 8 audit finding: no dependency vulnerability visibility existed
+      # in CI at all. Non-blocking (continue-on-error) rather than a hard
+      # gate — a real 2026-08 audit of this exact dependency tree found
+      # findings with no available fix yet (nedb/underscore, both abandoned
+      # packages backing in-process Mediasoup room/peer state — ephemeral
+      # data, not durable storage; see docs/PHASE8-CAPACITY-REPORT.md), so a
+      # hard --audit-level gate would permanently red every future run
+      # rather than catch a NEW regression. Still fails visibly in the
+      # summary so a newly introduced critical/high vulnerability is seen,
+      # not silently missed.
+      - name: Dependency vulnerability scan (npm audit)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
       - name: Run tests
         run: npm test
         env:
@@ -95,6 +109,10 @@ jobs:
 
       - name: Lint (ESLint)
         run: npm run lint:check
+
+      - name: Dependency vulnerability scan (npm audit)
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
       - name: Run tests
         run: npm test --if-present

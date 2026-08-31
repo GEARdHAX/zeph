@@ -42,7 +42,13 @@ describe('security headers (helmet)', () => {
     expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
   });
 
-  it('does NOT set a Content-Security-Policy header — this backend serves no HTML for a CSP to protect (JSON API + binary media server for a separately-hosted frontend)', async () => {
+  // Phase 9 audit finding: corrected from Phase 7's "this backend serves no
+  // HTML" — index.js DOES serve the built frontend via express.static as a
+  // fallback path on some deployments (Serv00/Render/local Docker without
+  // a separate frontend origin); CSP is disabled because it hasn't been
+  // verified against a real production build yet, not because there's no
+  // HTML to protect. See index.js's own comment for the full reasoning.
+  it('does NOT set a Content-Security-Policy header — disabled pending verification against a real production build, not because no HTML is ever served (see index.js)', async () => {
     const res = await request(buildHelmetApp()).get('/test');
     expect(res.headers['content-security-policy']).toBeUndefined();
   });

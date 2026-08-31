@@ -179,9 +179,16 @@ router.post(
   require('./vault-webauthn/auth-verify'),
 );
 
-router.post('/rtc/create', passport.authenticate('jwt', { session: false }, null), require('./rtc/create'));
-router.post('/rtc/join', passport.authenticate('jwt', { session: false }, null), require('./rtc/join'));
-router.post('/rtc/peers', passport.authenticate('jwt', { session: false }, null), require('./rtc/peers'));
+// Phase 9 audit finding: routes/rtc/create.js|join.js|peers.js removed —
+// confirmed dead code (zero callers anywhere in frontend/src) with two real
+// vulnerabilities: join.js granted access to any NeDB room by guessed id
+// with zero authorization check, and peers.js leaked every active peer
+// across every room to any authenticated caller. The real call flow goes
+// entirely through meeting/*.js (HTTP) + mediasoup's Socket.IO events
+// (both independently authorized this same audit pass) — these three
+// routes duplicated a subset of that same store.rooms/store.peers state
+// with no authorization at all. Removing unreachable, insecure code is the
+// fix here, not hardening a path nothing calls.
 
 router.post('/meeting/get', passport.authenticate('jwt', { session: false }, null), require('./meeting/get'));
 router.post('/meeting/call', passport.authenticate('jwt', { session: false }, null), require('./meeting/call'));

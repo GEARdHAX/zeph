@@ -130,10 +130,12 @@ describe('Spoofing regression: POST /api/message', () => {
 });
 
 describe('Unauthenticated-endpoint regression', () => {
-  it('rejects /api/rtc/peers without a token', async () => {
-    const res = await request(app).post('/api/rtc/peers');
-    expect(res.status).toBe(401);
-  });
+  // routes/rtc/create.js|join.js|peers.js were removed entirely in Phase 9
+  // (confirmed dead code — zero frontend callers — with two real
+  // vulnerabilities: join.js had no authorization check at all, peers.js
+  // leaked every active call participant across every room to any
+  // authenticated caller). /api/rtc/peers correctly 404s now; there is no
+  // longer a route here to assert an auth requirement on.
 
   it('rejects /api/meeting/get without a token', async () => {
     const res = await request(app).post('/api/meeting/get').field('title', 'call');
@@ -141,14 +143,21 @@ describe('Unauthenticated-endpoint regression', () => {
   });
 
   it('derives caller from the authenticated session on /api/meeting/get', async () => {
+    // Phase 9: meeting/get.js now requires the caller to actually be a
+    // member of `group` (see meeting-get-authorization.test.js for the
+    // full authorization suite) — this test's own point (caller is taken
+    // from req.user, never trusted from the request body) still holds, it
+    // just needs a real, authorized group to reach that assertion.
     const caller = await createUser();
     const impersonated = await createUser();
+    const room = await Room.create({ people: [caller._id, impersonated._id], isGroup: false });
 
     const res = await request(app)
       .post('/api/meeting/get')
       .set('Authorization', `Bearer ${tokenFor(caller)}`)
       .field('title', 'call')
-      .field('callee', impersonated._id.toString());
+      .field('callee', impersonated._id.toString())
+      .field('group', room._id.toString());
 
     expect(res.status).toBe(200);
     expect(res.body.caller).toBe(caller._id.toString());
