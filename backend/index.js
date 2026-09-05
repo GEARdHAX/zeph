@@ -71,6 +71,8 @@ const mongoose = require('mongoose');
 const setupRedisAdapter = require('./src/setupRedisAdapter');
 const { startGroupCleanupWorker } = require('./src/queues/groupCleanupWorker');
 const { startSecurityAiWorker } = require('./src/queues/securityAiWorker');
+const { startAiWorker } = require('./src/queues/aiWorker');
+const { startMeetingAiWorker } = require('./src/queues/meetingAiWorker');
 const store = require('./src/store');
 const init = require('./src/init');
 // MEDIASOUP_ENABLED controls whether the WebRTC SFU is loaded.
@@ -121,6 +123,8 @@ store.io = io(server, { cors: { origin: Config.corsOrigin, credentials: true } }
 // subClient were just promoted to module scope: shutdown needs to reach them.
 let groupCleanupWorker = null;
 let securityAiWorker = null;
+let aiWorker = null;
+let meetingAiWorker = null;
 
 const startServer = async () => {
   await setupRedisAdapter(store.io, Config.redisUrl);
@@ -136,6 +140,8 @@ const startServer = async () => {
   // them up, never a boot crash or lost job.
   groupCleanupWorker = startGroupCleanupWorker();
   securityAiWorker = startSecurityAiWorker();
+  aiWorker = startAiWorker();
+  meetingAiWorker = startMeetingAiWorker();
 };
 
 const listen = () => server.listen(Config.port, () => logger.info(`Server listening on port ${Config.port}`));
@@ -251,6 +257,8 @@ const gracefulShutdown = async (signal) => {
     await Promise.all([
       groupCleanupWorker ? groupCleanupWorker.close() : Promise.resolve(),
       securityAiWorker ? securityAiWorker.close() : Promise.resolve(),
+      aiWorker ? aiWorker.close() : Promise.resolve(),
+      meetingAiWorker ? meetingAiWorker.close() : Promise.resolve(),
     ]);
 
     // 5. Close every independent Redis connection this process opened —

@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import ReactImageAppear from 'react-image-appear';
 import {
-  DownloadCloud, Check, CheckCheck, Clock, AlertCircle, MoreVertical, Trash2, Ban, Copy,
+  DownloadCloud, Check, CheckCheck, Clock, AlertCircle, MoreVertical, Trash2, Ban, Copy, Languages,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -21,10 +21,12 @@ import BioText from '../../../components/BioText';
 import parseBio, { tokensToHtml } from '../../../lib/parseBio';
 import deleteMessage from '../../../actions/deleteMessage';
 import createRoom from '../../../actions/createRoom';
+import translateMessage from '../../../actions/translateMessage';
 import Actions from '../../../constants/Actions';
 import Config from '../../../config';
 import formatFileSize from '../../../lib/formatFileSize';
 import LazyFallback from '../../../components/LazyFallback';
+import { getAiErrorMessage } from '../../../lib/aiErrorMessage';
 
 // Lazy-loaded so the profile viewer never ships in the initial chat bundle —
 // only fetched the first time a user actually clicks a message author's
@@ -36,8 +38,10 @@ const ProfileView = lazy(() => import('../../Panel/components/ProfileView'));
 // typing indicator, unrelated global state) re-rendered every bubble in
 // the conversation, not just the changed one. memo() skips a re-render
 // when this message's own props are referentially unchanged.
+const TRANSLATE_LANGUAGES = ['Spanish', 'French', 'German', 'Hindi', 'Japanese', 'Arabic'];
+
 function Message({
-  message, previous, next, onOpen, roomID,
+  message, previous, next, onOpen, roomID, aiEnabled,
 }) {
   const { content, date, status } = message;
   let { author } = message;
@@ -49,12 +53,18 @@ function Message({
   const [deleting, setDeleting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [previewUsername, setPreviewUsername] = useState(null);
+  const [translating, setTranslating] = useState(false);
+  const [translation, setTranslation] = useState(null); // { language, text } | null
+  const [showLanguages, setShowLanguages] = useState(false);
   const menuRef = useRef(null);
+  const translateAbortRef = useRef(null);
+  useEffect(() => () => translateAbortRef.current?.abort(), []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setMenuOpen(false);
+        setShowLanguages(false);
       }
     };
     if (menuOpen) {
@@ -270,6 +280,24 @@ function Message({
     }
   };
 
+  const handleTranslate = async (language) => {
+    setMenuOpen(false);
+    if (translating || !content) return;
+    setTranslating(true);
+    translateAbortRef.current?.abort();
+    const controller = new AbortController();
+    translateAbortRef.current = controller;
+    try {
+      const res = await translateMessage(content, language, controller.signal);
+      setTranslation({ language, text: res.data.translation });
+    } catch (err) {
+      if (err.code === 'ERR_CANCELED') return;
+      toast.error(getAiErrorMessage(err));
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   const handleDeleteForMe = async (e) => {
     if (e) {
       e.preventDefault();
@@ -400,6 +428,51 @@ function Message({
                         <span>Copy</span>
                       </button>
                     )}
+                    {aiEnabled && !isImage && message.type !== 'file' && content && !showLanguages && (
+                      <button
+                        type="button"
+                        disabled={translating}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowLanguages(true);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Languages className={cn('h-3.5 w-3.5 text-muted-foreground', translating && 'animate-spin')} />
+                        <span>{translating ? 'Translating…' : 'Translate'}</span>
+                      </button>
+                    )}
+                    {aiEnabled && showLanguages && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowLanguages(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+                        >
+                          <span>← Back</span>
+                        </button>
+                        {TRANSLATE_LANGUAGES.map((language) => (
+                          <button
+                            key={language}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowLanguages(false);
+                              handleTranslate(language);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 pl-6 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+                          >
+                            <span>{language}</span>
+                          </button>
+                        ))}
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={handleDeleteForMe}
@@ -430,6 +503,17 @@ function Message({
               </div>
             )}
           </div>
+
+          {translation && (
+            <div className={cn('mt-1 max-w-full rounded-xl border border-border/60 bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground', isMine && 'text-right')}>
+              <span className="font-semibold text-foreground">
+                {translation.language}
+                :
+                {' '}
+              </span>
+              {translation.text}
+            </div>
+          )}
 
           {/* Timestamp on last message of group */}
           {!attachNext && (

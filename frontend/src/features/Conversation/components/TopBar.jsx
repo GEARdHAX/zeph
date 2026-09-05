@@ -1,7 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import {
+  useEffect, useState, useRef, useCallback,
+} from 'react';
 import {
   Phone, Video, ArrowLeft, MoreHorizontal, Star, Info, Sparkles,
-  Search, BellOff, Lock, Trash2, Ban, Flag, UserCheck,
+  Search, BellOff, Lock, Trash2, Ban, Flag, UserCheck, Hash,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
@@ -27,6 +29,8 @@ import toggleFavorite from '../../../actions/toggleFavorite';
 import getMeetingRoom from '../../../actions/getMeetingRoom';
 import postCall from '../../../actions/postCall';
 import summarizeConversation from '../../../actions/summarizeConversation';
+import extractTopics from '../../../actions/extractTopics';
+import { getAiErrorMessage } from '../../../lib/aiErrorMessage';
 import hideConversation from '../../../actions/hideConversation';
 import deleteConversation from '../../../actions/deleteConversation';
 import setupVaultPin from '../../../actions/setupVaultPin';
@@ -57,6 +61,19 @@ function TopBar({ back, loading, aiEnabled }) {
   const user = useGlobal('user')[0] || {};
   const [summary, setSummary] = useState(null);
   const [summarizing, setSummarizing] = useState(false);
+  const [topics, setTopics] = useState(null);
+  const [extractingTopics, setExtractingTopics] = useState(false);
+  // AbortControllers for the two AI calls this component can trigger — kept
+  // in refs (not state) since they're never rendered, only referenced
+  // imperatively to cancel a stale/superseded request. Aborted on unmount
+  // (see the cleanup effect below) so navigating away from a conversation
+  // mid-summarize never tries to setState on an unmounted component.
+  const summarizeAbortRef = useRef(null);
+  const topicsAbortRef = useRef(null);
+  useEffect(() => () => {
+    summarizeAbortRef.current?.abort();
+    topicsAbortRef.current?.abort();
+  }, []);
   const [favorites, setFavorites] = useGlobal('favorites');
   const [showDetails, setShowDetails] = useGlobal('showDetails');
   const setNav = useGlobal('nav')[1];
@@ -158,17 +175,50 @@ function TopBar({ back, loading, aiEnabled }) {
     setShowDetails(!showDetails);
   };
 
-  const summarize = async () => {
+  // Prevent-duplicate-submission: bail out if a summarize call is already
+  // in flight rather than letting a second click fire a second request.
+  const summarize = useCallback(async () => {
+    if (summarizing) return;
     setSummarizing(true);
+    summarizeAbortRef.current?.abort();
+    const controller = new AbortController();
+    summarizeAbortRef.current = controller;
     try {
-      const res = await summarizeConversation(room._id);
+      const res = await summarizeConversation(room._id, controller.signal);
+      if (res.status === 202) {
+        // Queued (BullMQ handling it asynchronously) — surface any previous
+        // summary immediately as a starting point, plus a toast explaining
+        // a fresh one is on the way, rather than a spinner with no result.
+        if (res.data.previousSummary) setSummary(res.data.previousSummary);
+        toast.info(res.data.message || 'Summary is being generated. Check back shortly.');
+        return;
+      }
       setSummary(res.data.summary);
+      if (res.data.cached) toast.info('Showing the most recent summary for this conversation.');
     } catch (e) {
-      errorToast('Could not summarize this conversation.');
+      if (e.code === 'ERR_CANCELED') return; // unmounted or superseded — not a user-facing failure
+      errorToast(getAiErrorMessage(e));
     } finally {
       setSummarizing(false);
     }
-  };
+  }, [room._id, summarizing]);
+
+  const extractTopicsForRoom = useCallback(async () => {
+    if (extractingTopics) return;
+    setExtractingTopics(true);
+    topicsAbortRef.current?.abort();
+    const controller = new AbortController();
+    topicsAbortRef.current = controller;
+    try {
+      const res = await extractTopics(room._id, controller.signal);
+      setTopics(res.data.topics);
+    } catch (e) {
+      if (e.code === 'ERR_CANCELED') return;
+      errorToast(getAiErrorMessage(e));
+    } finally {
+      setExtractingTopics(false);
+    }
+  }, [room._id, extractingTopics]);
 
   const doHide = async () => {
     setVaultBusy(true);
@@ -430,6 +480,42 @@ function TopBar({ back, loading, aiEnabled }) {
                 <span data-disabled>Mute</span>
               </button>
 
+              {aiEnabled && (
+                <>
+                  <div className="my-1 h-px bg-border/60" />
+                  <button
+                    type="button"
+                    disabled={summarizing}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                      summarize();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Sparkles className={cn('h-3.5 w-3.5 text-muted-foreground', summarizing && 'animate-spin')} />
+                    <span>{summarizing ? 'Summarizing…' : 'Summarize conversation'}</span>
+                  </button>
+                  {room.isGroup && (
+                    <button
+                      type="button"
+                      disabled={extractingTopics}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setMenuOpen(false);
+                        extractTopicsForRoom();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Hash className={cn('h-3.5 w-3.5 text-muted-foreground', extractingTopics && 'animate-spin')} />
+                      <span>{extractingTopics ? 'Finding topics…' : 'Extract topics'}</span>
+                    </button>
+                  )}
+                </>
+              )}
+
               <div className="my-1 h-px bg-border/60" />
 
               <button
@@ -518,8 +604,25 @@ function TopBar({ back, loading, aiEnabled }) {
         <DialogContent className="rounded-2xl border border-border bg-card">
           <DialogHeader>
             <DialogTitle>Conversation Summary</DialogTitle>
+            <DialogDescription>AI-generated — may be inaccurate.</DialogDescription>
           </DialogHeader>
           <p className="text-xs leading-relaxed text-muted-foreground">{summary}</p>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!topics} onOpenChange={(next) => !next && setTopics(null)}>
+        <DialogContent className="rounded-2xl border border-border bg-card">
+          <DialogHeader>
+            <DialogTitle>Conversation Topics</DialogTitle>
+            <DialogDescription>AI-generated — may be inaccurate.</DialogDescription>
+          </DialogHeader>
+          <ul className="flex flex-wrap gap-1.5">
+            {(topics || []).map((topic) => (
+              <li key={topic} className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground">
+                {topic}
+              </li>
+            ))}
+          </ul>
         </DialogContent>
       </Dialog>
 

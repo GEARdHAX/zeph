@@ -427,7 +427,22 @@ const leaveRoom = async (socket, roomID) => {
 
   store.roomIDs[socket.id] = null;
 
-  await Meeting.findOneAndUpdate({ _id: roomID }, { lastLeave: Date.now(), $pull: { peers: socket.id } })
+  if (store.consumerUserIDs[roomID])
+    store.consumerUserIDs[roomID].splice(store.consumerUserIDs[roomID].indexOf(socket.id), 1);
+
+  // Zeph AI Meeting AI (Phase 14): mark the meeting genuinely ended only
+  // once the LAST participant has left (checked BEFORE the $pull below
+  // removes this socket from peers, using consumerUserIDs — already pruned
+  // above — as "who's actually still connected"). endedAt is the anchor
+  // ai/eligibility.js uses for meeting-duration eligibility; setting it on
+  // every individual departure (like lastLeave already does) would make a
+  // meeting with one person briefly dropping and rejoining look "ended"
+  // partway through.
+  const stillHasParticipants = (store.consumerUserIDs[roomID] || []).length > 0;
+  const meetingUpdate = { lastLeave: Date.now(), $pull: { peers: socket.id } };
+  if (!stillHasParticipants) meetingUpdate.endedAt = new Date();
+
+  await Meeting.findOneAndUpdate({ _id: roomID }, meetingUpdate)
     .then((meeting) => {
       // Same string-vs-ObjectId fix as the join handler above.
       (meeting?.users || []).forEach((user) => {
@@ -435,9 +450,6 @@ const leaveRoom = async (socket, roomID) => {
       });
     })
     .catch((err) => logger.error({ err, meetingId: roomID }, 'Failed to update meeting on leave'));
-
-  if (store.consumerUserIDs[roomID])
-    store.consumerUserIDs[roomID].splice(store.consumerUserIDs[roomID].indexOf(socket.id), 1);
   socket.to(roomID).emit('consumers', { content: store.consumerUserIDs[roomID], timestamp: Date.now() });
 
   socket.to(roomID).emit('leave', { socketID: socket.id });

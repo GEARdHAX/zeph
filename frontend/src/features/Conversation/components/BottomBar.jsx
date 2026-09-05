@@ -2,7 +2,7 @@ import {
   useRef, useState, useEffect, lazy, Suspense,
 } from 'react';
 import {
-  Send, Image, Smile, Paperclip, Sparkles, ShieldOff, Trash2,
+  Send, Image, Smile, Paperclip, Sparkles, ShieldOff, Trash2, Wand2,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import moment from 'moment';
@@ -20,7 +20,9 @@ import getRooms from '../../../actions/getRooms';
 import typing from '../../../actions/typing';
 import retryWithBackoff from '../../../lib/retryWithBackoff';
 import draftReply from '../../../actions/draftReply';
+import rewriteMessage from '../../../actions/rewriteMessage';
 import deleteConversation from '../../../actions/deleteConversation';
+import { getAiErrorMessage } from '../../../lib/aiErrorMessage';
 import useTheme from '../../../lib/useTheme';
 import { validateFile } from '../../../lib/mediaPolicy';
 import RichMessageInput from './RichMessageInput';
@@ -46,6 +48,16 @@ function BottomBar({ aiEnabled }) {
   const [isPicker, showPicker] = useGlobal('isPicker');
   const [pictureRefs, addPictureRef] = useState([]);
   const [drafting, setDrafting] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
+  // AbortControllers for the two in-flight AI calls BottomBar can trigger —
+  // aborted on unmount so a slow draft/rewrite response never calls
+  // setState after the component (or the whole conversation view) is gone.
+  const draftAbortRef = useRef(null);
+  const rewriteAbortRef = useRef(null);
+  useEffect(() => () => {
+    draftAbortRef.current?.abort();
+    rewriteAbortRef.current?.abort();
+  }, []);
 
   // Image-editor queue — component-local only (never global/Redux), per
   // the feature's own requirement. editorQueue holds raw Files still
@@ -192,14 +204,39 @@ function BottomBar({ aiEnabled }) {
   };
 
   const draft = async () => {
+    if (drafting) return; // prevent-duplicate-submission
     setDrafting(true);
+    draftAbortRef.current?.abort();
+    const controller = new AbortController();
+    draftAbortRef.current = controller;
     try {
-      const res = await draftReply(room._id);
+      const res = await draftReply(room._id, controller.signal);
       setText(res.data.draft);
     } catch (e) {
-      console.log(e);
+      if (e.code === 'ERR_CANCELED') return;
+      toast.error(getAiErrorMessage(e));
     } finally {
       setDrafting(false);
+    }
+  };
+
+  // Rewrites whatever the user has already typed, in place — a distinct
+  // action from draft() (which generates a reply from scratch based on the
+  // conversation, not the composer's own text).
+  const rewrite = async () => {
+    if (rewriting || !text.trim()) return;
+    setRewriting(true);
+    rewriteAbortRef.current?.abort();
+    const controller = new AbortController();
+    rewriteAbortRef.current = controller;
+    try {
+      const res = await rewriteMessage(text, null, controller.signal);
+      setText(res.data.rewritten);
+    } catch (e) {
+      if (e.code === 'ERR_CANCELED') return;
+      toast.error(getAiErrorMessage(e));
+    } finally {
+      setRewriting(false);
     }
   };
 
@@ -520,17 +557,30 @@ function BottomBar({ aiEnabled }) {
       </div>
 
       <div className="flex items-center gap-1.5 ml-2">
+        {aiEnabled && text.trim() && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary"
+            aria-label="Rewrite with AI"
+            disabled={rewriting || drafting}
+            onClick={rewrite}
+            title="Rewrite with AI"
+          >
+            <Wand2 className={`h-4 w-4 ${rewriting ? 'animate-spin' : ''}`} />
+          </Button>
+        )}
         {aiEnabled && (
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary"
             aria-label="Draft reply with AI"
-            disabled={drafting}
+            disabled={drafting || rewriting}
             onClick={draft}
             title="Draft with AI"
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className={`h-4 w-4 ${drafting ? 'animate-spin' : ''}`} />
           </Button>
         )}
 

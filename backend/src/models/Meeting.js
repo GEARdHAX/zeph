@@ -38,6 +38,14 @@ const MeetingSchema = new Schema({
     default: [],
   },
   users: [{ type: Schema.ObjectId, ref: 'users' }],
+  // Zeph AI Meeting AI (Phase 14) — set once the meeting genuinely ends
+  // (mediasoup/index.js's leaveRoom, when the last participant leaves), so
+  // eligibility (ai/eligibility.js's checkMeetingSummaryEligibility) can
+  // compute a real duration without depending on a live socket state.
+  // null/unset means "still ongoing or never properly closed" — never
+  // guessed from lastLeave, which updates on every individual departure,
+  // not just the final one.
+  endedAt: { type: Date, default: null },
 });
 
 module.exports = User = mongoose.model('meetings', MeetingSchema);

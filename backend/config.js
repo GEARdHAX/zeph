@@ -16,9 +16,44 @@ module.exports = {
   corsOrigin: process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
     : ['http://localhost:5173'],
+  // Zeph AI (chat assistant — summarize/translate/rewrite/draft-reply/title/
+  // topics). 'groq' is the default cloud provider (Llama 3.1 8B Instant,
+  // free tier); 'ollama' remains available (self-hosted, no key) as an
+  // alternate — set AI_PROVIDER=ollama to use it instead. 'none' (default)
+  // disables AI features entirely; every AI route then returns 503, and no
+  // other Zeph functionality depends on this being set.
   aiProvider: process.env.AI_PROVIDER || 'none',
+  groqApiKey: process.env.GROQ_API_KEY || null,
+  groqModel: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+  // Override point for load-testing (backend/loadtest/ai-load.js) and
+  // future self-tests — same pattern as abuseIpDbBaseUrl. Never needs
+  // setting in a real deployment; defaults to the real Groq API.
+  groqBaseUrl: process.env.GROQ_BASE_URL || 'https://api.groq.com',
   ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'llama3.2:1b',
+  // Token/context governance (Phase 6) — crude chars/4 estimate, see
+  // ai/contextBuilder.js. Output is additionally bounded by the provider's
+  // own max_tokens param.
+  aiMaxInputTokens: Number(process.env.AI_MAX_INPUT_TOKENS) || 4000,
+  aiMaxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS) || 800,
+  aiProviderTimeoutMs: Number(process.env.AI_PROVIDER_TIMEOUT_MS) || 15000,
+  // Quota / Abuse Protection (Phase 5) — Zeph's OWN self-imposed ceilings,
+  // deliberately stricter than Groq's actual free-tier limits. See ai/quota.js.
+  aiLimitUserPerMinute: Number(process.env.AI_LIMIT_USER_PER_MINUTE) || 5,
+  aiLimitUserPerDay: Number(process.env.AI_LIMIT_USER_PER_DAY) || 50,
+  aiLimitUserConcurrent: Number(process.env.AI_LIMIT_USER_CONCURRENT) || 2,
+  aiLimitIpPerMinute: Number(process.env.AI_LIMIT_IP_PER_MINUTE) || 20,
+  aiLimitGlobalConcurrent: Number(process.env.AI_LIMIT_GLOBAL_CONCURRENT) || 10,
+  // Eligibility Engine thresholds (Phase 4) — see ai/policy.js.
+  aiPolicyGroupSummaryMinMessages: Number(process.env.AI_POLICY_GROUP_SUMMARY_MIN_MESSAGES) || 100,
+  aiPolicyDmSummaryMinMessages: Number(process.env.AI_POLICY_DM_SUMMARY_MIN_MESSAGES) || 30,
+  aiPolicyTitleMinMessages: Number(process.env.AI_POLICY_TITLE_MIN_MESSAGES) || 5,
+  aiPolicyTopicMinMessages: Number(process.env.AI_POLICY_TOPIC_MIN_MESSAGES) || 50,
+  aiPolicySummaryFreshnessMinNewMessages: Number(process.env.AI_POLICY_SUMMARY_FRESHNESS_MIN_NEW_MESSAGES) || 25,
+  // Meeting AI (Phase 14) — see ai/policy.js's meetingSummary entry.
+  aiPolicyMeetingSummaryMinDurationSeconds: Number(process.env.AI_POLICY_MEETING_SUMMARY_MIN_DURATION_SECONDS) || 300,
+  aiPolicyMeetingSummaryMinParticipants: Number(process.env.AI_POLICY_MEETING_SUMMARY_MIN_PARTICIPANTS) || 2,
+  aiPolicyMeetingSummaryMinTranscriptWords: Number(process.env.AI_POLICY_MEETING_SUMMARY_MIN_TRANSCRIPT_WORDS) || 100,
   // Phase 6 — AI Security Risk Engine (spec section 49/62). Reuses
   // aiProvider/ollamaUrl/ollamaModel above entirely — AI_SECURITY_ENABLED
   // is a SEPARATE flag from AI_PROVIDER because the chat-assistant

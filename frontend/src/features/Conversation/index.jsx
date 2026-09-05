@@ -117,7 +117,7 @@ function Conversation() {
         </div>
       )}
 
-      {room && !loading && <Messages />}
+      {room && !loading && <Messages aiEnabled={aiEnabled} />}
 
       <BottomBar aiEnabled={aiEnabled} />
     </div>

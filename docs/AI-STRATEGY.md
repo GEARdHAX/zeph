@@ -1,97 +1,112 @@
-# AI Assistant Strategy — zeph.
+# Zeph AI — Strategy
 
-Status: **backend implemented, frontend UI not yet wired.** Three features
-(summarize, translate, draft-reply), one local provider (Ollama), zero cloud API
-keys anywhere in the codebase.
+Status: **implemented, backend + governance layer, frontend UI not yet
+wired.** Seven features (summarize, translate, rewrite, draft-reply/smart
+reply, title, topics), one primary cloud provider (Groq, Llama 3.1 8B
+Instant), zero cost beyond the provider's free tier.
+
+This document replaces the earlier Ollama-only AI strategy. See
+`DECISIONS.md` (the entry superseding D-018's chat-assistant scope) for why
+the primary provider changed, and `docs/ZEPH-AI-ARCHITECTURE.md` for the full
+architecture, governance pipeline, and Big-O analysis.
 
 ## Design goal
 
-The plan's own framing: `Chat → AI Assistant service → provider abstraction →
-configured provider OR disabled`. Every requirement below follows from taking
-that diagram literally rather than treating it as a suggestion.
+`Zeph Client → AI API Gateway → Eligibility Engine → Quota/Abuse Protection →
+Context Builder + Token Budget → Redis Cache/Dedup/Locks → BullMQ AI Jobs →
+Groq API (Llama 3.1 8B Instant) → Output Validation → Cache/Persistence →
+User`. Every requirement below follows from that pipeline, not from calling
+an LLM endpoint directly.
 
-## Provider: local only, by design, not as a placeholder for "add OpenAI later"
+## Provider: Groq (cloud, free tier), Ollama retained for Security AI
 
-`backend/src/ai/provider.js` implements exactly one real provider — Ollama,
-self-hosted via Docker (`docker compose --profile ai up`, not started by
-default). No cloud AI provider exists in this codebase.
+`backend/src/ai/provider.js` implements two adapters behind one interface
+(`generate(prompt, options)`):
 
-This wasn't the default choice — see D-018 in `DECISIONS.md` and
-`COST-MODEL.md` for the full reasoning — but it's worth restating here because
-it's the single decision that makes every other requirement below trivially
-true instead of aspirational:
+- **`groq`** (default target) — Llama 3.1 8B Instant via Groq's
+  OpenAI-compatible Chat Completions API. Requires `GROQ_API_KEY`
+  (server-side only, never sent to the frontend). Free tier, not unlimited —
+  see "Cost control" below.
+- **`ollama`** — local, self-hosted, no API key. Still used by the
+  *separate* Security AI subsystem (`services/securityAi/`, Phase 6), which
+  has its own `AI_SECURITY_ENABLED` flag and different privacy reasoning
+  (security telemetry should not leave the deployment). Also selectable for
+  the chat assistant via `AI_PROVIDER=ollama` if an operator prefers it.
 
-- **No API key exists to expose to the frontend**, because there's no cloud
-  provider that issues one. The "don't expose API keys in the frontend"
-  requirement is satisfied by construction, not by careful handling of a secret.
-- **No per-token billing risk**, because there's no metered API being called.
-- **No dependency on a third party's uptime or rate limits.**
+`AI_PROVIDER` defaults to `none`. When unset, or when `AI_PROVIDER=groq` but
+`GROQ_API_KEY` is missing, every AI route returns a clean `503
+{ error: true, reason: 'AI_DISABLED', message: '...' }` — never a crash,
+never a silent no-op. **Core Zeph functionality (messaging, calls,
+authentication) never depends on AI being configured or available.**
 
-Adding a second, cloud-based provider later means adding one more branch to
-`getProvider()` — the interface (`generate(prompt)`) doesn't change. That's a
-real future option, not a foreclosed one; it just isn't the default.
+## Why not self-hosted LLM infrastructure
 
-## Fails closed, not open
+Explicitly out of scope, per the project's zero-cost constraint: no GPU
+hosting, no separate model-serving microservice, no vector database. Groq's
+free tier does the actual inference; Zeph's own infrastructure (Redis,
+BullMQ, MongoDB — all already deployed for other features) does governance
+(eligibility, quotas, caching, deduplication, job queuing). See
+`docs/COST-MODEL.md` and the Cost Control section of
+`ZEPH-AI-ARCHITECTURE.md`.
 
-`AI_PROVIDER` defaults to `none`. When no provider is configured,
-`buildAssistant(config).enabled` is `false`, and every AI route
-(`/api/ai/summarize`, `/api/ai/translate`, `/api/ai/draft-reply`) returns a
-clean `503 { error: true, message: 'AI features are not enabled on this
-server.' }` — not a crash, not a silent no-op, not a degraded experience that
-looks broken. **The application is fully functional with zero AI configured**;
-this was verified with a test (`test/ai.test.js`), not just asserted.
+## Eligibility before expense
+
+The Eligibility Engine (`backend/src/ai/policy.js`,
+`backend/src/ai/eligibility.js`) decides whether a request is *useful*
+before any provider call — never "call Groq, then decide it was
+unnecessary." Thresholds (minimum messages per feature, meeting duration,
+summary freshness) are centralized in one policy object, not scattered
+across route handlers. See `ZEPH-AI-ARCHITECTURE.md`'s Eligibility Rules
+section for the full table.
 
 ## Privacy boundaries
 
-- **No conversation memory beyond what's explicitly passed in.** Each call to
-  `summarize`/`draftReply` sends only the specific room's recent messages
-  (capped: 50 for summarize, 20 for draft-reply) fetched fresh for that one
-  request — nothing is cached, logged, or retained by the AI service layer
-  itself between calls.
-- **Input is bounded** (`MAX_INPUT_CHARS = 4000` in `assistant.js`) — this is a
-  chat assistant operating on a specific, scoped request, not an open-ended
-  completion endpoint that could be handed arbitrarily large or unrelated text.
-- **Room-membership-checked**: `summarize` and `draftReply` verify the requester
-  is a member of the room before touching its messages — same authorization
-  pattern as every other message-reading route in this codebase, not a special
-  case. `translate` operates only on client-supplied text (no room access), so
-  no membership check applies there.
-- **Rate-limited separately and more strictly** than general API traffic (15
-  requests / 15 min vs. 300 / 15 min) — AI calls are slower and more
-  resource-intensive even against a local model, and deserve a tighter budget
-  regardless of cost, since they're the most expensive request type this
-  backend serves.
+- **No conversation memory beyond what's explicitly passed in.** Each
+  request fetches that room's recent messages fresh, bounded by both a
+  message-count cap and a token budget (`ai/contextBuilder.js`) — nothing is
+  retained by the AI layer between calls beyond the durable summary cache
+  itself (`ConversationSummary`, which stores only the generated summary
+  text, not raw messages).
+- **Input is token-bounded** (`AI_MAX_INPUT_TOKENS`, default ~4000) and
+  **output is token-bounded** (`AI_MAX_OUTPUT_TOKENS`, default ~800) — see
+  Phase 6 of `ZEPH-AI-ARCHITECTURE.md`.
+- **Room-membership-checked** for every room-scoped feature (summarize,
+  draft-reply, title, topics) — same authorization pattern as every other
+  message-reading route in this codebase. `translate`/`rewrite` operate only
+  on client-supplied text (no room access), so no membership check applies.
+- **Rate-limited and quota-bounded** at multiple layers (per-user/minute,
+  per-user/day, per-user-concurrent, per-IP/minute, global-concurrent — all
+  Redis-backed, all configurable) on top of the existing `aiLimiter`
+  express-rate-limit middleware in `init.js`. See Phase 5 of
+  `ZEPH-AI-ARCHITECTURE.md`.
+- **Secrets never reach the model or the logs**: `GROQ_API_KEY` lives only
+  in `config.js`/env and the `Authorization` header of the outbound Groq
+  request; it is never part of a prompt, a log line, or a frontend response.
 
-## The E2EE interaction (the part that actually required design work)
+## The E2EE interaction
 
-This is the one place "keep AI simple" and "the plan wants E2EE eventually"
-genuinely conflict, and it's worth being explicit about the conflict rather than
-leaving it implicit.
+Unchanged from the original design (carried forward, not re-litigated
+here): **today, pre-E2EE**, the server has plaintext access to stored
+messages already, so AI routes reading `Message.content` is not a new
+exposure. **If/when E2EE ships**, AI features must become an explicit,
+per-use, user-triggered plaintext opt-in — passive/automatic AI processing
+of E2EE'd content must never happen. See `E2EE-THREAT-MODEL.md` §5.
 
-**Today, pre-E2EE:** `summarize`/`draftReply` read `Message.content` directly
-from MongoDB — the server already has plaintext access to stored messages, so
-these routes reading it is not a new exposure.
+## What's built (updated)
 
-**If/when E2EE ships** (see `E2EE-THREAT-MODEL.md` — not yet implemented,
-blocked on a device-identity prerequisite that doesn't exist yet): the server
-will no longer have plaintext message content to read at all. At that point,
-`summarize`/`draftReply` **must become an explicit, per-use, user-triggered
-plaintext opt-in** — the client decrypts locally, and *at the moment the user
-clicks "summarize this conversation"* sends that specific plaintext to the AI
-route for that one call. The server still never stores or logs it, but the user
-has explicitly chosen to let that one request be processed in the clear.
-**Passive or automatic AI processing of E2EE'd content must never happen** —
-that would silently defeat the entire point of E2EE for any room where these
-features are used.
+**Meeting summary** and **frontend UI** — both previously listed below as
+not built — are now implemented. Meeting AI (client-side audio capture →
+Groq Whisper transcription → eligibility → summary) is documented in
+`docs/ZEPH-AI-ARCHITECTURE.md`'s Phase 14 section; frontend integration
+(Summarize/Translate/Rewrite/Draft Reply/Topics/Meeting Recorder, all wired
+into the real chat/meeting UI with loading/error/quota/cancellation states)
+is documented in that same doc's Phase 10 section.
 
-This requirement is recorded in `E2EE-THREAT-MODEL.md` (§5) as a constraint on
-the E2EE design, and recorded here as a constraint on the AI design — the two
-docs should stay in sync if either changes.
+## What's not built
 
-## What's not built yet
-
-Frontend UI for triggering summarize/translate/draft-reply doesn't exist —
-the backend routes are complete and tested, but there's no button/panel in the
-chat UI that calls them. This is a deliberate "backend-compatible plumbing now,
-UI later" sequencing choice (same pattern used for read receipts and reconnect
-resync earlier in this project), not an oversight.
+- **Hierarchical/incremental multi-pass summarization** and a vector
+  database/RAG pipeline — YAGNI at portfolio scale. The context builder's
+  recency-biased token-budget trim (Phase 6/10) keeps summaries useful for
+  a conversation's current tail without a separate chunk-then-merge
+  pipeline; build that only if an actual requirement (very long conversation
+  histories) appears.

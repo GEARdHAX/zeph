@@ -28,7 +28,9 @@ import AddPeers from './components/AddPeers';
 import Ringing from './components/Ringing';
 import Streams from './components/Streams';
 import LittleStreams from './components/LittleStreams';
+import MeetingRecorder from './components/MeetingRecorder';
 import callManager from '../../lib/callManager';
+import getInfo from '../../actions/getInfo';
 
 // The mediasoup session itself (Device, transports, producers) lives in
 // callManager.js as module-level state, not here — that's what lets a call
@@ -68,6 +70,11 @@ function Meeting() {
   // with no "something is happening" cue, and a failure (denied camera
   // permission, dropped handshake) threw silently with zero user feedback.
   const [connecting, setConnecting] = useState(false);
+  const [meetingAiEnabled, setMeetingAiEnabled] = useState(false);
+
+  useEffect(() => {
+    getInfo().then((res) => setMeetingAiEnabled(!!res.data.meetingAiEnabled)).catch(() => {});
+  }, []);
 
   const answerIncrement = useSelector((state) => state.rtc.answerIncrement);
   const answerData = useSelector((state) => state.rtc.answerData);
@@ -356,6 +363,13 @@ function Meeting() {
               title="Leave call"
               onClick={close}
             />
+
+            {meetingAiEnabled && (
+              <>
+                <div className="mx-0.5 h-8 w-px bg-white/15" />
+                <MeetingRecorder meetingId={roomID} />
+              </>
+            )}
 
             <div className="mx-0.5 h-8 w-px bg-white/15" />
 

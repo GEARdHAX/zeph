@@ -1,29 +1,262 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <base href="./" />
     <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400;700&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/png" sizes="32x32" href="/src/assets/brand/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/src/assets/brand/favicon-16.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0A0A0A" />
-    <meta name="description" content="zeph. - real-time messaging and conferencing app" />
-    <meta property="og:title" content="zeph. - Connections that flow" />
-    <meta property="og:description" content="zeph. - real-time messaging and conferencing app" />
+    <meta name="description" content="zeph. — real-time messaging and conferencing app" />
+    <meta property="og:title" content="zeph. — Connections that flow" />
+    <meta property="og:description" content="zeph. — real-time messaging and conferencing app" />
     <meta property="og:image" content="/src/assets/brand/og-image.png" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="zeph." />
-    <meta name="twitter:description" content="zeph. - real-time messaging and conferencing app" />
+    <meta name="twitter:description" content="zeph. — real-time messaging and conferencing app" />
     <meta name="twitter:image" content="/src/assets/brand/og-image.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/src/assets/brand/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
     <title>zeph.</title>
+
+    <style>
+      /* Initial Preload Spinner Styles */
+      #initial-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #0A0A0A;
+      }
+
+      @media (prefers-color-scheme: light) {
+        #initial-loader {
+          background-color: #FAFAFA;
+        }
+        #initial-loader .zeph-init-wordmark {
+          color: #0A0A0A;
+        }
+      }
+
+      .zeph-init-container {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        --zeph-size: 42px;
+      }
+
+      .zeph-init-row {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        min-height: calc(var(--zeph-size) * 1.9);
+        position: relative;
+      }
+
+      .zeph-init-wordmark {
+        font-family: 'Google Sans Flex', sans-serif;
+        font-size: var(--zeph-size);
+        font-weight: 700;
+        color: #FFFFFF;
+        letter-spacing: 0.02em;
+        min-width: 10px;
+        display: inline-block;
+        line-height: 1.2;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .zeph-init-dot {
+        width: calc(var(--zeph-size) * 0.5714);
+        height: calc(var(--zeph-size) * 0.5714);
+        background: #E63946;
+        border-radius: 50%;
+        flex-shrink: 0;
+        position: relative;
+        transform: translateY(0);
+        transition: transform 0.08s ease, opacity 0.12s ease;
+        box-shadow: 0 0 20px rgba(230, 57, 70, 0.2);
+        opacity: 1;
+      }
+
+      .zeph-init-dot.bouncing {
+        animation: zeph-init-bounce 0.38s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite;
+      }
+
+      .zeph-init-dot.squash {
+        animation: zeph-init-squash 0.06s ease forwards;
+      }
+
+      .zeph-init-dot.blink {
+        animation: zeph-init-blinkDot 0.4s ease-in-out infinite;
+      }
+
+      @keyframes zeph-init-blinkDot {
+        0%, 100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.15;
+          transform: scale(0.85);
+        }
+      }
+
+      @keyframes zeph-init-bounce {
+        0% {
+          transform: translateY(0) scale(1, 1);
+        }
+        30% {
+          transform: translateY(calc(var(--zeph-size) * -0.952)) scale(1, 1);
+        }
+        50% {
+          transform: translateY(0) scale(1, 1);
+        }
+        70% {
+          transform: translateY(calc(var(--zeph-size) * -0.476)) scale(1, 1);
+        }
+        85% {
+          transform: translateY(0) scale(1.15, 0.85);
+        }
+        100% {
+          transform: translateY(0) scale(1, 1);
+        }
+      }
+
+      @keyframes zeph-init-squash {
+        0% {
+          transform: scale(1.2, 0.8);
+        }
+        100% {
+          transform: scale(1, 1);
+        }
+      }
+    </style>
   </head>
 
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    
+    <!-- Pre-React Initial Loading Screen -->
+    <div id="initial-loader" aria-label="Loading zeph">
+      <div class="zeph-init-container">
+        <div class="zeph-init-row">
+          <span class="zeph-init-wordmark" id="zeph-init-wordmark"></span>
+          <span class="zeph-init-dot bouncing" id="zeph-init-dot"></span>
+        </div>
+      </div>
+    </div>
+
     <div id="root"></div>
+
+    <script>
+      (function () {
+        const dot = document.getElementById('zeph-init-dot');
+        const wordmark = document.getElementById('zeph-init-wordmark');
+        if (!dot || !wordmark) return;
+
+        const PHASE_TIMINGS = {
+          bounceMs: 380,
+          squashMs: 60,
+          squashSettleMs: 40,
+          typeCharMs: 50,
+          typeHoldMs: 150,
+          blinkMs: 800,
+          blinkSettleMs: 40,
+          deleteCharMs: 25,
+          deleteHoldMs: 90,
+        };
+
+        const FULL_TEXT = 'zeph';
+        const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        let isRunning = true;
+
+        async function frame1_Bounce() {
+          if (!isRunning) return;
+          dot.className = 'zeph-init-dot bouncing';
+          wordmark.textContent = '';
+          await sleep(PHASE_TIMINGS.bounceMs);
+          if (!isRunning) return;
+
+          dot.className = 'zeph-init-dot squash';
+          await sleep(PHASE_TIMINGS.squashMs);
+          if (!isRunning) return;
+
+          dot.className = 'zeph-init-dot';
+          await sleep(PHASE_TIMINGS.squashSettleMs);
+        }
+
+        async function frame2_Type() {
+          if (!isRunning) return;
+          let currentText = '';
+          wordmark.textContent = '';
+          dot.className = 'zeph-init-dot';
+
+          const chars = FULL_TEXT.split('');
+          for (let i = 0; i < chars.length; i++) {
+            if (!isRunning) return;
+            currentText += chars[i];
+            wordmark.textContent = currentText;
+            await sleep(PHASE_TIMINGS.typeCharMs);
+          }
+          if (!isRunning) return;
+          await sleep(PHASE_TIMINGS.typeHoldMs);
+        }
+
+        async function frame3_Blink() {
+          if (!isRunning) return;
+          dot.className = 'zeph-init-dot blink';
+          await sleep(PHASE_TIMINGS.blinkMs);
+          if (!isRunning) return;
+          dot.className = 'zeph-init-dot';
+          await sleep(PHASE_TIMINGS.blinkSettleMs);
+        }
+
+        async function frame4_Delete() {
+          if (!isRunning) return;
+          let deleteText = FULL_TEXT;
+          for (let i = deleteText.length; i > 0; i--) {
+            if (!isRunning) return;
+            deleteText = deleteText.slice(0, -1);
+            wordmark.textContent = deleteText;
+            await sleep(PHASE_TIMINGS.deleteCharMs);
+          }
+          if (!isRunning) return;
+          wordmark.textContent = '';
+          await sleep(PHASE_TIMINGS.deleteHoldMs);
+        }
+
+        async function mainLoop() {
+          while (isRunning) {
+            await frame1_Bounce();
+            await frame2_Type();
+            await frame3_Blink();
+            await frame4_Delete();
+          }
+        }
+
+        mainLoop();
+
+        // Immediately remove loader on React ready event
+        window.addEventListener('zeph:ready', function () {
+          isRunning = false;
+          const loader = document.getElementById('initial-loader');
+          if (loader) {
+            loader.remove();
+          }
+        }, { once: true });
+      })();
+    </script>
+
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

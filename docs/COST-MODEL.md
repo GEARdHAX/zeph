@@ -45,7 +45,7 @@ separate managed queue service.
 | File/media storage | Cloudflare R2 | 10GB free, zero egress fees — matters because Render's free compute has ephemeral/limited disk |
 | DNS / TLS | Cloudflare free | Free proxy + TLS termination |
 | WebRTC SFU (mediasoup) | Local Docker only | No free host in this stack reliably compiles/runs mediasoup's native addon — an acknowledged, documented gap, not silently dropped |
-| AI (optional) | Ollama, self-hosted via Docker (`docker compose --profile ai up`) | No API key, no per-token billing, no cloud dependency at all — the strongest version of "works with zero AI configured" is not depending on a cloud AI provider in the first place |
+| AI (optional) | Zeph AI — Groq free tier (Llama 3.1 8B Instant) by default; Ollama, self-hosted via Docker (`docker compose --profile ai up`), remains available as `AI_PROVIDER=ollama` | Groq's free tier keeps this at $0 without needing GPU-capable hosting (the Azure B1s VM, D-045, isn't one) — see `docs/ZEPH-AI-ARCHITECTURE.md`'s Cost Control section for the self-imposed rate limits that protect the free-tier budget from accidental exhaustion. AI stays fully optional either way: every route fails closed with `AI_DISABLED` when unconfigured, and no other Zeph feature depends on it |
 
 ## Where the $0 constraint directly shaped engineering decisions, not just hosting
 

@@ -23,6 +23,7 @@ import useZephLoader from '../../lib/useZephLoader';
 import BrandLogo from '../../components/BrandLogo';
 import ZephWordmark from '../../components/ZephWordmark';
 import Config from '../../config';
+import loginBg from '../../assets/login-bg.png';
 
 const FEATURES = [
   {
@@ -56,15 +57,6 @@ function Login() {
   const { theme, toggle: toggleTheme } = useTheme();
   const zephLoader = useZephLoader();
 
-  // A ref, not state — must be readable/settable synchronously the instant
-  // onLogin/onRegister runs, with zero re-render delay. A second submit
-  // (double-click, double-Enter, or just clicking again before the overlay
-  // has visually blocked the button on a slow first paint) previously fired
-  // a second in-flight request; that second request's own show()/finally
-  // hide() would then race the first one, and could leave zephLoading
-  // toggling on/off mid-cycle — which restarts ZephSpinner's animation
-  // loop from the beginning every time, looking exactly like "stuck on
-  // the dot" even though the sequencer itself was never broken.
   const submittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -100,30 +92,24 @@ function Login() {
   }, []);
 
   const onLogin = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (submittingRef.current) return;
     submittingRef.current = true;
     setIsSubmitting(true);
     zephLoader.show('Logging in');
     try {
       const res = await login(email, password);
-      // token/user must land in reactn global state, not just storage —
-      // App.jsx's route guard reads useGlobal('token') on every render, so
-      // without this the app immediately bounces back to /login right
-      // after a successful login (storage alone doesn't drive routing).
       if (keep) localStorage.setItem('token', res.data.token);
       else sessionStorage.setItem('token', res.data.token);
       setAuthToken(res.data.token);
       setUser(jwtDecode(res.data.token));
       setToken(res.data.token);
-      // initIO is a thunk (initIO(token) -> (dispatch) => {...}) — must be
-      // dispatched, not called with dispatch as a second argument.
       dispatch(initIO(res.data.token));
-      navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath || '/', { replace: true });
+      navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath, { replace: true });
       await setEntryPath(null);
     } catch (err) {
       let errors = {};
-      if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Could not connect to server.';
+      if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Invalid credentials';
       else errors = err.response.data;
       setLoginErrors(errors);
     } finally {
@@ -134,7 +120,7 @@ function Login() {
   };
 
   const onRegister = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (submittingRef.current) return;
     submittingRef.current = true;
     setIsSubmitting(true);
@@ -148,9 +134,6 @@ function Login() {
         password: registerPassword,
         repeatPassword: registerRepeatPassword,
       });
-      // /api/register only creates the account and returns the user doc —
-      // no token. A follow-up login() is what actually authenticates the
-      // client, same credentials just submitted.
       const res = await login(registerEmail, registerPassword);
       if (keep) localStorage.setItem('token', res.data.token);
       else sessionStorage.setItem('token', res.data.token);
@@ -158,17 +141,8 @@ function Login() {
       setUser(jwtDecode(res.data.token));
       setToken(res.data.token);
       dispatch(initIO(res.data.token));
-      // Home reads this once to offer (not force) the onboarding tour —
-      // only ever set here, never in onLogin above — a returning user
-      // never sees this.
       await setIsNewRegistration(true);
 
-      // Friend invites (spec A 24): never bounce a newly registered user
-      // straight to its own page post-registration — Home instead pops an
-      // "Add Friend" dialog over the inbox (see pendingFriendInviteToken in
-      // init.js), so a brand-new user lands in the app, not on another
-      // full-page interstitial. Every other entryPath (a group invite, a
-      // deep-linked room, etc.) keeps navigating there directly, unchanged.
       const friendInviteMatch = entryPath?.match(/^\/invite\/f\/(.+)$/);
       if (friendInviteMatch) {
         await setPendingFriendInviteToken(friendInviteMatch[1]);
@@ -204,12 +178,18 @@ function Login() {
   return (
     <Div100vh>
       <div className="flex h-full w-full overflow-y-auto bg-background text-foreground lg:overflow-hidden">
-        {/* Left Side: Dark Hero Marketing Panel */}
+        {/* Left Side: Dark Hero Marketing Panel with background */}
         <div className="relative hidden w-[45%] max-w-[560px] min-w-[380px] shrink-0 flex-col justify-between overflow-hidden bg-[#070708] p-10 text-white lg:flex xl:p-14">
-          {/* Top Branding */}
-          <div>
+          {/* Background Binary Wave Image */}
+          <div
+            className="pointer-events-none absolute inset-0 bg-cover bg-bottom bg-no-repeat opacity-40"
+            style={{ backgroundImage: `url(${loginBg})` }}
+          />
+
+          {/* Top Branding (Always dark surface logo) */}
+          <div className="relative z-10">
             <Link to="/login" className="flex items-center gap-3">
-              <BrandLogo className="h-8 w-8" />
+              <BrandLogo variant="dark" className="h-8 w-8" />
               <ZephWordmark className="text-2xl font-extrabold tracking-tight text-white" />
             </Link>
 
@@ -218,7 +198,7 @@ function Login() {
               <br />
               <span className="text-primary">Simplified.</span>
             </h1>
-            <p className="mt-4 max-w-[340px] text-sm leading-relaxed text-zinc-400">
+            <p className="mt-4 max-w-[340px] text-sm leading-relaxed text-zinc-300 drop-shadow-sm">
               Real-time messaging, voice &amp; video calls, group chats and more. Built for speed, security and
               seamless communication.
             </p>
@@ -227,12 +207,12 @@ function Login() {
             <div className="mt-10 flex flex-col gap-4">
               {FEATURES.map(({ Icon, title, text }) => (
                 <div key={title} className="flex items-start gap-3.5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-primary border border-white/[0.05]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/50 text-primary border border-white/10 backdrop-blur-none">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-zinc-200">{title}</div>
-                    <div className="text-xs text-zinc-400 mt-0.5">{text}</div>
+                    <div className="text-sm font-semibold text-zinc-100">{title}</div>
+                    <div className="text-xs text-zinc-300 mt-0.5">{text}</div>
                   </div>
                 </div>
               ))}
@@ -240,11 +220,9 @@ function Login() {
           </div>
 
           {/* Footer branding and credits */}
-          <div className="text-xs text-zinc-500 z-10 flex items-center gap-1">
+          <div className="text-xs text-zinc-400 z-10 flex items-center gap-1">
             <span>© {new Date().getFullYear()}</span>
-            <ZephWordmark className="text-xs font-semibold text-zinc-400" />
-            {/* <span>•</span> */}
-            {/* <span className="text-primary font-medium">{Config.brand}</span> */}
+            <ZephWordmark className="text-xs font-semibold text-zinc-300" />
             <span>{`v${info.version || '1.0.0'}`}</span>
             {Config.showCredits && (
               <>
@@ -260,22 +238,10 @@ function Login() {
               </>
             )}
           </div>
-
-          {/* Refined Diagonal Accent Glow */}
-          <div
-            className="pointer-events-none absolute -bottom-28 -right-28 h-80 w-80 rounded-full opacity-35 blur-[90px]"
-            style={{ background: 'radial-gradient(circle, var(--color-primary, #e11d48) 0%, transparent 70%)' }}
-          />
-          <div
-            className="pointer-events-none absolute -bottom-10 right-0 h-48 w-48 rotate-45 opacity-20"
-            style={{
-              background: 'linear-gradient(135deg, transparent 40%, var(--color-primary, #e11d48) 100%)',
-            }}
-          />
         </div>
 
-        {/* Right Side: Auth Panel with Equal Margins and Responsive Layout */}
-        <div className="relative flex flex-1 flex-col justify-between overflow-y-auto px-6 py-6 sm:px-10 sm:py-8 lg:px-12 xl:px-16">
+        {/* Right Side: Auth Forms */}
+        <div className="flex flex-1 flex-col justify-between overflow-y-auto p-6 sm:p-10 lg:p-14">
           {/* Top Bar: Mobile Brand + Theme Toggle */}
           <div className="flex w-full items-center justify-between">
             <div className="lg:hidden">
@@ -285,20 +251,50 @@ function Login() {
               </Link>
             </div>
             <div className="ml-auto">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={toggleTheme}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground"
+                aria-label="Toggle theme"
               >
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                {theme === 'dark' ? 'Light' : 'Dark'}
-              </button>
+              </Button>
             </div>
           </div>
 
-          {/* Centered Form Box */}
-          <div className="mx-auto my-auto w-full max-w-[420px] py-4">
-            {!showCredits ? (
+          {/* Center Content: Login / Register Box or Credits Panel */}
+          <div className="mx-auto my-auto w-full max-w-[400px] py-8">
+            {showCredits ? (
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-bold">Credits & Acknowledgements</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCredits(false)}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <ArrowLeft className="mr-1 h-3.5 w-3.5" />
+                    Back
+                  </Button>
+                </div>
+                <div className="space-y-4 text-xs text-muted-foreground">
+                  <div>
+                    <div className="font-semibold text-foreground">Avatars & Placeholders</div>
+                    <div>Picsum Photos (Lorem Picsum) by David Walsh</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-foreground">Sound Effects</div>
+                    <div>Notification and call audio tracks licensed under Creative Commons.</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-foreground">Open Source Libraries</div>
+                    <div>React, Tailwind CSS, Radix UI, Lucide Icons, Mediasoup, Socket.io</div>
+                  </div>
+                </div>
+              </div>
+            ) : (
               <div>
                 {/* Header: Icon + Welcome back + Greeting */}
                 <div className="mb-6 flex flex-col items-center text-center">
@@ -306,24 +302,25 @@ function Login() {
                     <BrandLogo className="h-12 w-12" />
                   </div>
                   <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-                    Welcome back
-                    {' '}
-                    <span aria-hidden className="inline-block animate-pulse">👋</span>
+                    {tab === 'login' ? 'Welcome back' : 'Create an account'}
                   </h2>
                   <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
-                    Login to continue to
-                    {' '}
-                    <ZephWordmark className="font-semibold text-foreground" />
+                    {tab === 'login'
+                      ? 'Enter your credentials to access your account'
+                      : 'Get started with your free account today'}
                   </p>
                 </div>
 
-                {/* Switch Tabs (Clean underline/segmented style matching mockup) */}
-                <div className="mb-6 flex w-full border-b border-border/80">
+                {/* Tabs Switcher */}
+                <div className="mb-6 flex border-b border-border">
                   <button
                     type="button"
                     role="tab"
                     aria-selected={tab === 'login'}
-                    onClick={() => setTab('login')}
+                    onClick={() => {
+                      setTab('login');
+                      setLoginErrors({});
+                    }}
                     className={`relative flex-1 pb-3 text-center text-sm font-semibold transition-all duration-200 ${
                       tab === 'login'
                         ? 'text-foreground'
@@ -332,14 +329,17 @@ function Login() {
                   >
                     Log In
                     {tab === 'login' && (
-                      <span className="absolute bottom-0 left-0 h-[2.5px] w-full rounded-t-full bg-primary" />
+                      <span className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />
                     )}
                   </button>
                   <button
                     type="button"
                     role="tab"
                     aria-selected={tab === 'register'}
-                    onClick={() => setTab('register')}
+                    onClick={() => {
+                      setTab('register');
+                      setRegisterErrors({});
+                    }}
                     className={`relative flex-1 pb-3 text-center text-sm font-semibold transition-all duration-200 ${
                       tab === 'register'
                         ? 'text-foreground'
@@ -348,51 +348,59 @@ function Login() {
                   >
                     Register
                     {tab === 'register' && (
-                      <span className="absolute bottom-0 left-0 h-[2.5px] w-full rounded-t-full bg-primary" />
+                      <span className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />
                     )}
                   </button>
                 </div>
 
-                {/* Login Form */}
+                {/* Forms */}
                 {tab === 'login' ? (
-                  <form onSubmit={onLogin} className="flex flex-col gap-4">
+                  <form onSubmit={onLogin} className="space-y-4">
                     {loginInfo}
-                    <Input
-                      id="login-email"
-                      type="text"
-                      placeholder="Username or email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                    <Input
-                      id="login-password"
-                      type={showLoginPassword ? 'text' : 'password'}
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      isPassword
-                      showPassword={showLoginPassword}
-                      onTogglePassword={() => setShowLoginPassword((prev) => !prev)}
-                      required
-                    />
+                    <div>
+                      <Input
+                        id="login-email"
+                        type="text"
+                        placeholder="Username or email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="h-11 rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        id="login-password"
+                        type={showLoginPassword ? 'text' : 'password'}
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="h-11 rounded-xl"
+                        showPasswordToggle
+                        isPasswordVisible={showLoginPassword}
+                        onTogglePassword={() => setShowLoginPassword(!showLoginPassword)}
+                      />
+                    </div>
 
-                    {/* Keep me logged in checkbox */}
-                    <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="keep-login"
                           checked={keep}
-                          onCheckedChange={(checked) => setKeep(Boolean(checked))}
+                          onCheckedChange={(checked) => setKeep(!!checked)}
                         />
                         <Label
                           htmlFor="keep-login"
-                          className="cursor-pointer text-xs font-normal text-muted-foreground select-none"
+                          className="cursor-pointer text-xs font-normal text-muted-foreground"
                         >
                           Keep me logged in
                         </Label>
                       </div>
-                      <Link to="/forgot-password" className="text-xs font-semibold text-primary hover:underline">
+                      <Link
+                        to="/forgot-password"
+                        className="font-medium text-primary transition-colors hover:underline"
+                      >
                         Forgot password?
                       </Link>
                     </div>
@@ -400,176 +408,121 @@ function Login() {
                     <Button
                       type="submit"
                       disabled={isSubmitting}
-                      className="mt-2 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99] disabled:opacity-70"
+                      className="h-11 w-full rounded-xl text-sm font-bold shadow-md transition-all hover:shadow-lg"
                     >
-                      Log In
-                      <ArrowRight className="ml-1.5 h-4 w-4" />
+                      {isSubmitting ? 'Logging in...' : 'Log In'}
+                      {!isSubmitting && <ArrowRight className="ml-2 h-4 w-4" />}
                     </Button>
                   </form>
                 ) : (
-                  /* Register Form */
-                  <form onSubmit={onRegister} className="flex flex-col gap-3">
+                  <form onSubmit={onRegister} className="space-y-3.5">
                     {registerInfo}
                     <div className="grid grid-cols-2 gap-2.5">
                       <Input
-                        id="reg-first-name"
                         type="text"
                         placeholder="First Name"
                         value={registerFirstName}
                         onChange={(e) => setRegisterFirstName(e.target.value)}
                         required
+                        className="h-10 rounded-xl"
                       />
                       <Input
-                        id="reg-last-name"
                         type="text"
                         placeholder="Last Name"
                         value={registerLastName}
                         onChange={(e) => setRegisterLastName(e.target.value)}
                         required
+                        className="h-10 rounded-xl"
                       />
                     </div>
                     <Input
-                      id="reg-username"
                       type="text"
                       placeholder="Username"
                       value={registerUsername}
                       onChange={(e) => setRegisterUsername(e.target.value)}
                       required
+                      className="h-10 rounded-xl"
                     />
                     <Input
-                      id="reg-email"
                       type="email"
                       placeholder="Email"
                       value={registerEmail}
                       onChange={(e) => setRegisterEmail(e.target.value)}
                       required
+                      className="h-10 rounded-xl"
                     />
                     <Input
-                      id="reg-password"
                       type={showRegisterPassword ? 'text' : 'password'}
                       placeholder="Password"
                       value={registerPassword}
                       onChange={(e) => setRegisterPassword(e.target.value)}
-                      isPassword
-                      showPassword={showRegisterPassword}
-                      onTogglePassword={() => setShowRegisterPassword((prev) => !prev)}
                       required
+                      className="h-10 rounded-xl"
+                      showPasswordToggle
+                      isPasswordVisible={showRegisterPassword}
+                      onTogglePassword={() => setShowRegisterPassword(!showRegisterPassword)}
                     />
                     <Input
-                      id="reg-repeat-password"
                       type={showRegisterRepeatPassword ? 'text' : 'password'}
                       placeholder="Repeat Password"
                       value={registerRepeatPassword}
                       onChange={(e) => setRegisterRepeatPassword(e.target.value)}
-                      isPassword
-                      showPassword={showRegisterRepeatPassword}
-                      onTogglePassword={() => setShowRegisterRepeatPassword((prev) => !prev)}
                       required
+                      className="h-10 rounded-xl"
+                      showPasswordToggle
+                      isPasswordVisible={showRegisterRepeatPassword}
+                      onTogglePassword={() => setShowRegisterRepeatPassword(!showRegisterRepeatPassword)}
                     />
 
                     <Button
                       type="submit"
                       disabled={isSubmitting}
-                      className="mt-2 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.99] disabled:opacity-70"
+                      className="mt-2 h-11 w-full rounded-xl text-sm font-bold shadow-md transition-all hover:shadow-lg"
                     >
-                      Register
-                      <ArrowRight className="ml-1.5 h-4 w-4" />
+                      {isSubmitting ? 'Creating account...' : 'Create Account'}
+                      {!isSubmitting && <ArrowRight className="ml-2 h-4 w-4" />}
                     </Button>
                   </form>
                 )}
-              </div>
-            ) : (
-              /* Credits & Open Source Attributions Panel */
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2 border-b border-border/80 pb-3">
-                  <button
-                    type="button"
-                    aria-label="Close credits"
-                    onClick={() => setShowCredits(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </button>
-                  <h3 className="text-base font-bold tracking-tight">Open Source Credits &amp; Thanks</h3>
-                </div>
 
-                <div className="flex flex-col gap-3 text-xs leading-relaxed text-muted-foreground">
-                  <p>
-                    Special thanks to the open source community and creators whose work helps power this platform:
-                  </p>
-                  <div className="rounded-xl border border-border/60 bg-muted/40 p-3.5 flex flex-col gap-2">
-                    <div className="font-semibold text-foreground">Avatar Imagery</div>
-                    <div>
-                      Random initial user avatars provided by{' '}
-                      <a
-                        href="https://picsum.photos"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline font-medium"
+                {/* Footer terms / switch */}
+                <div className="mt-6 text-center text-xs text-muted-foreground">
+                  {tab === 'login' ? (
+                    <span>
+                      Don&apos;t have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTab('register');
+                          setRegisterErrors({});
+                        }}
+                        className="font-bold text-primary transition-colors hover:underline"
                       >
-                        Picsum Photos
-                      </a>
-                      .
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/40 p-3.5 flex flex-col gap-2">
-                    <div className="font-semibold text-foreground">Icons &amp; Assets</div>
-                    <div>
-                      Icons beautifully crafted by{' '}
-                      <a
-                        href="https://lucide.dev"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline font-medium"
+                        Register now
+                      </button>
+                    </span>
+                  ) : (
+                    <span>
+                      Already have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTab('login');
+                          setLoginErrors({});
+                        }}
+                        className="font-bold text-primary transition-colors hover:underline"
                       >
-                        Lucide Icons
-                      </a>
-                      .
-                    </div>
-                  </div>
+                        Log In
+                      </button>
+                    </span>
+                  )}
                 </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-2 h-10 w-full rounded-xl text-xs font-semibold"
-                  onClick={() => setShowCredits(false)}
-                >
-                  Back to Login
-                </Button>
               </div>
             )}
           </div>
 
-          {/* Right Bottom Footer: Disclaimer + Switch view */}
-          <div className="flex flex-col items-center gap-1 text-center text-xs text-muted-foreground sm:flex-row sm:justify-between">
-            <span>By continuing, you agree to our Terms.</span>
-            <div className="flex items-center gap-1 font-medium text-foreground">
-              {tab === 'login' ? (
-                <>
-                  <span>Don&apos;t have an account?</span>
-                  <button
-                    type="button"
-                    onClick={() => setTab('register')}
-                    className="font-bold text-primary transition-colors hover:underline"
-                  >
-                    Register
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span>Already have an account?</span>
-                  <button
-                    type="button"
-                    onClick={() => setTab('login')}
-                    className="font-bold text-primary transition-colors hover:underline"
-                  >
-                    Log In
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+          {/* Bottom spacer for balance */}
+          <div className="hidden lg:block" />
         </div>
       </div>
     </Div100vh>

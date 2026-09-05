@@ -197,6 +197,8 @@ router.post('/meeting/answer', passport.authenticate('jwt', { session: false }, 
 router.post('/meeting/close', passport.authenticate('jwt', { session: false }, null), require('./meeting/close'));
 router.post('/meeting/list', passport.authenticate('jwt', { session: false }, null), require('./meeting/list'));
 router.post('/meeting/delete', passport.authenticate('jwt', { session: false }, null), require('./meeting/delete'));
+router.post('/meeting/:id/summarize', passport.authenticate('jwt', { session: false }, null), require('./meeting/summarize'));
+router.get('/meeting/:id/summary', passport.authenticate('jwt', { session: false }, null), require('./meeting/get-summary'));
 
 router.post('/auth/change', require('./auth/change'));
 router.post('/auth/code', require('./auth/code'));
@@ -228,6 +230,9 @@ router.post(
 router.post('/ai/summarize', passport.authenticate('jwt', { session: false }, null), require('./ai/summarize'));
 router.post('/ai/translate', passport.authenticate('jwt', { session: false }, null), require('./ai/translate'));
 router.post('/ai/draft-reply', passport.authenticate('jwt', { session: false }, null), require('./ai/draft-reply'));
+router.post('/ai/rewrite', passport.authenticate('jwt', { session: false }, null), require('./ai/rewrite'));
+router.post('/ai/title', passport.authenticate('jwt', { session: false }, null), require('./ai/title'));
+router.post('/ai/topics', passport.authenticate('jwt', { session: false }, null), require('./ai/topics'));
 
 router.post('/logout', passport.authenticate('jwt', { session: false }, null), require('./logout'));
 router.get('/sessions', passport.authenticate('jwt', { session: false }, null), require('./sessions/list'));

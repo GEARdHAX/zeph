@@ -54,9 +54,13 @@ services:
     networks:
       - chitcx_net
 
-  # ── Ollama (optional local AI — summarize/translate/draft-reply) ──
+  # ── Ollama (optional local AI alternative to Zeph AI's default Groq provider) ──
   # Not a backend dependency: the app runs fully without this container.
-  # Set AI_PROVIDER=ollama in backend/.env to enable AI features against it.
+  # Zeph AI (see docs/ZEPH-AI-ARCHITECTURE.md) defaults to AI_PROVIDER=groq
+  # (cloud, no container needed). Set AI_PROVIDER=ollama in backend/.env
+  # instead to run the chat assistant against this local container; the
+  # separate Security AI subsystem (AI_SECURITY_ENABLED) always uses Ollama
+  # regardless of AI_PROVIDER.
   ollama:
     image: ollama/ollama:latest
     container_name: chitcx_ollama

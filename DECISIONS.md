@@ -5,6 +5,185 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-047: Zeph AI Phases 10-14 — frontend integration, observability, load testing, hardening, Meeting AI — 2026-09-05
+
+**Context:** D-046 shipped the backend governance pipeline (gateway,
+eligibility, quota, dedup, BullMQ, provider) with zero frontend UI and no
+Meeting AI (explicitly deferred — no transcript source existed). This pass
+completes the remaining roadmap phases.
+
+**Phase 10 (frontend):** Wired Summarize/Extract-Topics into `TopBar.jsx`'s
+existing menu, Draft-Reply/Rewrite into `BottomBar.jsx`'s composer,
+Translate into `Message.jsx`'s per-message hover menu, and a new
+opt-in Meeting Recorder into the call control bar — all through the
+existing action-file/axios/react-toastify conventions, zero new frontend
+dependency. Every action gets cancellation (`AbortController` + unmount
+cleanup), duplicate-submission prevention, and consistent error copy via a
+new `frontend/src/lib/aiErrorMessage.js` mapping backend rejection reasons
+to user-facing sentences.
+
+**A real divergence found and fixed along the way:** `BottomBar.jsx` on
+disk (uncommitted, present before this session started) had silently
+diverged from the committed HEAD version — missing the typing-indicator
+dispatch and SLOW_MODE toast entirely, using a different state-management
+shape (`useState` vs `useGlobal` for `pictureRefs`/`isPicker`). Discovered
+only because the file's existing test suite (22 tests) failed against my
+additions in ways that didn't implicate my changes. Reset to HEAD and
+reapplied the Phase 10 additions cleanly rather than building on the
+regressed version — user confirmed this was the right call before
+proceeding (see the corresponding turn in this session's transcript).
+
+**Phase 11 (observability):** Every AI request now carries a `requestId`
+(pino-http's `req.id`, uuid fallback via `ai/telemetry.js#resolveRequestId`)
+through every stage — route → eligibility → gateway → provider → BullMQ
+worker — logged as structured pino events (`ai_eligibility_rejected`,
+`ai_cache_hit`, `ai_job_queued`, `ai_quota_rejected`, `ai_dedup_in_progress`,
+`ai_provider_call_failed`, `ai_output_validation_failed`,
+`ai_request_succeeded` with a queueWaitMs/providerLatencyMs/totalLatencyMs
+breakdown, `ai_worker_*`). No new observability dependency added — this
+project's own Phase 8 audit already declined to add APM for a single
+measurement pass, and the same reasoning applies here; "dashboards" means
+which existing-logger fields to graph, not a shipped dashboard app.
+
+**Phase 12 (load testing):** `backend/loadtest/ai-load.js` +
+`mock-groq-server.js` (a local, zero-cost HTTP stand-in for Groq — never
+the real API, so no quota/cost is ever burned by this suite) +
+`seed-ai-room.js`, matching the existing `loadtest/` convention exactly
+(plain Node, no autocannon/artillery/k6). Actually run end-to-end against
+local throwaway Mongo+Redis: confirmed 10 concurrent identical
+group-summary requests collapse into exactly 1 BullMQ job (dedup working),
+cache hits skip the provider entirely, per-user quota rejects at exactly
+its configured threshold (5/min) in single-digit milliseconds without
+touching the provider, and a 500-message conversation's context builder
+correctly bounds input to ~4019 estimated tokens (right at the 4000-token
+budget). No production capacity number is claimed — see
+`ZEPH-AI-ARCHITECTURE.md`'s Phase 12 section for the full measured results
+and the explicit "what this does NOT claim" boundary.
+
+**Phase 13 (hardening) — two real bugs found and fixed, not just audited:**
+1. `ai/quota.js#checkQuota` incremented per-user minute/day counters on
+   every *attempt*, before knowing the provider call would succeed — a
+   user hitting nothing but Groq timeouts could exhaust their whole daily
+   quota with zero successful results. Fixed: quota check is now read-only;
+   `recordUsage()` fires only after `validateTextOutput` confirms success.
+2. `ai/contextBuilder.js`'s trim loop can't shrink a single oversized
+   message (`messagesUsed` never goes below 1) — confirmed empirically that
+   a 2MB `translate`/`rewrite` input sailed through at 125x the token
+   budget. Fixed: per-message hard truncation (`MAX_MESSAGE_CHARS`) before
+   the trim loop, plus a route-level `413 INPUT_TOO_LARGE` guard that
+   rejects oversized input before any processing at all.
+
+**Phase 14 (Meeting AI) — built as a real feature per explicit instruction,
+not a placeholder:** client-side `MediaRecorder` (opt-in, the caller's own
+mic only) → existing `upload-media.js` pipeline (audio category, already
+supported) → new `POST /api/meeting/:id/summarize` → Groq Whisper
+transcription (new `provider.transcribe()`, same API key/account as chat
+completions, no separate STT dependency) → raw audio deleted immediately
+after transcription (only text persists, in a new `MeetingTranscript`
+model) → eligibility (`Meeting.endedAt`, set by `mediasoup/index.js` only
+when the last participant leaves; duration/participant/transcript-word
+checks) → summary through the existing `ai/gateway.js` pipeline → new
+`queues/meetingAiQueue.js`/`meetingAiWorker.js` (BullMQ, `jobId:
+meeting:{id}` preventing duplicate generation). Deliberately client-side,
+not a server-side mediasoup RTP tap: mediasoup has no existing
+plain-transport/recording plumbing, and — the decisive fact — mediasoup is
+**disabled in this app's own production deployment**
+(`MEDIASOUP_ENABLED=false`, D-045/PHASE8-CAPACITY-REPORT.md), so a
+server-side pipeline built on it would be dead code where it matters most.
+
+**Tests:** 104 new/changed backend tests (aiMeetingEligibility: 12,
+meetingAi API: 13, aiGateway quota-accounting: 7, aiContextBuilder
+hardening: +4, aiProvider transcribe: +6, info.js meetingAiEnabled: 4,
+plus existing suites re-verified), full backend suite 1198/1201 passing
+(3 pre-existing unrelated flakes, confirmed passing in isolation — one
+timing-window test in `securityAiFeatureExtraction`, two 10k-event
+stress-timeout tests in `securityAiResourceExhaustion`, none touching any
+file this pass changed). Frontend: 15 new tests
+(BottomBarAi: 6, TopBarAi: 9 across two edits) + 6 (MeetingRecorder) + 5
+(aiErrorMessage) + 5 (MessageAi) = 508/508 frontend tests passing overall.
+
+---
+
+## D-046: Zeph AI — Groq/Llama 3.1 8B Instant replaces Ollama as the chat-assistant provider, full governance pipeline added — 2026-09-04
+
+**Context:** D-018 (in this file's numbering, distinct from `docs/`'s own
+Phase-numbered D-018 low-network-pass entry — see that section's own AI
+provider reasoning in the original `AI-STRATEGY.md`) established Ollama
+(local, self-hosted, zero cloud API keys) as the sole AI provider for the
+chat assistant (summarize/translate/draft-reply). That reasoning was sound
+for "no API key to expose, no per-token billing risk" — but this project
+targets a real portfolio deployment (D-045's Azure B1s VM, a free-tier
+Student-benefit VM, not GPU-capable hardware), where self-hosting an LLM
+means either a tiny, low-quality model (`llama3.2:1b`) or CPU inference too
+slow to demo live.
+
+**Decision:** Added `groq` as a provider adapter in `ai/provider.js`
+(OpenAI-compatible Chat Completions API, one `fetch` call — no SDK
+dependency added) and made it the default target for the chat assistant:
+Llama 3.1 8B Instant via Groq's free tier. `ollama` remains available (both
+as `AI_PROVIDER=ollama` for the chat assistant, and unconditionally for the
+separate Security AI subsystem, Phase 6, which has its own
+`AI_SECURITY_ENABLED` flag and different privacy reasoning — security
+telemetry analysis staying fully local is a deliberate, unrelated choice
+not revisited here).
+
+Alongside the provider swap, built the full governance pipeline the earlier
+Ollama-only implementation didn't need as urgently (a local model has no
+per-request cost or external rate limit to protect against): a centralized
+Eligibility Engine (`ai/policy.js`, `ai/eligibility.js` — minimum message
+counts per feature, summary freshness), layered Redis-backed Quota/Abuse
+Protection (`ai/quota.js` — per-user minute/day/concurrent, per-IP minute,
+global concurrent, on top of the pre-existing `aiLimiter` express-rate-limit
+middleware), a Context Builder with token budgets (`ai/contextBuilder.js`),
+Redis-backed request deduplication/distributed locking
+(`ai/dedup.js` — same SET NX PX + Lua compare-delete pattern as every other
+Redis-backed lock in this codebase), a durable summary cache
+(`models/ConversationSummary.js`) with freshness-based regeneration, a
+BullMQ queue for the one genuinely expensive operation (conversation
+summaries — `queues/aiQueue.js`/`aiWorker.js`, mirroring
+`securityAiQueue.js`/`securityAiWorker.js` exactly), and output validation
+(`ai/outputValidation.js`) that treats every model response as untrusted
+external input. See `docs/ZEPH-AI-ARCHITECTURE.md` for the full pipeline,
+Big-O analysis, and cost model.
+
+Two new features shipped alongside the governance rewrite (Phase 20's P0/P1
+list): message rewrite (`POST /api/ai/rewrite`) and conversation
+title/topic suggestion (`POST /api/ai/title`, `POST /api/ai/topics`) — all
+route through the same gateway (`ai/gateway.js#runGoverned`) as the
+pre-existing three routes, not a separate code path.
+
+**Not built, deliberately:** meeting summary. `models/Meeting.js` has no
+transcript field and no speech-to-text pipeline exists anywhere in this
+codebase — building eligibility/generation logic against a data source that
+doesn't exist would be speculative infrastructure with no way to test it
+end-to-end. Real future work once a transcription pipeline exists, not
+scaffolded ahead of that need. Also not built: a vector database/RAG
+pipeline, hierarchical multi-pass summarization, and any self-hosted
+model-serving infrastructure — none were required by an actual feature, and
+adding them would have contradicted the project's zero-cost, minimal-
+infrastructure constraints (`CLAUDE.md`'s Zero-Cost Architecture and
+Engineering Priorities sections).
+
+**Trade-off:** Groq is a cloud dependency Ollama wasn't — an outage or
+free-tier exhaustion on Groq's side degrades AI features (never core
+messaging/calls/auth, which have zero AI dependency by construction — see
+`ai/provider.js`'s fail-closed `disabledProvider` and every route's own
+`AI_DISABLED`/`PROVIDER_UNAVAILABLE` handling). This is judged worth it for
+a portfolio deployment on non-GPU free-tier hardware, where the alternative
+(a 1B-parameter local model) would demo worse than no AI feature at all.
+
+**Verification:** `test/ai.test.js` (rewritten for Groq, adds eligibility-
+gating, freshness, cross-user-authorization, and output-validation cases),
+plus new unit suites `test/aiPolicy.test.js`, `test/aiEligibility.test.js`,
+`test/aiQuota.test.js`, `test/aiDedup.test.js`,
+`test/aiOutputValidation.test.js`, `test/aiContextBuilder.test.js`,
+`test/aiProvider.test.js` — 55 new/changed tests, full backend suite
+(1152 tests) green except one pre-existing, unrelated flaky test
+(`conversation-restore.test.js`, passes in isolation, no shared code with
+Zeph AI).
+
+---
+
 ## D-045: Azure B1s VM adopted as active backend host — explicitly time-boxed, 12-month clock — 2026-09-01
 
 **Context:** D-011 (2026-07-18) left Render as the active backend host with

@@ -64,7 +64,7 @@ function DaySeparator({ date }) {
   );
 }
 
-function Messages() {
+function Messages({ aiEnabled }) {
   const user = useGlobal('user')[0] || {};
   const messages = useSelector((state) => state.io.messages) || [];
   const room = useSelector((state) => state.io.room) || {};
@@ -114,6 +114,7 @@ function Messages() {
           next={messages[index + 1]}
           onOpen={setOpen}
           roomID={room._id}
+          aiEnabled={aiEnabled}
         />
       </div>
     );
