@@ -1,12 +1,12 @@
 const Room = require('../../models/Room');
 const store = require('../../store');
-const { getProvider } = require('../../ai/provider');
+const { aiTextEnabled } = require('../../ai/providerRouter');
 const { REJECTION_REASONS } = require('../../ai/policy');
 const { buildBoundedContext } = require('../../ai/contextBuilder');
 const { runGoverned } = require('../../ai/gateway');
 const { fetchRecentMessages } = require('../../ai/summaryService');
 const Message = require('../../models/Message');
-const { resolveRequestId } = require('../../ai/telemetry');
+const { resolveRequestId, aiFailureResponse } = require('../../ai/telemetry');
 
 // Zeph AI — POST /api/ai/draft-reply (also serves as "smart reply", Phase 20
 // P1 — same shape: bounded recent context, no conversation-size minimum per
@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
   if (!roomID) return res.status(400).json({ error: true, requestId });
 
   const config = store.config;
-  if (config.aiProvider === 'none' || !config.aiProvider || !getProvider(config).enabled) {
+  if (!aiTextEnabled(config)) {
     return res.status(503).json({
       error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'AI features are not enabled on this server.', requestId,
     });
@@ -61,11 +61,6 @@ module.exports = async (req, res) => {
     scope: room.isGroup ? 'group' : 'dm',
   });
 
-  if (!result.ok) {
-    const status = result.reason === REJECTION_REASONS.RATE_LIMITED || result.reason === REJECTION_REASONS.QUOTA_EXCEEDED ? 429 : 502;
-    return res.status(status).json({
-      error: true, reason: result.reason, message: 'AI provider request failed.', requestId: result.requestId,
-    });
-  }
+  if (!result.ok) return aiFailureResponse(res, result, requestId);
   res.status(200).json({ draft: result.text, requestId: result.requestId });
 };

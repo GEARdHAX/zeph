@@ -3,7 +3,7 @@ import { useGlobal } from 'reactn';
 import { useNavigate } from 'react-router-dom';
 import DataTable from 'react-data-table-component';
 import {
-  Search, Plus, UserCheck, Shield, Edit2, Trash2, ArrowLeft, ShieldAlert, Radar, Cpu, Network, Sparkles,
+  Search, Plus, UserCheck, Shield, Edit2, Trash2, ArrowLeft, ShieldAlert, Radar, Cpu, Network, Sparkles, Gauge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useTheme from '../../lib/useTheme';
@@ -100,6 +100,7 @@ function Admin() {
       name: 'Actions',
       sortable: false,
       right: true,
+      grow: 1.3,
       cell: (row) => (
         <div className="flex items-center gap-1">
           <Button
@@ -113,6 +114,19 @@ function Admin() {
           >
             <Edit2 className="h-3.5 w-3.5" />
             Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+            onClick={() => {
+              setUser(row);
+              setPopup('ai-quota');
+            }}
+            title="View / reset this user's AI usage"
+          >
+            <Gauge className="h-3.5 w-3.5" />
+            AI usage
           </Button>
           <Button
             variant="ghost"

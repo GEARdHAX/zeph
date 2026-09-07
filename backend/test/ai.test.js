@@ -19,6 +19,15 @@ afterAll(async () => {
   await db.closeDatabase();
 });
 
+// Reset AI config to "disabled" BEFORE each test, not just after — otherwise
+// the very first test inherits whatever the real .env's AI_PROVIDER is
+// (config.js reads it), which is now 'groq' on a machine with a key set.
+// Each test that wants AI enabled opts in explicitly (enableGroq()).
+beforeEach(() => {
+  store.config.aiProvider = 'none';
+  store.config.groqApiKey = null;
+});
+
 afterEach(async () => {
   await db.clearDatabase();
   store.config.aiProvider = 'none';

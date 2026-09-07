@@ -1,4 +1,6 @@
-const { buildBoundedContext, estimateTokens, MAX_MESSAGE_CHARS } = require('../src/ai/contextBuilder');
+const {
+  buildBoundedContext, boundText, estimateTokens, MAX_MESSAGE_CHARS,
+} = require('../src/ai/contextBuilder');
 
 describe('estimateTokens', () => {
   it('estimates roughly chars/4', () => {
@@ -58,5 +60,35 @@ describe('buildBoundedContext', () => {
       const result = buildBoundedContext([{ author: 'user', content: normal }], { aiMaxInputTokens: 4000 });
       expect(result.text).toContain(normal.trim());
     });
+  });
+});
+
+// boundText — for translate/rewrite, which take ONE piece of client text and
+// must NOT get the "author: " conversation prefix (a real bug found in live
+// Groq testing: "translate 'Hello'" returned "usuario: Hola" because the
+// prompt contained "Message: user: Hello").
+describe('boundText', () => {
+  it('returns the raw text with no author prefix', () => {
+    const result = boundText('Hello, how are you?', { aiMaxInputTokens: 4000 });
+    expect(result.text).toBe('Hello, how are you?');
+    expect(result.text).not.toMatch(/^\w+:\s/);
+  });
+
+  it('truncates text longer than MAX_MESSAGE_CHARS', () => {
+    const huge = 'z'.repeat(100000);
+    const result = boundText(huge, { aiMaxInputTokens: 1000000 });
+    expect(result.text.length).toBeLessThanOrEqual(MAX_MESSAGE_CHARS + 3); // + "..."
+  });
+
+  it('hard-caps at the token budget for a genuinely enormous input', () => {
+    const huge = 'z'.repeat(2_000_000);
+    const result = boundText(huge, { aiMaxInputTokens: 4000 });
+    expect(result.text.length).toBeLessThanOrEqual(4000 * 4);
+    expect(result.inputTokenEstimate).toBeLessThanOrEqual(4000);
+  });
+
+  it('handles empty/undefined input without throwing', () => {
+    expect(boundText('').text).toBe('');
+    expect(boundText(undefined).text).toBe('');
   });
 });

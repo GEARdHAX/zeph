@@ -18,9 +18,12 @@ const getQueue = () => {
   return queue;
 };
 
-// jobId = room:messageCountAtSummary boundary (Phase 8's dedupe key) — BullMQ
-// refuses a second job with the same id while one is active/waiting, so N
-// simultaneous requests for the same summary enqueue at most one job.
+// jobId = `summary-{roomId}-{messageCount}` boundary (Phase 8's dedupe key) —
+// BullMQ refuses a second job with the same id while one is active/waiting,
+// so N simultaneous requests for the same summary enqueue at most one job.
+// NOTE: BullMQ custom job ids MUST NOT contain ':' (it throws
+// "Custom Id cannot contain :"), so this uses '-' as the separator even
+// though Redis keys elsewhere (ai/dedup.js locks) idiomatically use ':'.
 const enqueueSummaryJob = async ({
   roomId, conversationType, userId, messageCountAtSummary, requestId,
 }) => {
@@ -30,7 +33,7 @@ const enqueueSummaryJob = async ({
     await q.add('generate-summary', {
       roomId, conversationType, userId, requestId,
     }, {
-      jobId: `summary:${roomId}:${messageCountAtSummary}`,
+      jobId: `summary-${roomId}-${messageCountAtSummary}`,
       attempts: 2,
       backoff: { type: 'exponential', delay: 3000 },
       timeout: 20000,

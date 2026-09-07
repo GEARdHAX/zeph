@@ -17,10 +17,11 @@ const getQueue = () => {
   return queue;
 };
 
-// jobId = meetingId — BullMQ refuses a second job with the same id while
-// one is active/waiting, so a duplicate "generate summary" click while
-// transcription/summarization is already running enqueues nothing new
-// (Phase 14: "Prevent duplicate summary generation").
+// jobId = `meeting-{meetingId}` — BullMQ refuses a second job with the same
+// id while one is active/waiting, so a duplicate "generate summary" click
+// while transcription/summarization is already running enqueues nothing new
+// (Phase 14: "Prevent duplicate summary generation"). BullMQ custom job ids
+// cannot contain ':', hence the '-' separator.
 const enqueueMeetingSummaryJob = async ({
   meetingId, mediaId, userId, requestId,
 }) => {
@@ -30,7 +31,7 @@ const enqueueMeetingSummaryJob = async ({
     await q.add('process-meeting', {
       meetingId, mediaId, userId, requestId,
     }, {
-      jobId: `meeting:${meetingId}`,
+      jobId: `meeting-${meetingId}`,
       attempts: 2,
       backoff: { type: 'exponential', delay: 5000 },
       timeout: 120000, // transcription of up to a 25MB audio file can genuinely take a while

@@ -457,7 +457,7 @@ function BottomBar({ aiEnabled }) {
   }
 
   return (
-    <div data-tour="message-composer" className="relative flex w-full items-center gap-2 border-t border-border/60 bg-card px-3.5 pt-3 pb-6 sm:py-2.5 text-card-foreground">
+    <div data-tour="message-composer" className="relative flex w-full items-end gap-1.5 sm:gap-2 border-t border-border/60 bg-card px-2.5 sm:px-4 py-2 sm:py-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-2.5 text-card-foreground">
       {uploadProgress.length > 0 && (
         <div className="absolute -top-1.5 left-3.5 right-3.5 flex -translate-y-full flex-col gap-1.5 rounded-xl border border-border/60 bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm">
           {uploadProgress.map((item) => (
@@ -486,7 +486,7 @@ function BottomBar({ aiEnabled }) {
         </div>
       )}
 
-      <div className="flex items-center gap-0.5 text-muted-foreground shrink-0">
+      <div className="flex items-center gap-0.5 text-muted-foreground shrink-0 pb-1">
         <Button
           data-tour="emoji-button"
           variant="ghost"
@@ -541,13 +541,10 @@ function BottomBar({ aiEnabled }) {
         </Button>
       </div>
 
-      {/* Text input with clean rounded container — contentEditable, not a
-          plain input, so bold/italic/etc formatting syntax can be
-          live-styled as the user types (see RichMessageInput.jsx for why a
-          plain input can't do this at all). */}
-      <div data-tour="message-input" className="relative flex-1 flex items-center">
+      {/* Text input with clean rounded container — WhatsApp style multi-line auto-expanding input */}
+      <div data-tour="message-input" className="relative flex-1 min-w-0">
         <RichMessageInput
-          className="flex h-10 w-full items-center overflow-x-auto overflow-y-hidden whitespace-nowrap rounded-xl border border-input bg-muted/40 px-3.5 text-xs text-foreground outline-none transition-all focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/20"
+          className="w-full min-h-[40px] max-h-[140px] sm:max-h-[160px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words rounded-2xl border border-input/80 bg-muted/40 px-3.5 sm:px-4 py-2.5 text-xs sm:text-[13px] leading-5 text-foreground outline-none transition-all focus:border-border focus:bg-background focus:ring-1 focus:ring-ring/30 scrollbar-thin"
           placeholder="Type something to send..."
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -556,7 +553,7 @@ function BottomBar({ aiEnabled }) {
         />
       </div>
 
-      <div className="flex items-center gap-1.5 ml-2">
+      <div className="flex items-center gap-1 sm:gap-1.5 ml-1 sm:ml-2 pb-0.5 shrink-0">
         {aiEnabled && text.trim() && (
           <Button
             variant="ghost"
@@ -587,7 +584,7 @@ function BottomBar({ aiEnabled }) {
         <Button
           data-tour="send-button"
           size="icon"
-          className="h-9 w-9 rounded-xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+          className="h-9 w-9 rounded-2xl bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-transform active:scale-95 shrink-0"
           aria-label="Send message"
           onClick={sendMessage}
         >

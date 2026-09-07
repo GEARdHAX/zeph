@@ -1,13 +1,13 @@
 const Room = require('../../models/Room');
 const ConversationSummary = require('../../models/ConversationSummary');
 const store = require('../../store');
-const { getProvider } = require('../../ai/provider');
+const { aiTextEnabled } = require('../../ai/providerRouter');
 const { buildPolicy, REJECTION_REASONS } = require('../../ai/policy');
 const { checkSummaryEligibility, isSummaryStale } = require('../../ai/eligibility');
 const { generateAndPersistSummary } = require('../../ai/summaryService');
 const { enqueueSummaryJob, getQueue } = require('../../queues/aiQueue');
 const {
-  logEligibilityRejected, logCacheHit, logQueued, resolveRequestId,
+  logEligibilityRejected, logCacheHit, logQueued, resolveRequestId, aiFailureResponse,
 } = require('../../ai/telemetry');
 
 // Zeph AI — POST /api/ai/summarize (Phases 3-9). Gateway entry point:
@@ -21,7 +21,7 @@ module.exports = async (req, res) => {
   if (!roomID) return res.status(400).json({ error: true, requestId });
 
   const config = store.config;
-  if (config.aiProvider === 'none' || !config.aiProvider || !getProvider(config).enabled) {
+  if (!aiTextEnabled(config)) {
     return res.status(503).json({
       error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'AI features are not enabled on this server.', requestId,
     });
@@ -83,12 +83,7 @@ module.exports = async (req, res) => {
   const result = await generateAndPersistSummary({
     roomId: roomID, userId: req.user.id, ip: req.ip, currentMessageCount: eligibility.count, requestId, scope: conversationType,
   });
-  if (!result.ok) {
-    const status = result.reason === REJECTION_REASONS.RATE_LIMITED || result.reason === REJECTION_REASONS.QUOTA_EXCEEDED ? 429 : 502;
-    return res.status(status).json({
-      error: true, reason: result.reason, message: 'AI provider request failed.', requestId: result.requestId || requestId,
-    });
-  }
+  if (!result.ok) return aiFailureResponse(res, result, requestId);
   res.status(200).json({
     summary: result.text, cached: false, requestId: result.requestId || requestId,
   });

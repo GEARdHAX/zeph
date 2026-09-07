@@ -17,12 +17,13 @@ const getQueue = () => {
   return queue;
 };
 
-// jobId = incidentId (spec section 22: "jobs must be idempotent") — BullMQ
-// refuses to enqueue a second job with an id already active/waiting, so
-// correlateEvent() folding 50 more events into the SAME incident within a
-// short window can call this 50 times without producing 50 queued AI
-// analyses for one incident; the SECOND call for the same incidentId is a
-// silent no-op at the BullMQ level.
+// jobId = `incident-{incidentId}` (spec section 22: "jobs must be
+// idempotent") — BullMQ refuses to enqueue a second job with an id already
+// active/waiting, so correlateEvent() folding 50 more events into the SAME
+// incident within a short window can call this 50 times without producing
+// 50 queued AI analyses for one incident; the SECOND call for the same
+// incidentId is a silent no-op at the BullMQ level. ('-' separator because
+// BullMQ custom job ids cannot contain ':'.)
 const enqueueIncidentAnalysis = async (incidentId, priority) => {
   const q = getQueue();
   if (!q) {
@@ -31,7 +32,7 @@ const enqueueIncidentAnalysis = async (incidentId, priority) => {
   }
   try {
     await q.add('analyze-incident', { incidentId }, {
-      jobId: `incident:${incidentId}`,
+      jobId: `incident-${incidentId}`,
       priority, // BullMQ: LOWER number = higher priority (spec section 23's CRITICAL/HIGH/MEDIUM/LOW mapped to 1/2/3/4 by the caller)
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },

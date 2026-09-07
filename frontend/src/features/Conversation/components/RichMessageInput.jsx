@@ -241,7 +241,7 @@ function RichMessageInput({
       role="textbox"
       tabIndex={0}
       aria-label={placeholder}
-      aria-multiline="false"
+      aria-multiline="true"
       contentEditable
       suppressContentEditableWarning
       onInput={handleInput}

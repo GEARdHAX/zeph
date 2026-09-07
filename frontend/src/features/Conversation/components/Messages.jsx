@@ -54,7 +54,7 @@ function JoinedEmptyState({ joinInfo }) {
 
 function DaySeparator({ date }) {
   return (
-    <div className="flex items-center gap-3 px-1 py-1.5 sm:px-2">
+    <div className="flex items-center gap-3 my-2.5 px-1 select-none">
       <div className="h-px flex-1 bg-border/60" />
       <span className="shrink-0 rounded-full bg-muted/80 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-xs">
         {dayLabel(date)}
@@ -181,11 +181,11 @@ function Messages({ aiEnabled }) {
   return (
     <div
       data-tour="message-area"
-      className="relative z-0 flex-1 w-full overflow-y-auto overflow-x-hidden flex justify-center py-2 bg-transparent"
+      className="relative z-0 flex-1 w-full overflow-y-auto overflow-x-hidden py-2 bg-transparent"
       ref={chat}
       onScroll={onScroll}
     >
-      <div className="flex flex-col w-full mx-auto px-4 sm:px-6 md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
+      <div className="flex flex-col w-full px-3 sm:px-6">
         {open && (
           <Suspense fallback={<LazyFallback />}>
             <MediaViewerShell

@@ -92,9 +92,9 @@ describe('Message — Translate (AI)', () => {
     expect(translateMessage).not.toHaveBeenCalled();
   });
 
-  it('shows a rate-limited error message distinctly from a generic failure', async () => {
+  it('shows a rate-limited message with a "try again in X" hint', async () => {
     translateMessage.mockRejectedValueOnce({
-      response: { status: 429, data: { reason: 'RATE_LIMITED' } },
+      response: { status: 429, data: { reason: 'RATE_LIMITED', retryAfter: 25 } },
     });
     const user = userEvent.setup();
     renderMessage(TEXT_MESSAGE);
@@ -104,7 +104,9 @@ describe('Message — Translate (AI)', () => {
     await user.click(await screen.findByText('French'));
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('wait a moment'));
+      const msg = toast.error.mock.calls[0][0];
+      expect(msg).toContain('using AI a bit fast');
+      expect(msg).toMatch(/in about \d+ seconds/);
     });
   });
 

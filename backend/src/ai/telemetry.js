@@ -32,6 +32,38 @@ const logQueued = ({ requestId, feature, scope }) => {
   logger.info({ requestId, feature, scope }, 'ai_job_queued');
 };
 
+// Shared 4xx/5xx responder for a failed runGoverned() result. Every AI
+// route had an identical block; this is the one place it lives now.
+// - RATE_LIMITED / QUOTA_EXCEEDED  -> 429, with quota reset info so the
+//   frontend can show a "come back in X" modal (retryAfter seconds, resetAt
+//   ISO, quotaDetail identifying which limit).
+// - GENERATION_IN_PROGRESS         -> 409 (a dedup collision, caller should
+//   poll for the in-flight result).
+// - everything else (provider down, invalid output) -> 502.
+const REQUOTA_REASONS = new Set(['RATE_LIMITED', 'QUOTA_EXCEEDED']);
+const aiFailureResponse = (res, result, requestIdFallback) => {
+  const requestId = result.requestId || requestIdFallback;
+  if (REQUOTA_REASONS.has(result.reason)) {
+    return res.status(429).json({
+      error: true,
+      reason: result.reason,
+      quotaDetail: result.quotaDetail,
+      retryAfter: result.retryAfter,
+      resetAt: result.resetAt,
+      message: 'AI usage limit reached.',
+      requestId,
+    });
+  }
+  if (result.reason === 'GENERATION_IN_PROGRESS') {
+    return res.status(409).json({
+      error: true, reason: result.reason, message: 'This is already being generated — check back shortly.', requestId,
+    });
+  }
+  return res.status(502).json({
+    error: true, reason: result.reason, message: 'AI provider request failed.', requestId,
+  });
+};
+
 module.exports = {
-  logEligibilityRejected, logCacheHit, logQueued, resolveRequestId,
+  logEligibilityRejected, logCacheHit, logQueued, resolveRequestId, aiFailureResponse,
 };

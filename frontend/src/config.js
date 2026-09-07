@@ -12,5 +12,6 @@ export default {
   brand: import.meta.env.VITE_SITE_BRAND || 'zeph.',
   shortName: 'zeph',
   wordmark: 'zeph.',
+  theme: 'dark',
   showCredits: import.meta.env.VITE_SHOW_CREDITS === 'true',
 };

@@ -17,14 +17,32 @@ module.exports = {
     ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
     : ['http://localhost:5173'],
   // Zeph AI (chat assistant — summarize/translate/rewrite/draft-reply/title/
-  // topics). 'groq' is the default cloud provider (Llama 3.1 8B Instant,
-  // free tier); 'ollama' remains available (self-hosted, no key) as an
-  // alternate — set AI_PROVIDER=ollama to use it instead. 'none' (default)
-  // disables AI features entirely; every AI route then returns 503, and no
-  // other Zeph functionality depends on this being set.
+  // topics). AI_PROVIDER selects the PRIMARY text provider:
+  //   'gemini' — Google Gemini (gemini-3.5-flash-lite by default). Recommended
+  //              default: far larger free-tier token budget than Groq. When a
+  //              GROQ_API_KEY is ALSO set, ai/providerRouter.js automatically
+  //              falls back to Groq on a Gemini health failure.
+  //   'groq'   — Groq (openai/gpt-oss-20b). Faster but tighter free tier
+  //              (8K tokens/min). No fallback (it's already the simplest).
+  //   'ollama' — local, self-hosted; no key.
+  //   'none'   — default; AI disabled, every /api/ai route returns 503, and
+  //              no other Zeph functionality depends on this being set.
+  //
+  // GROQ_MODEL 'openai/gpt-oss-20b' is a reasoning model — its hidden
+  // reasoning eats the token budget, so ai/provider.js floors max_tokens at
+  // 512 and sends reasoning_effort:low for it. Gemini Flash-Lite has no such
+  // quirk. Qwen 3 models on Groq's free tier leak <think> blocks into the
+  // answer and are NOT drop-in safe.
   aiProvider: process.env.AI_PROVIDER || 'none',
+  geminiApiKey: process.env.GEMINI_API_KEY || null,
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+  // Meeting transcription (Phase 14) uses the DEDICATED STT model, not the
+  // text model — more accurate, keeps speaker labels. Falls back to Groq
+  // Whisper if Gemini isn't the provider. See ai/meetingTranscriptService.js.
+  geminiTranscribeModel: process.env.GEMINI_TRANSCRIBE_MODEL || 'gemini-3.5-transcribe',
+  geminiBaseUrl: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com',
   groqApiKey: process.env.GROQ_API_KEY || null,
-  groqModel: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+  groqModel: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
   // Override point for load-testing (backend/loadtest/ai-load.js) and
   // future self-tests — same pattern as abuseIpDbBaseUrl. Never needs
   // setting in a real deployment; defaults to the real Groq API.

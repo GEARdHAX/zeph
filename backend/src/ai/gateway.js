@@ -11,7 +11,7 @@
 const crypto = require('crypto');
 const store = require('../store');
 const logger = require('../logger');
-const { getProvider } = require('./provider');
+const providerRouter = require('./providerRouter');
 const {
   checkQuota, recordUsage, acquireConcurrency, releaseConcurrency,
 } = require('./quota');
@@ -59,8 +59,7 @@ const runGoverned = async ({
     return { ok: false, reason: REJECTION_REASONS.AI_DISABLED, requestId: rid };
   }
 
-  const provider = getProvider(config);
-  if (!provider.enabled) {
+  if (!providerRouter.anyProviderAvailable(config)) {
     logOutcome('ai_request_rejected', { ...base, reason: REJECTION_REASONS.PROVIDER_UNAVAILABLE });
     return { ok: false, reason: REJECTION_REASONS.PROVIDER_UNAVAILABLE, requestId: rid };
   }
@@ -68,9 +67,16 @@ const runGoverned = async ({
   const quota = await checkQuota({ userId, ip, config });
   if (!quota.allowed) {
     logOutcome('ai_quota_rejected', {
-      ...base, reason: quota.reason, detail: quota.detail,
+      ...base, reason: quota.reason, detail: quota.detail, retryAfter: quota.retryAfter,
     });
-    return { ok: false, reason: quota.reason, requestId: rid };
+    return {
+      ok: false,
+      reason: quota.reason,
+      requestId: rid,
+      quotaDetail: quota.detail, // 'user_per_minute' | 'user_per_day' | 'ip_per_minute' | 'user_concurrent' | 'global_concurrent'
+      retryAfter: quota.retryAfter, // seconds
+      resetAt: quota.resetAt, // ISO
+    };
   }
 
   let lock = { acquired: true, token: null };
@@ -90,11 +96,16 @@ const runGoverned = async ({
   const providerStartedAt = Date.now();
   try {
     let rawOutput;
+    let providerUsed;
     try {
-      rawOutput = await provider.generate(prompt, {
+      // providerRouter tries the primary (Gemini) then falls back to Groq on
+      // a health failure; the single AbortSignal.timeout applies to the WHOLE
+      // routed attempt (primary + fallback share the deadline — a caller
+      // waiting on Zeph AI shouldn't wait 2x the timeout because we retried).
+      ({ text: rawOutput, providerUsed } = await providerRouter.generate(prompt, {
         maxTokens,
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS()),
-      });
+      }));
     } catch (err) {
       const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
       const reason = err.code === 'RATE_LIMITED' ? REJECTION_REASONS.RATE_LIMITED : REJECTION_REASONS.PROVIDER_UNAVAILABLE;
@@ -133,6 +144,7 @@ const runGoverned = async ({
     const outputTokenEstimate = estimateTokens(validation.text);
     logOutcome('ai_request_succeeded', {
       ...base,
+      providerUsed,
       queueWaitMs,
       providerLatencyMs,
       totalLatencyMs,

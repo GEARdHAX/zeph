@@ -79,7 +79,7 @@ function ForgotPassword() {
         <div className="relative hidden w-[45%] max-w-[560px] min-w-[380px] shrink-0 flex-col justify-between overflow-hidden bg-[#070708] p-10 text-white lg:flex xl:p-14">
           <div>
             <Link to="/login" className="flex items-center gap-3">
-              <BrandLogo className="h-8 w-8" />
+              <BrandLogo variant="dark" className="h-8 w-8" />
               <ZephWordmark className="text-2xl font-extrabold tracking-tight text-white" />
             </Link>
 

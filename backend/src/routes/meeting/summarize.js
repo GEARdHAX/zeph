@@ -3,11 +3,11 @@ const MeetingTranscript = require('../../models/MeetingTranscript');
 const Media = require('../../models/Media');
 const groupPolicy = require('../../authorization/groupPolicy');
 const store = require('../../store');
-const { getProvider } = require('../../ai/provider');
+const { aiTextEnabled } = require('../../ai/providerRouter');
 const { REJECTION_REASONS } = require('../../ai/policy');
 const { generateMeetingSummary, transcribeMeetingAudio } = require('../../ai/meetingTranscriptService');
 const { enqueueMeetingSummaryJob, getQueue } = require('../../queues/meetingAiQueue');
-const { resolveRequestId } = require('../../ai/telemetry');
+const { resolveRequestId, aiFailureResponse } = require('../../ai/telemetry');
 
 // Zeph AI — Meeting AI (Phase 14). POST /api/meeting/:id/summarize —
 // { mediaId } for the FIRST call (client already uploaded the recorded
@@ -40,9 +40,12 @@ module.exports = async (req, res) => {
   const { mediaId } = req.fields;
 
   const config = store.config;
-  if (config.aiProvider !== 'groq' || !config.groqApiKey || !getProvider(config).enabled) {
+  // Meeting AI needs a transcription-capable provider (Gemini multimodal or
+  // Groq Whisper) — Ollama has no STT. aiTextEnabled covers gemini/groq;
+  // ollama-only deployments correctly get the 503.
+  if (!aiTextEnabled(config) || config.aiProvider === 'ollama') {
     return res.status(503).json({
-      error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'Meeting AI requires the Groq provider to be configured on this server.', requestId,
+      error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'Meeting AI requires the Gemini or Groq provider to be configured on this server.', requestId,
     });
   }
 
@@ -86,11 +89,15 @@ module.exports = async (req, res) => {
 
   const result = await generateMeetingSummary({ meetingId, userId: req.user.id, requestId });
   if (!result.ok) {
-    const status = result.reason === REJECTION_REASONS.RATE_LIMITED || result.reason === REJECTION_REASONS.QUOTA_EXCEEDED ? 429
-      : (result.reason === 'MEETING_TOO_SHORT' || result.reason === 'INSUFFICIENT_PARTICIPANTS' || result.reason === 'INSUFFICIENT_TRANSCRIPT' || result.reason === 'MEETING_NOT_ENDED') ? 422 : 502;
-    return res.status(status).json({
-      error: true, reason: result.reason, message: meetingEligibilityMessage(result), requestId,
-    });
+    const ELIGIBILITY_REASONS = new Set(['MEETING_TOO_SHORT', 'INSUFFICIENT_PARTICIPANTS', 'INSUFFICIENT_TRANSCRIPT', 'MEETING_NOT_ENDED']);
+    if (ELIGIBILITY_REASONS.has(result.reason)) {
+      return res.status(422).json({
+        error: true, reason: result.reason, message: meetingEligibilityMessage(result), requestId,
+      });
+    }
+    // RATE_LIMITED / QUOTA_EXCEEDED (with reset info) / provider failures —
+    // shared responder, same 429 shape as the chat routes.
+    return aiFailureResponse(res, result, requestId);
   }
   res.status(200).json({
     summary: result.text || result.summary, cached: !!result.cached, requestId: result.requestId || requestId,

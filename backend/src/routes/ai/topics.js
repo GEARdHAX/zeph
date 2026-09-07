@@ -1,12 +1,12 @@
 const Room = require('../../models/Room');
 const Message = require('../../models/Message');
 const store = require('../../store');
-const { getProvider } = require('../../ai/provider');
+const { aiTextEnabled } = require('../../ai/providerRouter');
 const { buildPolicy, REJECTION_REASONS } = require('../../ai/policy');
 const { checkTopicEligibility } = require('../../ai/eligibility');
 const { buildBoundedContext } = require('../../ai/contextBuilder');
 const { runGoverned } = require('../../ai/gateway');
-const { logEligibilityRejected, resolveRequestId } = require('../../ai/telemetry');
+const { logEligibilityRejected, resolveRequestId, aiFailureResponse } = require('../../ai/telemetry');
 
 // Zeph AI — POST /api/ai/topics (Phase 20, P1). Group topic extraction —
 // group rooms only, same eligibility/dedupe shape as title.js.
@@ -16,7 +16,7 @@ module.exports = async (req, res) => {
   if (!roomID) return res.status(400).json({ error: true, requestId });
 
   const config = store.config;
-  if (config.aiProvider === 'none' || !config.aiProvider || !getProvider(config).enabled) {
+  if (!aiTextEnabled(config)) {
     return res.status(503).json({
       error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'AI features are not enabled on this server.', requestId,
     });
@@ -70,11 +70,6 @@ module.exports = async (req, res) => {
     scope: 'group',
   });
 
-  if (!result.ok) {
-    const status = result.reason === REJECTION_REASONS.RATE_LIMITED || result.reason === REJECTION_REASONS.QUOTA_EXCEEDED ? 429 : 502;
-    return res.status(status).json({
-      error: true, reason: result.reason, message: 'AI provider request failed.', requestId: result.requestId,
-    });
-  }
+  if (!result.ok) return aiFailureResponse(res, result, requestId);
   res.status(200).json({ topics: result.text.split(',').map((t) => t.trim()).filter(Boolean), requestId: result.requestId });
 };

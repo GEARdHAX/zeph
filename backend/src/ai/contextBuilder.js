@@ -48,4 +48,19 @@ const buildBoundedContext = (messages, config = {}) => {
   return { text, inputTokenEstimate: estimateTokens(text), messagesUsed: lines.length };
 };
 
-module.exports = { buildBoundedContext, estimateTokens, MAX_MESSAGE_CHARS };
+// Single-blob bounding for translate/rewrite — those take ONE piece of
+// client-supplied text with no meaningful "author", so buildBoundedContext's
+// `${author}: ${content}` conversation format is wrong for them (it prefixes
+// "user: " onto the text, which the model then translates/echoes). This just
+// truncates the raw string to the token budget, nothing else.
+const boundText = (text, config = {}) => {
+  const maxInputTokens = config.aiMaxInputTokens || 4000;
+  let out = (text || '').length > MAX_MESSAGE_CHARS ? `${text.slice(0, MAX_MESSAGE_CHARS)}...` : (text || '');
+  const hardCapChars = maxInputTokens * 4;
+  if (out.length > hardCapChars) out = out.slice(0, hardCapChars);
+  return { text: out, inputTokenEstimate: estimateTokens(out) };
+};
+
+module.exports = {
+  buildBoundedContext, boundText, estimateTokens, MAX_MESSAGE_CHARS,
+};

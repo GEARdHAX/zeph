@@ -186,7 +186,7 @@ code {
 /* Dotted Wave Background for Chat Feed (Adaptive Light / Dark modes) */
 .chat-canvas-bg {
   position: relative;
-  background-color: #f4f4f6;
+  background-color: #f8f8fa;
 }
 
 .chat-canvas-bg::before {
@@ -197,7 +197,7 @@ code {
   background-size: 100% 100%;
   background-position: center center;
   background-repeat: no-repeat;
-  opacity: 0.70;
+  opacity: 0.28;
   filter: none;
   pointer-events: none;
   z-index: 0;
@@ -206,23 +206,23 @@ code {
 :root[data-theme='dark'] .chat-canvas-bg,
 .dark .chat-canvas-bg,
 :root.dark .chat-canvas-bg {
-  background-color: #000000;
+  background-color: #09090b;
 }
 
 :root[data-theme='dark'] .chat-canvas-bg::before,
 .dark .chat-canvas-bg::before,
 :root.dark .chat-canvas-bg::before {
   background-image: url('./assets/chat-bg.png');
-  opacity: 0.55;
+  opacity: 0.25;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .chat-canvas-bg {
-    background-color: #000000;
+    background-color: #09090b;
   }
   :root:not([data-theme='light']) .chat-canvas-bg::before {
     background-image: url('./assets/chat-bg.png');
-    opacity: 0.55;
+    opacity: 0.25;
   }
 }
 

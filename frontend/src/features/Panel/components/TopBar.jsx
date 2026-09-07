@@ -120,7 +120,7 @@ function TopBar() {
             className={`h-8 w-8 rounded-full transition-colors ${
               isMenuOpen ? 'bg-muted text-foreground' : 'hover:bg-muted hover:text-foreground'
             }`}
-            title="Create or Add"
+            title="New Chat or Group (+)"
             aria-label="Add person or create group"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
@@ -171,7 +171,7 @@ function TopBar() {
           size="icon"
           className={cn('h-8 w-8 rounded-full hover:bg-muted hover:text-foreground', nav === 'vault' && 'text-primary')}
           onClick={() => setNav('vault')}
-          title="Private Vault"
+          title="Private Vault (Encrypted Chats)"
           aria-label="Private Vault"
         >
           <Lock className="h-4 w-4" />
@@ -187,7 +187,7 @@ function TopBar() {
           size="icon"
           className={cn('h-8 w-8 rounded-full hover:bg-muted hover:text-foreground', nav === 'removed' && 'text-primary')}
           onClick={() => setNav('removed')}
-          title="Removed Conversations"
+          title="Removed Conversations (Archive)"
           aria-label="Removed Conversations"
         >
           <ArchiveRestore className="h-4 w-4" />

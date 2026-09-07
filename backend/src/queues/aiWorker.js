@@ -6,10 +6,18 @@ const { generateAndPersistSummary } = require('../ai/summaryService');
 const Message = require('../models/Message');
 
 // Zeph AI — BullMQ worker for summary generation (Phase 9, observability
-// Phase 11). Mirrors securityAiWorker.js: a failed/unavailable AI result is
-// NOT a job failure worth retrying with backoff (the gateway has already
-// classified and logged the reason) — only an unexpected throw reaches
-// BullMQ's own retry.
+// Phase 11). A failed/unavailable AI result is NOT a job worth BullMQ's own
+// exponential-backoff retry (the gateway has already classified and logged
+// the reason) — but for a TRANSIENT failure the job must be REMOVED so its
+// dedupe id (summary-{roomId}-{messageCount}) is free for a fresh request.
+// Without this, a rate-limited summary attempt leaves a "completed" job
+// whose id then silently blocks every re-enqueue for the 24h retention
+// window — the summary would never generate until enough new messages
+// changed the messageCount and thus the id.
+const TRANSIENT_REASONS = new Set([
+  'RATE_LIMITED', 'QUOTA_EXCEEDED', 'PROVIDER_UNAVAILABLE', 'GENERATION_IN_PROGRESS',
+]);
+
 const processSummaryJob = async (job) => {
   const {
     roomId, userId, conversationType, requestId,
@@ -28,6 +36,11 @@ const processSummaryJob = async (job) => {
     logger.info({
       requestId, roomId, reason: result.reason, queueWaitMs, attemptsMade: job.attemptsMade,
     }, 'ai_worker_summary_unavailable');
+    if (TRANSIENT_REASONS.has(result.reason)) {
+      // Free the dedupe id so the user's next summarize request enqueues a
+      // fresh job instead of being silently swallowed as a "duplicate".
+      await job.remove().catch((err) => logger.warn({ err, roomId }, 'ai_worker_transient_job_remove_failed'));
+    }
     return;
   }
   logger.info({

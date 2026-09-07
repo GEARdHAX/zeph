@@ -128,9 +128,9 @@ describe('BottomBar — Draft reply (AI)', () => {
     await waitFor(() => expect(button).not.toBeDisabled());
   });
 
-  it('shows a rate-limit-specific error message on 429 RATE_LIMITED', async () => {
+  it('shows a rate-limit message with a concrete "come back in X" on 429 RATE_LIMITED', async () => {
     draftReply.mockRejectedValueOnce({
-      response: { status: 429, data: { reason: 'RATE_LIMITED' } },
+      response: { status: 429, data: { reason: 'RATE_LIMITED', retryAfter: 40 } },
     });
     const userEv = userEvent.setup();
     renderBottomBar();
@@ -138,13 +138,18 @@ describe('BottomBar — Draft reply (AI)', () => {
     await userEv.click(screen.getByRole('button', { name: 'Draft reply with AI' }));
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('wait a moment'));
+      const msg = toast.error.mock.calls[0][0];
+      expect(msg).toContain('using AI a bit fast');
+      expect(msg).toMatch(/in about \d+ seconds/);
     });
   });
 
-  it('shows a quota-specific error message on QUOTA_EXCEEDED', async () => {
+  it('shows a quota-exceeded message with a reset hint on QUOTA_EXCEEDED', async () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(4, 0, 0, 0);
     draftReply.mockRejectedValueOnce({
-      response: { status: 429, data: { reason: 'QUOTA_EXCEEDED' } },
+      response: { status: 429, data: { reason: 'QUOTA_EXCEEDED', retryAfter: 60000, resetAt: tomorrow.toISOString() } },
     });
     const userEv = userEvent.setup();
     renderBottomBar();
@@ -152,7 +157,9 @@ describe('BottomBar — Draft reply (AI)', () => {
     await userEv.click(screen.getByRole('button', { name: 'Draft reply with AI' }));
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("today's AI usage limit"));
+      const msg = toast.error.mock.calls[0][0];
+      expect(msg).toContain('AI usage limit');
+      expect(msg).toContain('resets tomorrow');
     });
   });
 

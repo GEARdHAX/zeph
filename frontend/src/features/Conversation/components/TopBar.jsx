@@ -346,11 +346,11 @@ function TopBar({ back, loading, aiEnabled }) {
     if (peer.blockedByMe) return 'Blocked';
     if (peer.blockedMe) return "Can't see activity";
 
-    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'busy').length > 0) return 'busy';
-    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'online').length > 0) return 'online';
-    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'away').length > 0) return 'away';
-    if (lastOnline) return `Last online: ${moment(lastOnline).fromNow()}`;
-    return `Last online: ${peer.lastOnline ? moment(peer.lastOnline).fromNow() : 'Never'}`;
+    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'busy').length > 0) return 'Busy';
+    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'online').length > 0) return 'Active now';
+    if (statusUsers.filter((u) => u.id === peer._id && u.status === 'away').length > 0) return 'Away';
+    if (lastOnline) return `Offline ? Last seen ${moment(lastOnline).fromNow()}`;
+    return peer.lastOnline ? `Offline ? Last seen ${moment(peer.lastOnline).fromNow()}` : 'Offline';
   }
 
   const getStatus = () => {
@@ -367,16 +367,16 @@ function TopBar({ back, loading, aiEnabled }) {
   ).toUpperCase();
 
   return (
-    <div className="relative z-50 flex min-h-[60px] max-h-[60px] w-full items-center justify-between border-b border-border/60 bg-card px-4 text-card-foreground">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="sm:hidden h-8 w-8 text-muted-foreground" onClick={back}>
+    <div className="relative z-50 flex min-h-[60px] max-h-[60px] w-full items-center justify-between border-b border-border/60 bg-card px-2.5 sm:px-4 text-card-foreground">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 mr-2">
+        <Button variant="ghost" size="icon" className="sm:hidden h-8 w-8 shrink-0 text-muted-foreground" onClick={back} aria-label="Go back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         {!loading && (
           <button
             type="button"
             onClick={toggleDetails}
-            className="flex items-center gap-3 text-left rounded-xl p-1 -m-1 hover:bg-muted/50 transition-colors cursor-pointer group"
+            className="flex items-center gap-2.5 sm:gap-3 text-left rounded-xl p-1 -m-1 hover:bg-muted/50 transition-colors cursor-pointer group min-w-0"
             title="Click to view contact info"
           >
             <div className="relative shrink-0">
@@ -402,10 +402,10 @@ function TopBar({ back, loading, aiEnabled }) {
               )}
             </div>
             <div className="flex flex-col justify-center">
-              <div className="text-xs font-bold text-foreground truncate max-w-[200px] sm:max-w-[300px] group-hover:text-primary transition-colors">
+              <div className="text-xs sm:text-sm font-bold text-foreground truncate max-w-[130px] sm:max-w-[260px] md:max-w-[340px] group-hover:text-primary transition-colors">
                 {title}
               </div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-[140px] sm:max-w-[260px]">
                 {room.isGroup ? `Group · ${room.people?.length || 0} members` : <Online other={other} />}
               </div>
             </div>
@@ -413,7 +413,7 @@ function TopBar({ back, loading, aiEnabled }) {
         )}
       </div>
 
-      <div className="flex items-center gap-1 text-muted-foreground">
+      <div className="flex items-center gap-0.5 sm:gap-1 text-muted-foreground shrink-0">
         <div data-tour="call-buttons" className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-foreground" onClick={() => call(true)} title="Video Call">
             <Video className="h-4 w-4" />
@@ -425,7 +425,7 @@ function TopBar({ back, loading, aiEnabled }) {
         <Button
           variant="ghost"
           size="icon"
-          className={cn('h-8 w-8 hover:text-foreground', isFavorite() && 'text-primary fill-primary hover:text-primary')}
+          className={cn('hidden sm:inline-flex h-8 w-8 hover:text-foreground', isFavorite() && 'text-primary fill-primary hover:text-primary')}
           onClick={favorite}
           title="Toggle Favorite"
         >
@@ -435,7 +435,7 @@ function TopBar({ back, loading, aiEnabled }) {
           data-tour="conversation-info-button"
           variant="ghost"
           size="icon"
-          className={cn('h-8 w-8 hover:text-foreground', showDetails && 'bg-muted text-primary')}
+          className={cn('hidden sm:inline-flex h-8 w-8 hover:text-foreground', showDetails && 'bg-muted text-primary')}
           onClick={toggleDetails}
           title="Contact Info"
         >

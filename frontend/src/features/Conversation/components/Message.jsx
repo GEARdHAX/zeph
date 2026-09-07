@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import BioText from '../../../components/BioText';
+import MessageContent from './MessageContent';
 import parseBio, { tokensToHtml } from '../../../lib/parseBio';
 import deleteMessage from '../../../actions/deleteMessage';
 import createRoom from '../../../actions/createRoom';
@@ -189,12 +190,22 @@ function Message({
     switch (message.type) {
       case 'image':
         return (
-          <ReactImageAppear
-            src={`${Config.url || ''}/api/images/${message.content}/512`}
-            animationDuration="0.2s"
-            className="rounded-xl max-h-[240px] w-auto object-cover cursor-pointer hover:opacity-95 transition-opacity"
-            onClick={() => onOpen(message)}
-          />
+          <div className="group/media relative overflow-hidden rounded-2xl border border-border/50 shadow-sm w-full max-w-[420px] sm:max-w-[480px]">
+            <img
+              src={`${Config.url || ''}/api/images/${message.content}/512`}
+              alt="Attachment"
+              loading="lazy"
+              className="w-full h-auto max-h-[380px] object-cover cursor-pointer block rounded-2xl"
+              onClick={() => onOpen(message)}
+            />
+            <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-md select-none">
+              <span>{moment(date).format('h:mm A')}</span>
+              {isMine && tickStatus === 'sending' && <Clock className="h-2.5 w-2.5 animate-spin text-white/70" />}
+              {isMine && tickStatus === 'failed' && <AlertCircle className="h-2.5 w-2.5 text-destructive" />}
+              {isMine && (tickStatus === 'sent' || tickStatus === 'delivered') && <Check className="h-2.5 w-2.5 text-white/80" />}
+              {isMine && tickStatus === 'read' && <CheckCheck className="h-2.5 w-2.5 text-sky-400" />}
+            </div>
+          </div>
         );
       case 'file': {
         // New-format messages (upload-media.js) carry their attachment on
@@ -224,10 +235,10 @@ function Message({
       }
       default:
         return (
-          <BioText
-            text={content}
+          <MessageContent
+            content={content}
+            isMine={isMine}
             onMentionClick={setPreviewUsername}
-            className="block text-xs leading-relaxed break-words"
           />
         );
     }
@@ -346,23 +357,43 @@ function Message({
     }
   };
 
+  const getBubbleRadius = () => {
+    if (isMine) {
+      if (!attachPrevious && !attachNext) return 'rounded-2xl rounded-tr-xs';
+      if (!attachPrevious && attachNext) return 'rounded-2xl rounded-tr-xs rounded-br-sm';
+      if (attachPrevious && attachNext) return 'rounded-2xl rounded-r-sm';
+      if (attachPrevious && !attachNext) return 'rounded-2xl rounded-br-xs rounded-tr-sm';
+    } else {
+      if (!attachPrevious && !attachNext) return 'rounded-2xl rounded-tl-xs';
+      if (!attachPrevious && attachNext) return 'rounded-2xl rounded-tl-xs rounded-bl-sm';
+      if (attachPrevious && attachNext) return 'rounded-2xl rounded-l-sm';
+      if (attachPrevious && !attachNext) return 'rounded-2xl rounded-bl-xs rounded-tl-sm';
+    }
+    return 'rounded-2xl';
+  };
+
+  const isWideMessage = !isImage && message.type !== 'file' && !!content && (
+    content.length > 250
+    || content.includes('```')
+    || (content.includes('|') && content.includes('\n'))
+    || content.includes('\n- ')
+    || content.includes('\n* ')
+    || content.includes('\n1. ')
+  );
+
   return (
     <>
       <div
         className={cn(
-          'group flex w-full items-start gap-2 px-1 sm:px-2',
-          isMine ? 'justify-end' : 'justify-start',
-          attachPrevious ? 'pt-1' : 'pt-3',
-          attachNext ? 'pb-1' : 'pb-2',
-        )}
-      >
-        {!isMine && (
-          <div className="shrink-0 pt-0.5">
-            <PictureOrSpacer />
-          </div>
-        )}
+        'group relative flex w-full select-text px-1 sm:px-2 transition-all',
+        isMine ? 'justify-end' : 'justify-start',
+        attachPrevious ? 'my-0.5' : 'mt-3.5',
+      )}
+    >
+      <div className={cn('flex items-end gap-2', isWideMessage ? 'w-full max-w-[96%] sm:max-w-[86%] md:max-w-[80%]' : 'max-w-[85%] sm:max-w-[70%]', isMine && 'flex-row-reverse')}>
+        <PictureOrSpacer />
 
-        <div className={cn('flex flex-col max-w-[85%] sm:max-w-[70%]', isMine ? 'items-end' : 'items-start')}>
+        <div className={cn('flex flex-col', isWideMessage ? 'w-full' : '', isMine ? 'items-end' : 'items-start')}>
           {/* Author Name only on first message of consecutive group */}
           {!isMine && !attachPrevious && (
             <span className="mb-1 ml-1 text-[11px] font-semibold text-muted-foreground">
@@ -372,17 +403,19 @@ function Message({
             </span>
           )}
 
-          <div className={cn('relative flex items-center gap-1', isMine ? 'flex-row-reverse' : 'flex-row', menuOpen && 'z-30')}>
+          <div className={cn('relative flex items-center gap-1', isWideMessage && 'w-full', isMine ? 'flex-row-reverse' : 'flex-row', menuOpen && 'z-30')}>
             {isOnlyEmoji ? (
               <div className="p-1 text-3xl">{content}</div>
             ) : (
               <div
                 className={cn(
-                  'relative rounded-2xl px-4 py-2.5 shadow-xs transition-all',
+                  'relative px-4 py-2.5 shadow-xs transition-all',
+                  isWideMessage && 'w-full',
+                  getBubbleRadius(),
                   isMine
-                    ? 'bg-primary text-primary-foreground rounded-br-xs'
-                    : 'bg-muted text-foreground rounded-bl-xs border border-border/40',
-                  isImage && 'p-1 bg-transparent border-0 shadow-none',
+                    ? 'bg-gradient-to-b from-[#b91c1c] to-[#991b1b] dark:from-[#991b1b] dark:to-[#7f1d1d] text-white border border-rose-700/30 shadow-xs'
+                    : 'bg-card dark:bg-[#18181b] text-foreground border border-border/70 dark:border-zinc-800 shadow-xs backdrop-blur-sm',
+                  isImage && 'p-0 bg-transparent border-0 shadow-none',
                   isDeleted && 'bg-muted/60 text-muted-foreground border border-border/40',
                 )}
               >
@@ -516,18 +549,19 @@ function Message({
           )}
 
           {/* Timestamp on last message of group */}
-          {!attachNext && (
+          {!attachNext && !isImage && (
             <div className={cn('flex items-center gap-1.5 px-1 pt-1 text-[10px] text-muted-foreground', isMine && 'justify-end')}>
-              <span>{moment(date).format('MMM DD - h:mm A')}</span>
+              <span>{moment(date).format('h:mm A')}</span>
               {isMine && tickStatus === 'sending' && <Clock className="h-3 w-3 animate-spin text-muted-foreground" />}
               {isMine && tickStatus === 'failed' && <AlertCircle className="h-3 w-3 text-destructive" />}
-              {isMine && tickStatus === 'sent' && <Check className="h-3 w-3 text-primary" />}
-              {isMine && tickStatus === 'delivered' && <CheckCheck className="h-3 w-3 text-primary" />}
-              {isMine && tickStatus === 'read' && <CheckCheck className="h-3 w-3 text-sky-500" />}
+              {isMine && tickStatus === 'sent' && <Check className="h-3 w-3 text-muted-foreground" />}
+              {isMine && tickStatus === 'delivered' && <CheckCheck className="h-3 w-3 text-muted-foreground" />}
+              {isMine && tickStatus === 'read' && <CheckCheck className="h-3 w-3 text-sky-400" />}
             </div>
           )}
         </div>
       </div>
+    </div>
 
       <Dialog open={confirmDeleteForEveryone} onOpenChange={setConfirmDeleteForEveryone}>
         <DialogContent className="rounded-2xl border border-border bg-card">

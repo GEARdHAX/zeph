@@ -93,6 +93,12 @@ router.post('/register', require('./register'));
 router.post('/user/delete', passport.authenticate('jwt', { session: false }, null), require('./user-delete'));
 router.post('/user/edit', passport.authenticate('jwt', { session: false }, null), require('./user-edit'));
 router.post('/user/list', passport.authenticate('jwt', { session: false }, null), require('./user-list'));
+
+// Zeph AI — admin: inspect / reset a user's AI quota. Admin-only (the
+// handlers themselves 404 for non-admins, same posture as the security
+// admin routes — see the isPrivileged 404 comment further down).
+router.get('/admin/ai-quota/:userId', jwtAuth, require('./admin/ai-quota-get'));
+router.post('/admin/ai-quota/reset', jwtAuth, require('./admin/ai-quota-reset'));
 router.post('/picture/change', passport.authenticate('jwt', { session: false }, null), require('./change-picture'));
 router.post('/picture/remove', passport.authenticate('jwt', { session: false }, null), require('./change-picture'));
 

@@ -25,6 +25,23 @@ const minuteBucketKey = (userId) => `${PREFIX}user:${userId}:min:${Math.floor(Da
 const dayBucketKey = (userId) => `${PREFIX}user:${userId}:day:${new Date().toISOString().slice(0, 10)}`;
 const ipMinuteBucketKey = (ip) => `${PREFIX}ip:${ip}:min:${Math.floor(Date.now() / 60000)}`;
 
+// Seconds until the next UTC midnight — when the per-day counter's date
+// bucket rolls over.
+const secondsUntilUtcMidnight = () => {
+  const now = new Date();
+  const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0);
+  return Math.max(1, Math.ceil((midnight - now.getTime()) / 1000));
+};
+
+// Builds the { retryAfter, resetAt } pair the frontend toast uses to show a
+// concrete "come back in..." — `retryAfter` is seconds, `resetAt` an ISO
+// timestamp. `ttlFallback` is used when a Redis TTL read fails or the key
+// has no expiry set yet.
+const buildReset = (ttlSeconds, ttlFallback) => {
+  const retryAfter = ttlSeconds && ttlSeconds > 0 ? ttlSeconds : ttlFallback;
+  return { retryAfter, resetAt: new Date(Date.now() + retryAfter * 1000).toISOString() };
+};
+
 // Read-only — GET, never INCR. Concurrency counters are the exception:
 // they must reflect "requests currently in flight," not "requests that
 // succeeded," so acquireConcurrency/releaseConcurrency still bracket the
@@ -50,11 +67,37 @@ const checkQuota = async ({ userId, ip, config }) => {
       redis.get(`${PREFIX}global:concurrent`).then((v) => Number(v) || 0),
     ]);
 
-    if (userMinuteCount >= limits.perUserPerMinute) return { allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'user_per_minute' };
-    if (userDayCount >= limits.perUserPerDay) return { allowed: false, reason: REJECTION_REASONS.QUOTA_EXCEEDED, detail: 'user_per_day' };
-    if (ipMinuteCount >= limits.perIpPerMinute) return { allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'ip_per_minute' };
-    if (userConcurrent >= limits.perUserConcurrent) return { allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'user_concurrent' };
-    if (globalConcurrent >= limits.globalConcurrent) return { allowed: false, reason: REJECTION_REASONS.QUOTA_EXCEEDED, detail: 'global_concurrent' };
+    if (userMinuteCount >= limits.perUserPerMinute) {
+      const ttl = await redis.ttl(minuteBucketKey(userId)).catch(() => -1);
+      return {
+        allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'user_per_minute', ...buildReset(ttl, 60),
+      };
+    }
+    if (userDayCount >= limits.perUserPerDay) {
+      // The day-bucket key's TTL is ~26h (set generously in recordUsage) —
+      // NOT a reliable "resets at" signal. Use the actual date rollover.
+      return {
+        allowed: false, reason: REJECTION_REASONS.QUOTA_EXCEEDED, detail: 'user_per_day', ...buildReset(secondsUntilUtcMidnight(), secondsUntilUtcMidnight()),
+      };
+    }
+    if (ipMinuteCount >= limits.perIpPerMinute) {
+      const ttl = await redis.ttl(ipMinuteBucketKey(ip)).catch(() => -1);
+      return {
+        allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'ip_per_minute', ...buildReset(ttl, 60),
+      };
+    }
+    // Concurrent limits clear as soon as in-flight requests finish — a few
+    // seconds at most; no precise "resetAt", just a short retry hint.
+    if (userConcurrent >= limits.perUserConcurrent) {
+      return {
+        allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'user_concurrent', ...buildReset(0, 10),
+      };
+    }
+    if (globalConcurrent >= limits.globalConcurrent) {
+      return {
+        allowed: false, reason: REJECTION_REASONS.QUOTA_EXCEEDED, detail: 'global_concurrent', ...buildReset(0, 15),
+      };
+    }
 
     return { allowed: true };
   } catch (err) {
@@ -116,6 +159,77 @@ const releaseConcurrency = async (userId) => {
   }
 };
 
+// ── Admin: inspect / reset a user's AI quota ─────────────────────────────
+
+const QUOTA_TYPES = ['minute', 'day', 'concurrent'];
+
+const userConcurrentKey = (userId) => `${PREFIX}user:${userId}:concurrent`;
+
+// Current usage snapshot for one user — what the admin UI shows before a
+// reset. Returns null when Redis isn't configured (no quota to inspect).
+const getUserQuota = async (userId) => {
+  const redis = getClient();
+  if (!redis) return null;
+  try {
+    const [minute, day, concurrent, minuteTtl, dayTtl] = await Promise.all([
+      redis.get(minuteBucketKey(userId)).then((v) => Number(v) || 0),
+      redis.get(dayBucketKey(userId)).then((v) => Number(v) || 0),
+      redis.get(userConcurrentKey(userId)).then((v) => Number(v) || 0),
+      redis.ttl(minuteBucketKey(userId)).catch(() => -1),
+      redis.ttl(dayBucketKey(userId)).catch(() => -1),
+    ]);
+    return {
+      minute: { used: minute, ttlSeconds: minuteTtl > 0 ? minuteTtl : 0 },
+      day: { used: day, ttlSeconds: dayTtl > 0 ? dayTtl : 0 },
+      concurrent: { used: concurrent },
+    };
+  } catch (err) {
+    logger.warn({ err, userId }, 'ai_quota_get_user_failed');
+    return null;
+  }
+};
+
+// Reset one or more quota types for a user by deleting the backing Redis
+// keys. `types` is an array subset of QUOTA_TYPES, or ['all'].
+//   - minute:     the current per-minute bucket (unblocks immediately)
+//   - day:        the current per-day bucket (restores the full daily budget)
+//   - concurrent: the user's in-flight slot counter (clears a stuck slot;
+//                 the key also self-expires within 2 min, but an admin may
+//                 not want to wait). Does NOT touch the GLOBAL concurrent
+//                 counter — that's shared across all users and resetting it
+//                 from a per-user action would be wrong.
+// Returns { ok, cleared: [...types], deleted: <keyCount> }.
+const resetUserQuota = async (userId, types) => {
+  const redis = getClient();
+  if (!redis) return { ok: false, reason: 'REDIS_UNAVAILABLE' };
+
+  const wanted = (types && types.includes('all')) ? QUOTA_TYPES : (types || []).filter((t) => QUOTA_TYPES.includes(t));
+  if (wanted.length === 0) return { ok: false, reason: 'NO_VALID_TYPES' };
+
+  const keys = [];
+  if (wanted.includes('minute')) keys.push(minuteBucketKey(userId));
+  if (wanted.includes('day')) keys.push(dayBucketKey(userId));
+  if (wanted.includes('concurrent')) keys.push(userConcurrentKey(userId));
+
+  try {
+    const deleted = await redis.del(...keys);
+    logger.info({ userId, cleared: wanted, deleted }, 'ai_quota_admin_reset');
+    return { ok: true, cleared: wanted, deleted };
+  } catch (err) {
+    logger.error({ err, userId }, 'ai_quota_admin_reset_failed');
+    return { ok: false, reason: 'RESET_FAILED' };
+  }
+};
+
 module.exports = {
-  checkQuota, recordUsage, acquireConcurrency, releaseConcurrency,
+  checkQuota,
+  recordUsage,
+  acquireConcurrency,
+  releaseConcurrency,
+  getUserQuota,
+  resetUserQuota,
+  QUOTA_TYPES,
+  // exported for unit tests — pure reset-time math
+  secondsUntilUtcMidnight,
+  buildReset,
 };

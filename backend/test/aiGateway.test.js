@@ -10,6 +10,7 @@ const store = require('../src/store');
 const config = require('../config');
 const quota = require('../src/ai/quota');
 const { getProvider } = require('../src/ai/provider');
+const providerRouter = require('../src/ai/providerRouter');
 const { runGoverned } = require('../src/ai/gateway');
 
 beforeEach(() => {
@@ -18,6 +19,7 @@ beforeEach(() => {
   quota.recordUsage.mockResolvedValue(undefined);
   quota.acquireConcurrency.mockResolvedValue(undefined);
   quota.releaseConcurrency.mockResolvedValue(undefined);
+  providerRouter.resetBreakersForTests(); // provider circuit-breaker state is module-level — reset so a tripped breaker in one test doesn't skip the provider in the next
 });
 
 afterEach(() => jest.clearAllMocks());

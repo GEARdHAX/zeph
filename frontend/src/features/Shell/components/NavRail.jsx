@@ -39,7 +39,7 @@ function NavRail() {
 
   const itemClasses = ({ isActive }) => cn(
     'relative flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground',
-    isActive && 'bg-primary/15 text-primary shadow-inner font-semibold hover:bg-primary/20 hover:text-primary dark:bg-primary/20',
+    isActive && 'bg-primary/15 text-primary font-semibold shadow-xs hover:bg-primary/20 hover:text-primary dark:bg-primary/20 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary',
   );
 
   return (
@@ -78,7 +78,7 @@ function NavRail() {
           {PRIMARY_ITEMS.map(({
             to, label, Icon, end,
           }) => (
-            <NavLink key={to} to={to} end={end} className={itemClasses} title={!isHovered ? label : undefined}>
+            <NavLink key={to} to={to} end={end} className={itemClasses} title={label}>
               <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                 <Icon className="h-[19px] w-[19px]" />
                 {!isHovered && to === '/' && unreadTotal > 0 && (
@@ -106,7 +106,7 @@ function NavRail() {
           <div className="my-2 border-t border-border" />
 
           {SECONDARY_ITEMS.map(({ to, label, Icon }) => (
-            <NavLink key={to} to={to} className={itemClasses} title={!isHovered ? label : undefined}>
+            <NavLink key={to} to={to} className={itemClasses} title={label}>
               <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                 <Icon className="h-[19px] w-[19px]" />
                 {!isHovered && label === 'Notifications' && unreadTotal > 0 && (

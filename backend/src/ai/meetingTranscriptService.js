@@ -1,32 +1,49 @@
 // Zeph AI — Meeting AI business logic (Phase 14). Pipeline: fetch recorded
-// audio (Media/storage.js) -> transcribe (Groq Whisper, ai/provider.js) ->
-// persist transcript -> delete raw audio (privacy: only text persists) ->
-// eligibility check -> chunk + bound transcript -> generate summary
-// (existing ai/gateway.js pipeline, same governance every other Zeph AI
-// feature gets) -> persist + validate.
+// audio (Media/storage.js) -> transcribe -> persist transcript -> delete raw
+// audio (privacy: only text persists) -> eligibility check -> chunk + bound
+// transcript -> generate summary (existing ai/gateway.js pipeline, same
+// governance every other Zeph AI feature gets) -> persist + validate.
+//
+// Transcription provider: Gemini's multimodal model (inline audio) when
+// AI_PROVIDER=gemini, else Groq Whisper. Only ONE is used per call — no
+// automatic failover for transcription (a large audio upload retried on a
+// second provider doubles bandwidth + latency for a one-time operation; the
+// user can just retry). The chat-summary step DOES get failover, via
+// runGoverned -> providerRouter.
 const store = require('../store');
 const logger = require('../logger');
 const Meeting = require('../models/Meeting');
 const MeetingTranscript = require('../models/MeetingTranscript');
 const Media = require('../models/Media');
 const storage = require('../storage');
-const { getProvider } = require('./provider');
+const { getProvider, buildGroqFallback } = require('./provider');
 const { buildPolicy } = require('./policy');
 const { checkMeetingSummaryEligibility } = require('./eligibility');
-const { buildBoundedContext } = require('./contextBuilder');
+const { boundText } = require('./contextBuilder');
 const { runGoverned } = require('./gateway');
 
 const countWords = (text) => (text || '').trim().split(/\s+/).filter(Boolean).length;
 
+// The provider to use for transcription: the configured primary if it can
+// transcribe (gemini/groq both can), else a Groq fallback if a key exists.
+// null => transcription is not available on this deployment.
+const getTranscriptionProvider = (config) => {
+  const primary = getProvider(config);
+  if (primary.enabled && typeof primary.transcribe === 'function') {
+    // ollama's transcribe() throws — treat "has a real STT" as gemini/groq only.
+    if (config.aiProvider === 'gemini' || config.aiProvider === 'groq') return primary;
+  }
+  return buildGroqFallback(config); // may be null
+};
+
 // Transcription itself is not run through ai/gateway.js's quota/dedup
-// pipeline — it's a one-time, per-meeting operation triggered by an
-// explicit user action (not a repeatable "regenerate" like conversation
-// summary), and Groq bills/limits transcription separately from chat
-// completions. It IS still bounded (Groq's 25MB file limit, matched by
-// mediaPolicy's own audio.maxSize) and still fails closed if AI is disabled.
+// pipeline — it's a one-time, per-meeting operation triggered by an explicit
+// user action. It IS still bounded (25MB file limit, matched by
+// mediaPolicy's audio.maxSize) and fails closed if no STT provider is set.
 const transcribeMeetingAudio = async ({ meetingId, mediaId, userId }) => {
   const config = store.config || {};
-  if (config.aiProvider !== 'groq' || !config.groqApiKey) {
+  const provider = getTranscriptionProvider(config);
+  if (!provider) {
     return { ok: false, reason: 'AI_DISABLED' };
   }
 
@@ -54,7 +71,6 @@ const transcribeMeetingAudio = async ({ meetingId, mediaId, userId }) => {
     return { ok: false, reason: 'AUDIO_FETCH_FAILED' };
   }
 
-  const provider = getProvider(config);
   let transcriptText;
   try {
     transcriptText = await provider.transcribe(audioBuffer, media.originalName || 'audio.webm');
@@ -104,19 +120,14 @@ const generateMeetingSummary = async ({ meetingId, userId, requestId }) => {
 
   await MeetingTranscript.updateOne({ meeting: meetingId }, { status: 'SUMMARIZING', updatedAt: new Date() });
 
-  // Chunking long transcripts (Phase 14 requirement): buildBoundedContext
-  // already truncates to the token budget by dropping oldest "messages" —
-  // reused here by treating the transcript as a single "message" so the
-  // same, already-tested truncation logic applies (a meeting transcript is
-  // linear speech, not a multi-party message list, so one bounded block is
-  // the right shape — a real multi-pass hierarchical summarizer is future
-  // work if transcripts routinely exceed the token budget in practice, same
-  // "don't build it speculatively" call as ai/summaryService.js's own note).
-  const { text: boundedTranscript } = buildBoundedContext(
-    [{ author: 'Transcript', content: transcriptDoc.transcript }],
-    store.config,
-  );
-  const prompt = `Summarize this meeting transcript in 3-5 sentences, focusing on decisions made and action items. Be concise and neutral.\n\n${boundedTranscript}\n\nSummary:`;
+  // Chunking long transcripts (Phase 14 requirement): boundText truncates
+  // the transcript to the token budget (a meeting transcript is linear
+  // speech, not a multi-party message list, so one bounded block is the
+  // right shape — a real multi-pass hierarchical summarizer is future work
+  // if transcripts routinely exceed the budget, same "don't build it
+  // speculatively" call as ai/summaryService.js's own note).
+  const { text: boundedTranscript } = boundText(transcriptDoc.transcript, store.config);
+  const prompt = `Summarize the meeting transcript below (delimited by triple backticks) in 3-5 sentences, focusing on decisions made and action items. Be concise and neutral. Reply with only the summary.\n\n\`\`\`\n${boundedTranscript}\n\`\`\``;
 
   const result = await runGoverned({
     userId,

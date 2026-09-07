@@ -1,7 +1,15 @@
-﻿import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, act } from '@testing-library/react';
+import { setGlobal } from 'reactn';
 import BrandLogo from './BrandLogo';
 import Config from '../config';
+
+beforeEach(async () => {
+  await setGlobal({ theme: 'dark' });
+  document.documentElement.classList.remove('light');
+  document.documentElement.classList.add('dark');
+  document.documentElement.setAttribute('data-theme', 'dark');
+});
 
 describe('BrandLogo', () => {
   it('renders with an accessible img role and label', () => {
@@ -20,6 +28,36 @@ describe('BrandLogo', () => {
     const img = container.querySelector('img');
     expect(img).toBeInTheDocument();
     expect(img.src).toBeTruthy();
+  });
+
+  it('switches between dark and light logo variants based on active theme', async () => {
+    const { rerender } = render(<BrandLogo variant="auto" />);
+    const darkImg = screen.getByRole('img');
+    expect(darkImg.src).toContain('dark-bg-logo');
+
+    // Switch to light theme
+    await act(async () => {
+      await setGlobal({ theme: 'light' });
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+      document.documentElement.setAttribute('data-theme', 'light');
+    });
+
+    rerender(<BrandLogo variant="auto" />);
+    const lightImg = screen.getByRole('img');
+    expect(lightImg.src).toContain('white-bg-logo');
+  });
+
+  it('forces dark surface variant when variant="dark"', () => {
+    render(<BrandLogo variant="dark" />);
+    const img = screen.getByRole('img');
+    expect(img.src).toContain('dark-bg-logo');
+  });
+
+  it('forces light surface variant when variant="light"', () => {
+    render(<BrandLogo variant="light" />);
+    const img = screen.getByRole('img');
+    expect(img.src).toContain('white-bg-logo');
   });
 });
 

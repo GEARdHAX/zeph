@@ -24,6 +24,13 @@ afterAll(async () => {
   fs.rmSync(path.join(config.dataFolder, 'test'), { recursive: true, force: true });
 });
 
+// Reset BEFORE each test too — the real .env's AI_PROVIDER (now 'groq' on a
+// machine with a key) would otherwise leak into the first test.
+beforeEach(() => {
+  store.config.aiProvider = 'none';
+  store.config.groqApiKey = null;
+});
+
 afterEach(async () => {
   await db.clearDatabase();
   store.config.aiProvider = 'none';
