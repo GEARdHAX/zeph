@@ -385,45 +385,45 @@ function Message({
     <>
       <div
         className={cn(
-        'group relative flex w-full select-text px-1 sm:px-2 transition-all',
-        isMine ? 'justify-end' : 'justify-start',
-        attachPrevious ? 'my-0.5' : 'mt-3.5',
-      )}
-    >
-      <div className={cn('flex items-end gap-2', isWideMessage ? 'w-full max-w-[96%] sm:max-w-[86%] md:max-w-[80%]' : 'max-w-[85%] sm:max-w-[70%]', isMine && 'flex-row-reverse')}>
-        <PictureOrSpacer />
+          'group relative flex w-full select-text px-1 sm:px-2 transition-all',
+          isMine ? 'justify-end' : 'justify-start',
+          attachPrevious ? 'my-0.5' : 'mt-3.5',
+        )}
+      >
+        <div className={cn('flex items-end gap-2', isWideMessage ? 'w-full max-w-[96%] sm:max-w-[86%] md:max-w-[80%]' : 'max-w-[85%] sm:max-w-[70%]', isMine && 'flex-row-reverse')}>
+          <PictureOrSpacer />
 
-        <div className={cn('flex flex-col', isWideMessage ? 'w-full' : '', isMine ? 'items-end' : 'items-start')}>
-          {/* Author Name only on first message of consecutive group */}
-          {!isMine && !attachPrevious && (
+          <div className={cn('flex flex-col', isWideMessage ? 'w-full' : '', isMine ? 'items-end' : 'items-start')}>
+            {/* Author Name only on first message of consecutive group */}
+            {!isMine && !attachPrevious && (
             <span className="mb-1 ml-1 text-[11px] font-semibold text-muted-foreground">
               {author.firstName}
               {' '}
               {author.lastName}
             </span>
-          )}
-
-          <div className={cn('relative flex items-center gap-1', isWideMessage && 'w-full', isMine ? 'flex-row-reverse' : 'flex-row', menuOpen && 'z-30')}>
-            {isOnlyEmoji ? (
-              <div className="p-1 text-3xl">{content}</div>
-            ) : (
-              <div
-                className={cn(
-                  'relative px-4 py-2.5 shadow-xs transition-all',
-                  isWideMessage && 'w-full',
-                  getBubbleRadius(),
-                  isMine
-                    ? 'bg-gradient-to-b from-[#b91c1c] to-[#991b1b] dark:from-[#991b1b] dark:to-[#7f1d1d] text-white border border-rose-700/30 shadow-xs'
-                    : 'bg-card dark:bg-[#18181b] text-foreground border border-border/70 dark:border-zinc-800 shadow-xs backdrop-blur-sm',
-                  isImage && 'p-0 bg-transparent border-0 shadow-none',
-                  isDeleted && 'bg-muted/60 text-muted-foreground border border-border/40',
-                )}
-              >
-                <Content />
-              </div>
             )}
 
-            {!isDeleted && (
+            <div className={cn('relative flex items-center gap-1', isWideMessage && 'w-full', isMine ? 'flex-row-reverse' : 'flex-row', menuOpen && 'z-30')}>
+              {isOnlyEmoji ? (
+                <div className="p-1 text-3xl">{content}</div>
+              ) : (
+                <div
+                  className={cn(
+                    'relative px-4 py-2.5 shadow-xs transition-all',
+                    isWideMessage && 'w-full',
+                    getBubbleRadius(),
+                    isMine
+                      ? 'bg-gradient-to-b from-[#b91c1c] to-[#991b1b] dark:from-[#991b1b] dark:to-[#7f1d1d] text-white border border-rose-700/30 shadow-xs'
+                      : 'bg-card dark:bg-[#18181b] text-foreground border border-border/70 dark:border-zinc-800 shadow-xs backdrop-blur-sm',
+                    isImage && 'p-0 bg-transparent border-0 shadow-none',
+                    isDeleted && 'bg-muted/60 text-muted-foreground border border-border/40',
+                  )}
+                >
+                  <Content />
+                </div>
+              )}
+
+              {!isDeleted && (
               <div className="relative" ref={menuRef}>
                 <Button
                   type="button"
@@ -461,7 +461,11 @@ function Message({
                         <span>Copy</span>
                       </button>
                     )}
-                    {aiEnabled && !isImage && message.type !== 'file' && content && !showLanguages && (
+                    {/* Translate is only offered on OTHER people's messages —
+                        translating your own outgoing text tells you nothing you
+                        don't already know (sender-side "translate before
+                        sending" would be a composer feature, not this menu). */}
+                    {aiEnabled && !isMine && !isImage && message.type !== 'file' && content && !showLanguages && (
                       <button
                         type="button"
                         disabled={translating}
@@ -476,7 +480,7 @@ function Message({
                         <span>{translating ? 'Translating…' : 'Translate'}</span>
                       </button>
                     )}
-                    {aiEnabled && showLanguages && (
+                    {aiEnabled && !isMine && showLanguages && (
                       <>
                         <button
                           type="button"
@@ -534,10 +538,10 @@ function Message({
                   </div>
                 )}
               </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {translation && (
+            {translation && (
             <div className={cn('mt-1 max-w-full rounded-xl border border-border/60 bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground', isMine && 'text-right')}>
               <span className="font-semibold text-foreground">
                 {translation.language}
@@ -546,10 +550,10 @@ function Message({
               </span>
               {translation.text}
             </div>
-          )}
+            )}
 
-          {/* Timestamp on last message of group */}
-          {!attachNext && !isImage && (
+            {/* Timestamp on last message of group */}
+            {!attachNext && !isImage && (
             <div className={cn('flex items-center gap-1.5 px-1 pt-1 text-[10px] text-muted-foreground', isMine && 'justify-end')}>
               <span>{moment(date).format('h:mm A')}</span>
               {isMine && tickStatus === 'sending' && <Clock className="h-3 w-3 animate-spin text-muted-foreground" />}
@@ -558,10 +562,10 @@ function Message({
               {isMine && tickStatus === 'delivered' && <CheckCheck className="h-3 w-3 text-muted-foreground" />}
               {isMine && tickStatus === 'read' && <CheckCheck className="h-3 w-3 text-sky-400" />}
             </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
 
       <Dialog open={confirmDeleteForEveryone} onOpenChange={setConfirmDeleteForEveryone}>
         <DialogContent className="rounded-2xl border border-border bg-card">

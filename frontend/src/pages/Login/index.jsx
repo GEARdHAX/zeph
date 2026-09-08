@@ -1,4 +1,4 @@
-﻿import {
+import {
   useEffect, useRef, useState,
 } from 'react';
 import { useGlobal } from 'reactn';
@@ -7,13 +7,14 @@ import jwtDecode from 'jwt-decode';
 import { useDispatch } from 'react-redux';
 import Div100vh from 'react-div-100vh';
 import {
-  ArrowLeft, ArrowRight, Moon, Sun, MessageCircle, Video, Users, ShieldCheck,
+  ArrowLeft, ArrowRight, Moon, Sun, MessageCircle, Video, Users, ShieldCheck, Fingerprint,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Input from './components/Input';
 import login from '../../actions/login';
+import { loginWithPasskey, passkeySupported } from '../../actions/passkey';
 import register from '../../actions/register';
 import setAuthToken from '../../actions/setAuthToken';
 import initIO from '../../actions/initIO';
@@ -91,6 +92,39 @@ function Login() {
     getInfo().then((res) => setInfo(res.data)).catch(() => {});
   }, []);
 
+  const applyToken = async (token) => {
+    if (keep) localStorage.setItem('token', token);
+    else sessionStorage.setItem('token', token);
+    setAuthToken(token);
+    setUser(jwtDecode(token));
+    setToken(token);
+    dispatch(initIO(token));
+    navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath, { replace: true });
+    await setEntryPath(null);
+  };
+
+  const onPasskeyLogin = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setLoginErrors({});
+    zephLoader.show('Waiting for your passkey');
+    try {
+      // No username needed — the browser offers every passkey for this site.
+      // A typed username still narrows the choice for older passkeys.
+      const res = await loginWithPasskey(email.trim() || undefined);
+      await applyToken(res.data.token);
+    } catch (err) {
+      // NotAllowedError = user cancelled / timed out the OS prompt — not an error to shout about.
+      if (err && err.name === 'NotAllowedError') setLoginErrors({});
+      else setLoginErrors({ generic: 'Passkey sign-in failed. Use your password, or try again.' });
+    } finally {
+      zephLoader.hide();
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
   const onLogin = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (submittingRef.current) return;
@@ -99,14 +133,7 @@ function Login() {
     zephLoader.show('Logging in');
     try {
       const res = await login(email, password);
-      if (keep) localStorage.setItem('token', res.data.token);
-      else sessionStorage.setItem('token', res.data.token);
-      setAuthToken(res.data.token);
-      setUser(jwtDecode(res.data.token));
-      setToken(res.data.token);
-      dispatch(initIO(res.data.token));
-      navigate(['/login', '/'].includes(entryPath) ? '/' : entryPath, { replace: true });
-      await setEntryPath(null);
+      await applyToken(res.data.token);
     } catch (err) {
       let errors = {};
       if (!err.response || typeof err.response.data !== 'object') errors.generic = 'Invalid credentials';
@@ -142,6 +169,7 @@ function Login() {
       setToken(res.data.token);
       dispatch(initIO(res.data.token));
       await setIsNewRegistration(true);
+      // (register keeps its own post-login flow below for the friend-invite branch)
 
       const friendInviteMatch = entryPath?.match(/^\/invite\/f\/(.+)$/);
       if (friendInviteMatch) {
@@ -221,7 +249,10 @@ function Login() {
 
           {/* Footer branding and credits */}
           <div className="text-xs text-zinc-400 z-10 flex items-center gap-1">
-            <span>© {new Date().getFullYear()}</span>
+            <span>
+              ©
+              {new Date().getFullYear()}
+            </span>
             <ZephWordmark className="text-xs font-semibold text-zinc-300" />
             <span>{`v${info.version || '1.0.0'}`}</span>
             {Config.showCredits && (
@@ -413,6 +444,26 @@ function Login() {
                       {isSubmitting ? 'Logging in...' : 'Log In'}
                       {!isSubmitting && <ArrowRight className="ml-2 h-4 w-4" />}
                     </Button>
+
+                    {passkeySupported() && (
+                      <>
+                        <div className="flex items-center gap-3 py-1">
+                          <span className="h-px flex-1 bg-border" />
+                          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">or</span>
+                          <span className="h-px flex-1 bg-border" />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isSubmitting}
+                          onClick={onPasskeyLogin}
+                          className="h-11 w-full rounded-xl text-sm font-semibold"
+                        >
+                          <Fingerprint className="mr-2 h-4 w-4" />
+                          Sign in with a passkey
+                        </Button>
+                      </>
+                    )}
                   </form>
                 ) : (
                   <form onSubmit={onRegister} className="space-y-3.5">
@@ -489,7 +540,8 @@ function Login() {
                 <div className="mt-6 text-center text-xs text-muted-foreground">
                   {tab === 'login' ? (
                     <span>
-                      Don&apos;t have an account?{' '}
+                      Don&apos;t have an account?
+                      {' '}
                       <button
                         type="button"
                         onClick={() => {
@@ -503,7 +555,8 @@ function Login() {
                     </span>
                   ) : (
                     <span>
-                      Already have an account?{' '}
+                      Already have an account?
+                      {' '}
                       <button
                         type="button"
                         onClick={() => {

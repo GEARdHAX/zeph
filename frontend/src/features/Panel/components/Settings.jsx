@@ -4,7 +4,7 @@ import {
 import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
 import {
-  Pencil, Moon, Sun, KeyRound, ImageMinus, Shield, LogOut, PlusCircle, AtSign, FileText, Trash2, Compass,
+  Pencil, Moon, Sun, KeyRound, ImageMinus, Shield, LogOut, PlusCircle, AtSign, FileText, Trash2, Compass, Fingerprint,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import BioText from '../../../components/BioText';
 import Popup from './Popup';
 import SessionsPopup from './SessionsPopup';
 import ChangeUsernamePopup from './ChangeUsernamePopup';
+import PasskeysPopup from './PasskeysPopup';
 import EditBioPopup from './EditBioPopup';
 import DeleteAccountPopup from './DeleteAccountPopup';
 import { validateFile } from '../../../lib/mediaPolicy';
@@ -42,6 +43,7 @@ function Settings() {
   const [usernamePopup, showUsernamePopup] = useState(false);
   const [bioPopup, showBioPopup] = useState(false);
   const [deleteAccountPopup, showDeleteAccountPopup] = useState(false);
+  const [passkeysPopup, showPasskeysPopup] = useState(false);
 
   const fileInput = useRef(null);
   const [editingFile, setEditingFile] = useState(null);
@@ -235,6 +237,15 @@ function Settings() {
       <Button
         variant="outline"
         className="w-full justify-start gap-2.5 rounded-xl border border-border bg-card/40 text-xs font-semibold hover:bg-muted"
+        onClick={() => showPasskeysPopup(true)}
+      >
+        <Fingerprint className="h-4 w-4 text-muted-foreground" />
+        Passkeys &amp; Fingerprint Login
+      </Button>
+
+      <Button
+        variant="outline"
+        className="w-full justify-start gap-2.5 rounded-xl border border-border bg-card/40 text-xs font-semibold hover:bg-muted"
         onClick={() => showSessionsPopup(true)}
       >
         <Shield className="h-4 w-4 text-muted-foreground" />
@@ -287,6 +298,7 @@ function Settings() {
       {usernamePopup && <ChangeUsernamePopup onClose={() => showUsernamePopup(false)} />}
       {bioPopup && <EditBioPopup onClose={() => showBioPopup(false)} />}
       {deleteAccountPopup && <DeleteAccountPopup onClose={() => showDeleteAccountPopup(false)} />}
+      {passkeysPopup && <PasskeysPopup onClose={() => showPasskeysPopup(false)} />}
 
       {editingFile && (
         <Suspense fallback={<LazyFallback />}>

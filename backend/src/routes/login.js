@@ -1,12 +1,10 @@
 const User = require('../models/User');
-const Session = require('../models/Session');
 const argon2 = require('argon2');
-const store = require('../store');
-const jwt = require('jsonwebtoken');
 const validator = require('validator');
 const isEmpty = require('../utils/isEmpty');
 const SecurityEventService = require('../services/securityEventService');
 const securityEventContext = require('../utils/securityEventContext');
+const issueSession = require('../lib/issueSession');
 
 module.exports = (req, res, next) => {
   let { email, password } = req.fields;
@@ -20,30 +18,12 @@ module.exports = (req, res, next) => {
   const context = securityEventContext(req);
 
   const sendResponse = async (user) => {
-    const session = await new Session({ user: user._id, userAgent: req.headers['user-agent'] || '' }).save();
-
-    const payload = {
-      id: user._id,
-      email: user.email,
-      level: user.level,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      picture: user.picture,
-      username: user.username,
-      deviceId: session._id,
-    };
-    jwt.sign(payload, store.config.secret, { expiresIn: 60 * 60 * 24 * 60 }, (err, token) => {
-      if (err) return res.status(500).json({ token: 'Error signing token.' });
-      SecurityEventService.record({
-        type: 'LOGIN_SUCCESS',
-        severity: 'low',
-        actor: { userId: user._id.toString(), sessionId: session._id.toString() },
-        source: context,
-        target: { resource: '/api/login', action: 'login' },
-        result: 'success',
-      });
+    try {
+      const token = await issueSession(user, req, { method: 'password' });
       res.status(200).json({ token });
-    });
+    } catch (err) {
+      res.status(500).json({ token: 'Error signing token.' });
+    }
   };
 
   // Wrong-password branch — records the SAME LOGIN_FAILED type/severity as

@@ -31,6 +31,10 @@ const aiAnalyzeLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix
 // message split by the client, etc.) while still bounding a scripted
 // flood.
 const messageSendLimit = inviteRateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'message:send' });
+// Passwordless login is unauthenticated and does a username lookup + a
+// WebAuthn verify per call — bound both the enumeration surface and the
+// verify cost. 20/min per IP is far above any human sign-in cadence.
+const passkeyLoginLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'passkey:login' });
 
 // Zero Trust (Phase 2) — mounted AFTER jwtAuth, same middleware-chain
 // position every rate limiter already occupies. Only on the routes
@@ -80,6 +84,11 @@ router.get('/images/:id', require('./images'));
 router.get('/files/:id', require('./files'));
 router.get('/images/:id/:size', require('./images'));
 router.post('/login', require('./login'));
+
+// Passwordless login (WebAuthn passkey / fingerprint / device passcode).
+// options + verify are public — this IS the sign-in entry point.
+router.post('/passkey/login/options', passkeyLoginLimit, require('./passkey/login-options'));
+router.post('/passkey/login/verify', passkeyLoginLimit, require('./passkey/login-verify'));
 router.post('/typing', passport.authenticate('jwt', { session: false }, null), require('./typing'));
 router.post('/check-user', require('./checkUser'));
 router.post('/upload', passport.authenticate('jwt', { session: false }, null), require('./upload'));
@@ -99,6 +108,12 @@ router.post('/user/list', passport.authenticate('jwt', { session: false }, null)
 // admin routes — see the isPrivileged 404 comment further down).
 router.get('/admin/ai-quota/:userId', jwtAuth, require('./admin/ai-quota-get'));
 router.post('/admin/ai-quota/reset', jwtAuth, require('./admin/ai-quota-reset'));
+// Login-passkey management (enroll / list / remove) — authenticated: you
+// must already be signed in to add or remove a passkey for your account.
+router.post('/passkey/register/options', jwtAuth, require('./passkey/register-options'));
+router.post('/passkey/register/verify', jwtAuth, require('./passkey/register-verify'));
+router.get('/passkey/list', jwtAuth, require('./passkey/list'));
+router.post('/passkey/:id/delete', jwtAuth, require('./passkey/delete'));
 router.post('/picture/change', passport.authenticate('jwt', { session: false }, null), require('./change-picture'));
 router.post('/picture/remove', passport.authenticate('jwt', { session: false }, null), require('./change-picture'));
 

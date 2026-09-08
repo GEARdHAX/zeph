@@ -26,7 +26,9 @@ vi.mock('react-toastify', async (importOriginal) => {
 import translateMessage from '../../../actions/translateMessage';
 
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
-const AUTHOR = { _id: 'user-1', firstName: 'Me', lastName: 'Self' };
+// Translate is only offered on other people's messages, so the author here
+// must not be ME.
+const AUTHOR = { _id: 'user-2', firstName: 'Sam', lastName: 'Other' };
 const TEXT_MESSAGE = {
   _id: 'm1', type: 'text', content: 'hello there', author: AUTHOR, date: new Date().toISOString(),
 };
@@ -59,6 +61,13 @@ describe('Message — Translate (AI)', () => {
   it('does not offer Translate when AI is disabled', async () => {
     const user = userEvent.setup();
     renderMessage(TEXT_MESSAGE, false);
+    await user.click(screen.getByRole('button', { name: 'Message options' }));
+    expect(screen.queryByText('Translate')).not.toBeInTheDocument();
+  });
+
+  it('does not offer Translate on your own outgoing message', async () => {
+    const user = userEvent.setup();
+    renderMessage({ ...TEXT_MESSAGE, author: { _id: 'user-1', firstName: 'Me', lastName: 'Self' } });
     await user.click(screen.getByRole('button', { name: 'Message options' }));
     expect(screen.queryByText('Translate')).not.toBeInTheDocument();
   });
