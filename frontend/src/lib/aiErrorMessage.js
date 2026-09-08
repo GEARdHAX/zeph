@@ -13,6 +13,14 @@ const MESSAGES = {
   GENERATION_IN_PROGRESS: 'This is already being generated — check back in a few seconds.',
   INVALID_OUTPUT: 'AI could not produce a usable result this time. Please try again.',
   INPUT_TOO_LARGE: 'That text is too long for this AI action.',
+  // Meeting-summary eligibility — the synchronous 422 path carries a precise
+  // message from the backend (preferred, see ELIGIBILITY_REASONS below);
+  // these are the fallback for the async poll path, which only reports a
+  // bare `failureReason` code.
+  MEETING_NOT_ENDED: 'This meeting has not ended yet.',
+  MEETING_TOO_SHORT: 'This meeting was too short to summarize.',
+  INSUFFICIENT_PARTICIPANTS: 'This meeting needs more participants to generate a useful summary.',
+  INSUFFICIENT_TRANSCRIPT: 'Not enough was said in this meeting to generate a useful summary.',
 };
 
 // Turn a `retryAfter` (seconds) / `resetAt` (ISO) from a 429 body into a

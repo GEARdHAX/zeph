@@ -283,6 +283,36 @@ describe('GET /api/meeting/:id/summary', () => {
   });
 });
 
+describe('POST /api/meeting/:id/summarize — eligibility runs before any processing', () => {
+  // Regression: the BullMQ path used to return 202 and enqueue a job
+  // WITHOUT any transcript-independent eligibility check — the worker only
+  // discovered the meeting was ineligible AFTER paying for transcription,
+  // and the rejection was buried in a log line the user never saw. The
+  // check now runs synchronously in the route before the mediaId lookup
+  // and before the queue branch, so nothing is transcribed or persisted.
+  it('does not create a transcript doc when the meeting is too short', async () => {
+    enableGroqChatAndTranscribe('summary', 'word '.repeat(200));
+    const user = await createUser();
+    const other = await createUser();
+    const meeting = await createMeeting({
+      caller: user._id,
+      users: [user._id, other._id],
+      startedAt: new Date('2026-01-01T10:00:00Z'),
+      endedAt: new Date('2026-01-01T10:02:00Z'),
+    });
+    const media = await createMedia(user._id);
+
+    const res = await request(app)
+      .post(`/api/meeting/${meeting._id}/summarize`)
+      .set('Authorization', `Bearer ${tokenFor(user)}`)
+      .send({ mediaId: media._id.toString() });
+
+    expect(res.status).toBe(422);
+    expect(res.body.reason).toBe('MEETING_TOO_SHORT');
+    expect(await MeetingTranscript.findOne({ meeting: meeting._id })).toBeNull();
+  });
+});
+
 describe('POST /api/meeting/:id/summarize — duplicate generation prevention', () => {
   it('reuses an already-summarized transcript instead of calling the provider again', async () => {
     const user = await createUser();

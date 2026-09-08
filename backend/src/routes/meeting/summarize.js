@@ -4,7 +4,8 @@ const Media = require('../../models/Media');
 const groupPolicy = require('../../authorization/groupPolicy');
 const store = require('../../store');
 const { aiTextEnabled } = require('../../ai/providerRouter');
-const { REJECTION_REASONS } = require('../../ai/policy');
+const { REJECTION_REASONS, buildPolicy } = require('../../ai/policy');
+const { checkMeetingSummaryEligibility } = require('../../ai/eligibility');
 const { generateMeetingSummary, transcribeMeetingAudio } = require('../../ai/meetingTranscriptService');
 const { enqueueMeetingSummaryJob, getQueue } = require('../../queues/meetingAiQueue');
 const { resolveRequestId, aiFailureResponse } = require('../../ai/telemetry');
@@ -57,6 +58,23 @@ module.exports = async (req, res) => {
 
   const authorized = await authorizeMeetingAccess(meeting, req.user.id);
   if (!authorized) return res.status(403).json({ error: true, requestId });
+
+  // Eligibility that doesn't need a transcript (meeting ended? long enough?
+  // enough participants?) runs HERE, synchronously, before anything is
+  // queued — otherwise the BullMQ path returns 202 and the worker only
+  // discovers the meeting is ineligible AFTER paying for transcription,
+  // with the rejection buried in a log line the user never sees.
+  // (INSUFFICIENT_TRANSCRIPT still can't be checked until transcription
+  // runs — that verdict is persisted by the worker for the frontend poll.)
+  const eligibility = checkMeetingSummaryEligibility(buildPolicy(config), meeting);
+  if (!eligibility.eligible) {
+    return res.status(422).json({
+      error: true,
+      reason: eligibility.reason,
+      message: meetingEligibilityMessage(eligibility),
+      requestId,
+    });
+  }
 
   if (mediaId) {
     const media = await Media.findOne({ _id: mediaId, uploaderId: req.user.id, category: 'audio' });

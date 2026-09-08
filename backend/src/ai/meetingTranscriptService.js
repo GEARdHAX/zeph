@@ -127,7 +127,16 @@ const generateMeetingSummary = async ({ meetingId, userId, requestId }) => {
   const policy = buildPolicy(store.config);
   const wordCount = countWords(transcriptDoc.transcript);
   const eligibility = checkMeetingSummaryEligibility(policy, meeting, wordCount);
-  if (!eligibility.eligible) return { ok: false, ...eligibility };
+  if (!eligibility.eligible) {
+    // Persist the verdict so GET /meeting/:id/summary (the frontend poll on
+    // the async path) reports it instead of the meeting sitting on
+    // status:'TRANSCRIBED' forever with no explanation.
+    await MeetingTranscript.updateOne(
+      { meeting: meetingId },
+      { status: 'FAILED', failureReason: eligibility.reason, updatedAt: new Date() },
+    );
+    return { ok: false, ...eligibility };
+  }
 
   if (transcriptDoc.summary && transcriptDoc.status === 'SUMMARIZED') {
     return { ok: true, summary: transcriptDoc.summary, cached: true };
