@@ -1,6 +1,9 @@
 import axios from 'axios';
 import {
-  startRegistration, startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAvailable,
+  startRegistration,
+  startAuthentication,
+  browserSupportsWebAuthn,
+  platformAuthenticatorIsAvailable,
 } from '@simplewebauthn/browser';
 import Config from '../config';
 
@@ -32,7 +35,9 @@ export const deletePasskey = (id) => axios({ method: 'post', url: url(`/api/pass
 // the account from the one the user picks.
 export const loginWithPasskey = async (email) => {
   const options = await axios({
-    method: 'post', url: url('/api/passkey/login/options'), data: email ? { email } : {},
+    method: 'post',
+    url: url('/api/passkey/login/options'),
+    data: email ? { email } : {},
   });
   const { flowId, ...optionsJSON } = options.data;
   const response = await startAuthentication({ optionsJSON });

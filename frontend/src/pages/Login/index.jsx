@@ -1,14 +1,10 @@
-import {
-  useEffect, useRef, useState,
-} from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGlobal } from 'reactn';
 import { Link, useNavigate } from 'react-router-dom';
 import jwtDecode from 'jwt-decode';
 import { useDispatch } from 'react-redux';
 import Div100vh from 'react-div-100vh';
-import {
-  ArrowLeft, ArrowRight, Moon, Sun, MessageCircle, Video, Users, ShieldCheck, Fingerprint,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Moon, Sun, MessageCircle, Video, Users, ShieldCheck, Fingerprint } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -89,7 +85,9 @@ function Login() {
   const setIsNewRegistration = useGlobal('isNewRegistration')[1];
 
   useEffect(() => {
-    getInfo().then((res) => setInfo(res.data)).catch(() => {});
+    getInfo()
+      .then((res) => setInfo(res.data))
+      .catch(() => {});
   }, []);
 
   const applyToken = async (token) => {
@@ -227,8 +225,8 @@ function Login() {
               <span className="text-primary">Simplified.</span>
             </h1>
             <p className="mt-4 max-w-[340px] text-sm leading-relaxed text-zinc-300 drop-shadow-sm">
-              Real-time messaging, voice &amp; video calls, group chats and more. Built for speed, security and
-              seamless communication.
+              Real-time messaging, voice &amp; video calls, group chats and more. Built for speed, security and seamless
+              communication.
             </p>
 
             {/* Feature List */}
@@ -249,10 +247,7 @@ function Login() {
 
           {/* Footer branding and credits */}
           <div className="text-xs text-zinc-400 z-10 flex items-center gap-1">
-            <span>
-              ©
-              {new Date().getFullYear()}
-            </span>
+            <span>©{new Date().getFullYear()}</span>
             <ZephWordmark className="text-xs font-semibold text-zinc-300" />
             <span>{`v${info.version || '1.0.0'}`}</span>
             {Config.showCredits && (
@@ -300,12 +295,7 @@ function Login() {
               <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-lg font-bold">Credits & Acknowledgements</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCredits(false)}
-                    className="h-8 px-2 text-xs"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setShowCredits(false)} className="h-8 px-2 text-xs">
                     <ArrowLeft className="mr-1 h-3.5 w-3.5" />
                     Back
                   </Button>
@@ -353,15 +343,11 @@ function Login() {
                       setLoginErrors({});
                     }}
                     className={`relative flex-1 pb-3 text-center text-sm font-semibold transition-all duration-200 ${
-                      tab === 'login'
-                        ? 'text-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
+                      tab === 'login' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Log In
-                    {tab === 'login' && (
-                      <span className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />
-                    )}
+                    {tab === 'login' && <span className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />}
                   </button>
                   <button
                     type="button"
@@ -372,15 +358,11 @@ function Login() {
                       setRegisterErrors({});
                     }}
                     className={`relative flex-1 pb-3 text-center text-sm font-semibold transition-all duration-200 ${
-                      tab === 'register'
-                        ? 'text-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
+                      tab === 'register' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Register
-                    {tab === 'register' && (
-                      <span className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />
-                    )}
+                    {tab === 'register' && <span className="absolute bottom-0 left-0 h-0.5 w-full bg-primary" />}
                   </button>
                 </div>
 
@@ -416,11 +398,7 @@ function Login() {
 
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="keep-login"
-                          checked={keep}
-                          onCheckedChange={(checked) => setKeep(!!checked)}
-                        />
+                        <Checkbox id="keep-login" checked={keep} onCheckedChange={(checked) => setKeep(!!checked)} />
                         <Label
                           htmlFor="keep-login"
                           className="cursor-pointer text-xs font-normal text-muted-foreground"
@@ -449,7 +427,9 @@ function Login() {
                       <>
                         <div className="flex items-center gap-3 py-1">
                           <span className="h-px flex-1 bg-border" />
-                          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">or</span>
+                          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            or
+                          </span>
                           <span className="h-px flex-1 bg-border" />
                         </div>
                         <Button
@@ -540,8 +520,7 @@ function Login() {
                 <div className="mt-6 text-center text-xs text-muted-foreground">
                   {tab === 'login' ? (
                     <span>
-                      Don&apos;t have an account?
-                      {' '}
+                      Don&apos;t have an account?{' '}
                       <button
                         type="button"
                         onClick={() => {
@@ -555,8 +534,7 @@ function Login() {
                     </span>
                   ) : (
                     <span>
-                      Already have an account?
-                      {' '}
+                      Already have an account?{' '}
                       <button
                         type="button"
                         onClick={() => {

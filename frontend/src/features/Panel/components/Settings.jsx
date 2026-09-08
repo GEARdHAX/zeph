@@ -1,10 +1,20 @@
-import {
-  useRef, useState, lazy, Suspense,
-} from 'react';
+import { useRef, useState, lazy, Suspense } from 'react';
 import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
 import {
-  Pencil, Moon, Sun, KeyRound, ImageMinus, Shield, LogOut, PlusCircle, AtSign, FileText, Trash2, Compass, Fingerprint,
+  Pencil,
+  Moon,
+  Sun,
+  KeyRound,
+  ImageMinus,
+  Shield,
+  LogOut,
+  PlusCircle,
+  AtSign,
+  FileText,
+  Trash2,
+  Compass,
+  Fingerprint,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -171,14 +181,10 @@ function Settings() {
 
       <div className="text-center mb-1">
         <h3 className="text-base font-bold text-foreground">
-          {user.firstName}
-          {' '}
-          {user.lastName}
+          {user.firstName} {user.lastName}
         </h3>
         <p className="text-xs text-muted-foreground">{`@${user.username || 'user'}`}</p>
-        {user.bio && (
-          <BioText text={user.bio} className="mt-2 block text-xs text-muted-foreground" />
-        )}
+        {user.bio && <BioText text={user.bio} className="mt-2 block text-xs text-muted-foreground" />}
       </div>
 
       {/* Theme Toggle Button */}

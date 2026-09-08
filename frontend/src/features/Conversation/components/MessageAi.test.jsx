@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -30,12 +28,19 @@ const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
 // must not be ME.
 const AUTHOR = { _id: 'user-2', firstName: 'Sam', lastName: 'Other' };
 const TEXT_MESSAGE = {
-  _id: 'm1', type: 'text', content: 'hello there', author: AUTHOR, date: new Date().toISOString(),
+  _id: 'm1',
+  type: 'text',
+  content: 'hello there',
+  author: AUTHOR,
+  date: new Date().toISOString(),
 };
 
 function renderMessage(message, aiEnabled = true) {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   render(
@@ -121,7 +126,12 @@ describe('Message — Translate (AI)', () => {
 
   it('prevents a duplicate submission while a translation is already in flight', async () => {
     let resolveRequest;
-    translateMessage.mockImplementationOnce(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    translateMessage.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
     const user = userEvent.setup();
     renderMessage(TEXT_MESSAGE);
 

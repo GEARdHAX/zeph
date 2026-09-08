@@ -34,14 +34,15 @@ const createUser = async (over = {}) => {
 // A stored credential — the full WebAuthn ceremony needs a real
 // authenticator, so these tests cover everything AROUND the crypto:
 // auth gates, IDOR isolation, and the no-enumeration guarantee.
-const seedCred = (user, over = {}) => PasskeyCredential.create({
-  user: user._id,
-  credentialID: over.credentialID || `cred-${Math.random().toString(36).slice(2)}`,
-  publicKey: Buffer.from('fake-public-key'),
-  counter: 0,
-  transports: ['internal'],
-  label: over.label || 'My phone',
-});
+const seedCred = (user, over = {}) =>
+  PasskeyCredential.create({
+    user: user._id,
+    credentialID: over.credentialID || `cred-${Math.random().toString(36).slice(2)}`,
+    publicKey: Buffer.from('fake-public-key'),
+    counter: 0,
+    transports: ['internal'],
+    label: over.label || 'My phone',
+  });
 
 describe('passkey management routes require auth', () => {
   it('GET /api/passkey/list is 401 without a token', async () => {
@@ -56,7 +57,7 @@ describe('passkey management routes require auth', () => {
 });
 
 describe('GET /api/passkey/list', () => {
-  it('returns only the caller\'s own passkeys and never the public key', async () => {
+  it("returns only the caller's own passkeys and never the public key", async () => {
     const me = await createUser();
     const other = await createUser();
     await seedCred(me, { label: 'mine' });
@@ -75,7 +76,7 @@ describe('GET /api/passkey/list', () => {
 });
 
 describe('POST /api/passkey/:id/delete — IDOR', () => {
-  it('cannot delete another user\'s passkey', async () => {
+  it("cannot delete another user's passkey", async () => {
     const me = await createUser();
     const other = await createUser();
     const victim = await seedCred(other);
@@ -112,9 +113,7 @@ describe('POST /api/passkey/login/options — usernameless + no enumeration', ()
   });
 
   it('returns a well-formed options object for an unknown user', async () => {
-    const res = await request(app)
-      .post('/api/passkey/login/options')
-      .field('email', 'nobody-here');
+    const res = await request(app).post('/api/passkey/login/options').field('email', 'nobody-here');
 
     expect(res.status).toBe(200);
     expect(res.body.challenge).toBeDefined();
@@ -125,9 +124,7 @@ describe('POST /api/passkey/login/options — usernameless + no enumeration', ()
     const user = await createUser({ username: 'haspasskey' });
     await seedCred(user);
 
-    const res = await request(app)
-      .post('/api/passkey/login/options')
-      .field('email', 'haspasskey');
+    const res = await request(app).post('/api/passkey/login/options').field('email', 'haspasskey');
 
     expect(res.status).toBe(200);
     expect(res.body.challenge).toBeDefined();
@@ -162,15 +159,16 @@ describe('POST /api/passkey/login/verify — opaque failure', () => {
     const body = { flowId: opts.body.flowId, response: JSON.stringify({ id: 'x', response: {} }) };
 
     await request(app).post('/api/passkey/login/verify').field('flowId', body.flowId).field('response', body.response);
-    const second = await request(app).post('/api/passkey/login/verify').field('flowId', body.flowId).field('response', body.response);
+    const second = await request(app)
+      .post('/api/passkey/login/verify')
+      .field('flowId', body.flowId)
+      .field('response', body.response);
 
     expect(second.status).toBe(401);
   });
 
   it('401 for a malformed (non-JSON) response', async () => {
-    const res = await request(app)
-      .post('/api/passkey/login/verify')
-      .field('response', 'not json');
+    const res = await request(app).post('/api/passkey/login/verify').field('response', 'not json');
 
     expect(res.status).toBe(401);
     expect(res.body.reason).toBe('passkey_auth_failed');

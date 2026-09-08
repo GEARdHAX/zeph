@@ -1,6 +1,4 @@
-import {
-  memo, useState, useRef, useEffect, lazy, Suspense,
-} from 'react';
+import { memo, useState, useRef, useEffect, lazy, Suspense } from 'react';
 import moment from 'moment';
 import emojiRegex from 'emoji-regex';
 import { useGlobal } from 'reactn';
@@ -9,11 +7,25 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import ReactImageAppear from 'react-image-appear';
 import {
-  DownloadCloud, Check, CheckCheck, Clock, AlertCircle, MoreVertical, Trash2, Ban, Copy, Languages,
+  DownloadCloud,
+  Check,
+  CheckCheck,
+  Clock,
+  AlertCircle,
+  MoreVertical,
+  Trash2,
+  Ban,
+  Copy,
+  Languages,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -41,9 +53,7 @@ const ProfileView = lazy(() => import('../../Panel/components/ProfileView'));
 // when this message's own props are referentially unchanged.
 const TRANSLATE_LANGUAGES = ['Spanish', 'French', 'German', 'Hindi', 'Japanese', 'Arabic'];
 
-function Message({
-  message, previous, next, onOpen, roomID, aiEnabled,
-}) {
+function Message({ message, previous, next, onOpen, roomID, aiEnabled }) {
   const { content, date, status } = message;
   let { author } = message;
 
@@ -109,9 +119,14 @@ function Message({
   // independent delivery/read state, so this single tri-state icon only
   // reflects "at least one other member" until per-member receipts matter.
   const otherHasIt = (list) => (list || []).some((id) => String(id?._id || id) !== authorId);
-  const tickStatus = status === 'failed' || status === 'sending'
-    ? status
-    : (otherHasIt(message.readBy) ? 'read' : (otherHasIt(message.deliveredTo) ? 'delivered' : 'sent'));
+  const tickStatus =
+    status === 'failed' || status === 'sending'
+      ? status
+      : otherHasIt(message.readBy)
+        ? 'read'
+        : otherHasIt(message.deliveredTo)
+          ? 'delivered'
+          : 'sent';
 
   let attachPrevious = false;
   let attachNext = false;
@@ -119,19 +134,11 @@ function Message({
   const prevAuthorId = String(previous?.author?._id || previous?.author?.id || '');
   const nextAuthorId = String(next?.author?._id || next?.author?.id || '');
 
-  if (
-    previous
-    && Math.abs(moment(previous.date).diff(moment(date), 'minutes')) < 3
-    && prevAuthorId === authorId
-  ) {
+  if (previous && Math.abs(moment(previous.date).diff(moment(date), 'minutes')) < 3 && prevAuthorId === authorId) {
     attachPrevious = true;
   }
 
-  if (
-    next
-    && Math.abs(moment(next.date).diff(moment(date), 'minutes')) < 3
-    && nextAuthorId === authorId
-  ) {
+  if (next && Math.abs(moment(next.date).diff(moment(date), 'minutes')) < 3 && nextAuthorId === authorId) {
     attachNext = true;
   }
 
@@ -144,9 +151,7 @@ function Message({
       // Deleted/unknown author — nothing to preview, render the avatar inert.
       return (
         <Avatar className="h-7 w-7 shrink-0 border border-border bg-gradient-to-br from-rose-600 to-primary text-white font-bold">
-          <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">
-            {initials}
-          </AvatarFallback>
+          <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">{initials}</AvatarFallback>
         </Avatar>
       );
     }
@@ -165,9 +170,7 @@ function Message({
               className="aspect-square size-full object-cover"
             />
           )}
-          <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">
-            {initials}
-          </AvatarFallback>
+          <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">{initials}</AvatarFallback>
         </Avatar>
       </button>
     );
@@ -202,7 +205,9 @@ function Message({
               <span>{moment(date).format('h:mm A')}</span>
               {isMine && tickStatus === 'sending' && <Clock className="h-2.5 w-2.5 animate-spin text-white/70" />}
               {isMine && tickStatus === 'failed' && <AlertCircle className="h-2.5 w-2.5 text-destructive" />}
-              {isMine && (tickStatus === 'sent' || tickStatus === 'delivered') && <Check className="h-2.5 w-2.5 text-white/80" />}
+              {isMine && (tickStatus === 'sent' || tickStatus === 'delivered') && (
+                <Check className="h-2.5 w-2.5 text-white/80" />
+              )}
               {isMine && tickStatus === 'read' && <CheckCheck className="h-2.5 w-2.5 text-sky-400" />}
             </div>
           </div>
@@ -224,7 +229,7 @@ function Message({
             </div>
             <div className="min-w-0 pr-1">
               <div className="font-semibold text-xs truncate max-w-[200px]">
-                {attachment ? (attachment.originalName || attachment.name) : 'Attachment'}
+                {attachment ? attachment.originalName || attachment.name : 'Attachment'}
               </div>
               <div className="text-[10px] opacity-80 mt-0.5">
                 {attachment ? formatFileSize(attachment.size) : 'Unknown size'}
@@ -234,13 +239,7 @@ function Message({
         );
       }
       default:
-        return (
-          <MessageContent
-            content={content}
-            isMine={isMine}
-            onMentionClick={setPreviewUsername}
-          />
-        );
+        return <MessageContent content={content} isMine={isMine} onMentionClick={setPreviewUsername} />;
     }
   }
 
@@ -320,7 +319,9 @@ function Message({
     try {
       await deleteMessage({ roomID, messageID: message._id, forEveryone: false });
       dispatch({
-        type: Actions.MESSAGE_DELETE, messageID: message._id, forEveryone: false,
+        type: Actions.MESSAGE_DELETE,
+        messageID: message._id,
+        forEveryone: false,
       });
     } catch (err) {
       toast.error('Could not delete message. Please try again.');
@@ -372,14 +373,16 @@ function Message({
     return 'rounded-2xl';
   };
 
-  const isWideMessage = !isImage && message.type !== 'file' && !!content && (
-    content.length > 250
-    || content.includes('```')
-    || (content.includes('|') && content.includes('\n'))
-    || content.includes('\n- ')
-    || content.includes('\n* ')
-    || content.includes('\n1. ')
-  );
+  const isWideMessage =
+    !isImage &&
+    message.type !== 'file' &&
+    !!content &&
+    (content.length > 250 ||
+      content.includes('```') ||
+      (content.includes('|') && content.includes('\n')) ||
+      content.includes('\n- ') ||
+      content.includes('\n* ') ||
+      content.includes('\n1. '));
 
   return (
     <>
@@ -390,20 +393,31 @@ function Message({
           attachPrevious ? 'my-0.5' : 'mt-3.5',
         )}
       >
-        <div className={cn('flex items-end gap-2', isWideMessage ? 'w-full max-w-[96%] sm:max-w-[86%] md:max-w-[80%]' : 'max-w-[85%] sm:max-w-[70%]', isMine && 'flex-row-reverse')}>
+        <div
+          className={cn(
+            'flex items-end gap-2',
+            isWideMessage ? 'w-full max-w-[96%] sm:max-w-[86%] md:max-w-[80%]' : 'max-w-[85%] sm:max-w-[70%]',
+            isMine && 'flex-row-reverse',
+          )}
+        >
           <PictureOrSpacer />
 
           <div className={cn('flex flex-col', isWideMessage ? 'w-full' : '', isMine ? 'items-end' : 'items-start')}>
             {/* Author Name only on first message of consecutive group */}
             {!isMine && !attachPrevious && (
-            <span className="mb-1 ml-1 text-[11px] font-semibold text-muted-foreground">
-              {author.firstName}
-              {' '}
-              {author.lastName}
-            </span>
+              <span className="mb-1 ml-1 text-[11px] font-semibold text-muted-foreground">
+                {author.firstName} {author.lastName}
+              </span>
             )}
 
-            <div className={cn('relative flex items-center gap-1', isWideMessage && 'w-full', isMine ? 'flex-row-reverse' : 'flex-row', menuOpen && 'z-30')}>
+            <div
+              className={cn(
+                'relative flex items-center gap-1',
+                isWideMessage && 'w-full',
+                isMine ? 'flex-row-reverse' : 'flex-row',
+                menuOpen && 'z-30',
+              )}
+            >
               {isOnlyEmoji ? (
                 <div className="p-1 text-3xl">{content}</div>
               ) : (
@@ -424,144 +438,152 @@ function Message({
               )}
 
               {!isDeleted && (
-              <div className="relative" ref={menuRef}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={deleting}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setMenuOpen(!menuOpen);
-                  }}
-                  className={cn(
-                    'h-6 w-6 shrink-0 rounded-full transition-opacity hover:bg-muted/80 cursor-pointer',
-                    menuOpen ? 'opacity-100 bg-muted/80' : 'opacity-0 group-hover:opacity-100',
-                  )}
-                  aria-label="Message options"
-                >
-                  <MoreVertical className="h-3.5 w-3.5" />
-                </Button>
-
-                {menuOpen && (
-                  <div
+                <div className="relative" ref={menuRef}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={deleting}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setMenuOpen(!menuOpen);
+                    }}
                     className={cn(
-                      'absolute top-8 z-50 min-w-[150px] rounded-xl border border-border/80 bg-popover p-1 text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in-0 zoom-in-95',
-                      isMine ? 'right-0' : 'left-0',
+                      'h-6 w-6 shrink-0 rounded-full transition-opacity hover:bg-muted/80 cursor-pointer',
+                      menuOpen ? 'opacity-100 bg-muted/80' : 'opacity-0 group-hover:opacity-100',
                     )}
+                    aria-label="Message options"
                   >
-                    {!isImage && message.type !== 'file' && content && (
-                      <button
-                        type="button"
-                        onClick={handleCopy}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
-                      >
-                        <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>Copy</span>
-                      </button>
-                    )}
-                    {/* Translate is only offered on OTHER people's messages —
+                    <MoreVertical className="h-3.5 w-3.5" />
+                  </Button>
+
+                  {menuOpen && (
+                    <div
+                      className={cn(
+                        'absolute top-8 z-50 min-w-[150px] rounded-xl border border-border/80 bg-popover p-1 text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in-0 zoom-in-95',
+                        isMine ? 'right-0' : 'left-0',
+                      )}
+                    >
+                      {!isImage && message.type !== 'file' && content && (
+                        <button
+                          type="button"
+                          onClick={handleCopy}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+                        >
+                          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>Copy</span>
+                        </button>
+                      )}
+                      {/* Translate is only offered on OTHER people's messages —
                         translating your own outgoing text tells you nothing you
                         don't already know (sender-side "translate before
                         sending" would be a composer feature, not this menu). */}
-                    {aiEnabled && !isMine && !isImage && message.type !== 'file' && content && !showLanguages && (
-                      <button
-                        type="button"
-                        disabled={translating}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowLanguages(true);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Languages className={cn('h-3.5 w-3.5 text-muted-foreground', translating && 'animate-spin')} />
-                        <span>{translating ? 'Translating…' : 'Translate'}</span>
-                      </button>
-                    )}
-                    {aiEnabled && !isMine && showLanguages && (
-                      <>
+                      {aiEnabled && !isMine && !isImage && message.type !== 'file' && content && !showLanguages && (
                         <button
                           type="button"
+                          disabled={translating}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setShowLanguages(false);
+                            setShowLanguages(true);
                           }}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span>← Back</span>
+                          <Languages
+                            className={cn('h-3.5 w-3.5 text-muted-foreground', translating && 'animate-spin')}
+                          />
+                          <span>{translating ? 'Translating…' : 'Translate'}</span>
                         </button>
-                        {TRANSLATE_LANGUAGES.map((language) => (
+                      )}
+                      {aiEnabled && !isMine && showLanguages && (
+                        <>
                           <button
-                            key={language}
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
                               setShowLanguages(false);
-                              handleTranslate(language);
                             }}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 pl-6 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
                           >
-                            <span>{language}</span>
+                            <span>← Back</span>
                           </button>
-                        ))}
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleDeleteForMe}
-                      disabled={deleting}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>Delete for me</span>
-                    </button>
-                    {isMine && (
+                          {TRANSLATE_LANGUAGES.map((language) => (
+                            <button
+                              key={language}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setShowLanguages(false);
+                                handleTranslate(language);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 pl-6 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+                            >
+                              <span>{language}</span>
+                            </button>
+                          ))}
+                        </>
+                      )}
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setMenuOpen(false);
-                          setConfirmDeleteForEveryone(true);
-                        }}
+                        onClick={handleDeleteForMe}
                         disabled={deleting}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
                       >
-                        <Ban className="h-3.5 w-3.5 text-destructive" />
-                        <span>Delete for everyone</span>
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>Delete for me</span>
                       </button>
-                    )}
-                  </div>
-                )}
-              </div>
+                      {isMine && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setMenuOpen(false);
+                            setConfirmDeleteForEveryone(true);
+                          }}
+                          disabled={deleting}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                        >
+                          <Ban className="h-3.5 w-3.5 text-destructive" />
+                          <span>Delete for everyone</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
             {translation && (
-            <div className={cn('mt-1 max-w-full rounded-xl border border-border/60 bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground', isMine && 'text-right')}>
-              <span className="font-semibold text-foreground">
-                {translation.language}
-                :
-                {' '}
-              </span>
-              {translation.text}
-            </div>
+              <div
+                className={cn(
+                  'mt-1 max-w-full rounded-xl border border-border/60 bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground',
+                  isMine && 'text-right',
+                )}
+              >
+                <span className="font-semibold text-foreground">{translation.language}: </span>
+                {translation.text}
+              </div>
             )}
 
             {/* Timestamp on last message of group */}
             {!attachNext && !isImage && (
-            <div className={cn('flex items-center gap-1.5 px-1 pt-1 text-[10px] text-muted-foreground', isMine && 'justify-end')}>
-              <span>{moment(date).format('h:mm A')}</span>
-              {isMine && tickStatus === 'sending' && <Clock className="h-3 w-3 animate-spin text-muted-foreground" />}
-              {isMine && tickStatus === 'failed' && <AlertCircle className="h-3 w-3 text-destructive" />}
-              {isMine && tickStatus === 'sent' && <Check className="h-3 w-3 text-muted-foreground" />}
-              {isMine && tickStatus === 'delivered' && <CheckCheck className="h-3 w-3 text-muted-foreground" />}
-              {isMine && tickStatus === 'read' && <CheckCheck className="h-3 w-3 text-sky-400" />}
-            </div>
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 px-1 pt-1 text-[10px] text-muted-foreground',
+                  isMine && 'justify-end',
+                )}
+              >
+                <span>{moment(date).format('h:mm A')}</span>
+                {isMine && tickStatus === 'sending' && <Clock className="h-3 w-3 animate-spin text-muted-foreground" />}
+                {isMine && tickStatus === 'failed' && <AlertCircle className="h-3 w-3 text-destructive" />}
+                {isMine && tickStatus === 'sent' && <Check className="h-3 w-3 text-muted-foreground" />}
+                {isMine && tickStatus === 'delivered' && <CheckCheck className="h-3 w-3 text-muted-foreground" />}
+                {isMine && tickStatus === 'read' && <CheckCheck className="h-3 w-3 text-sky-400" />}
+              </div>
             )}
           </div>
         </div>
@@ -600,11 +622,7 @@ function Message({
 
       {previewUsername && (
         <Suspense fallback={<LazyFallback />}>
-          <ProfileView
-            username={previewUsername}
-            onClose={() => setPreviewUsername(null)}
-            onOpenChat={openChatWith}
-          />
+          <ProfileView username={previewUsername} onClose={() => setPreviewUsername(null)} onOpenChat={openChatWith} />
         </Suspense>
       )}
     </>

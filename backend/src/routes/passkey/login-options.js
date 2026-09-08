@@ -25,7 +25,10 @@ module.exports = async (req, res) => {
   let allowCredentials = [];
   if (raw) {
     const query = validator.isEmail(raw) ? { email: raw } : { usernameNormalized: raw };
-    const user = await User.findOne(query).select('_id').lean().catch(() => null);
+    const user = await User.findOne(query)
+      .select('_id')
+      .lean()
+      .catch(() => null);
     if (user) {
       const creds = await PasskeyCredential.find({ user: user._id }).select('credentialID transports').lean();
       allowCredentials = creds.map((c) => ({ id: c.credentialID, transports: c.transports }));

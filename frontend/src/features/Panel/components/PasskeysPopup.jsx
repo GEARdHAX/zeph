@@ -2,14 +2,10 @@ import { useEffect, useState } from 'react';
 import moment from 'moment';
 import { toast } from 'react-toastify';
 import { Fingerprint, Trash2, Plus } from 'lucide-react';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  listPasskeys, registerPasskey, deletePasskey, passkeySupported,
-} from '../../../actions/passkey';
+import { listPasskeys, registerPasskey, deletePasskey, passkeySupported } from '../../../actions/passkey';
 
 function PasskeysPopup({ onClose }) {
   const [passkeys, setPasskeys] = useState([]);
@@ -34,7 +30,9 @@ function PasskeysPopup({ onClose }) {
       toast.success('Passkey added. You can now sign in with it.');
       load();
     } catch (err) {
-      if (err && err.name === 'NotAllowedError') { /* user cancelled the OS prompt */ } else if (err?.response?.data?.reason === 'already_registered') {
+      if (err && err.name === 'NotAllowedError') {
+        /* user cancelled the OS prompt */
+      } else if (err?.response?.data?.reason === 'already_registered') {
         toast.error('That device is already registered.');
       } else {
         toast.error('Could not add a passkey. Please try again.');
@@ -78,7 +76,10 @@ function PasskeysPopup({ onClose }) {
                 <div className="text-center text-sm text-muted-foreground">No passkeys yet.</div>
               )}
               {passkeys.map((p) => (
-                <div key={p._id} className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card/50 p-2.5">
+                <div
+                  key={p._id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card/50 p-2.5"
+                >
                   <div className="flex min-w-0 items-center gap-2.5">
                     <Fingerprint className="h-4 w-4 shrink-0 text-primary" />
                     <div className="min-w-0">
@@ -117,7 +118,9 @@ function PasskeysPopup({ onClose }) {
           </>
         )}
 
-        <Button type="button" variant="secondary" onClick={() => onClose()}>Close</Button>
+        <Button type="button" variant="secondary" onClick={() => onClose()}>
+          Close
+        </Button>
       </DialogContent>
     </Dialog>
   );

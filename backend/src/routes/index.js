@@ -94,10 +94,22 @@ router.post('/check-user', require('./checkUser'));
 router.post('/upload', passport.authenticate('jwt', { session: false }, null), require('./upload'));
 router.post('/upload/file', passport.authenticate('jwt', { session: false }, null), require('./upload-file'));
 router.post('/upload/media', passport.authenticate('jwt', { session: false }, null), require('./upload-media'));
-router.post('/upload/media/presign', passport.authenticate('jwt', { session: false }, null), require('./upload-media-presign'));
-router.post('/upload/media/:mediaId/complete', passport.authenticate('jwt', { session: false }, null), require('./upload-media-complete'));
+router.post(
+  '/upload/media/presign',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./upload-media-presign'),
+);
+router.post(
+  '/upload/media/:mediaId/complete',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./upload-media-complete'),
+);
 router.get('/media/:id', passport.authenticate('jwt', { session: false }, null), require('./media'));
-router.get('/media/:id/thumbnail', passport.authenticate('jwt', { session: false }, null), require('./media').thumbnail);
+router.get(
+  '/media/:id/thumbnail',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./media').thumbnail,
+);
 router.post('/register', require('./register'));
 router.post('/user/delete', passport.authenticate('jwt', { session: false }, null), require('./user-delete'));
 router.post('/user/edit', passport.authenticate('jwt', { session: false }, null), require('./user-edit'));
@@ -130,7 +142,12 @@ router.post('/message/read', passport.authenticate('jwt', { session: false }, nu
 router.post('/message/delete', passport.authenticate('jwt', { session: false }, null), require('./message-delete'));
 router.post('/messages/more', passport.authenticate('jwt', { session: false }, null), require('./more-messages'));
 router.post('/messages/sync', passport.authenticate('jwt', { session: false }, null), require('./sync-messages'));
-router.post('/group/create', passport.authenticate('jwt', { session: false }, null), ztCreateGroup, require('./create-group'));
+router.post(
+  '/group/create',
+  passport.authenticate('jwt', { session: false }, null),
+  ztCreateGroup,
+  require('./create-group'),
+);
 router.post('/group/get', passport.authenticate('jwt', { session: false }, null), require('./group/get'));
 router.post('/group/update', passport.authenticate('jwt', { session: false }, null), require('./group/update'));
 router.post('/group/members', passport.authenticate('jwt', { session: false }, null), require('./group/members-list'));
@@ -157,7 +174,12 @@ router.post(
 );
 router.post('/group/leave', passport.authenticate('jwt', { session: false }, null), require('./group/leave'));
 router.post('/group/delete', passport.authenticate('jwt', { session: false }, null), require('./group/delete'));
-router.post('/group/members/ban', passport.authenticate('jwt', { session: false }, null), ztBanMember, require('./group/members-ban'));
+router.post(
+  '/group/members/ban',
+  passport.authenticate('jwt', { session: false }, null),
+  ztBanMember,
+  require('./group/members-ban'),
+);
 router.post(
   '/group/ownership/transfer',
   passport.authenticate('jwt', { session: false }, null),
@@ -169,11 +191,31 @@ router.post('/group/join-requests/list', jwtAuth, require('./group/join-requests
 router.post('/group/join-requests/:userId/approve', jwtAuth, require('./group/join-requests/approve'));
 router.post('/group/join-requests/:userId/deny', jwtAuth, require('./group/join-requests/deny'));
 
-router.post('/conversation/hide', passport.authenticate('jwt', { session: false }, null), require('./conversation-hide'));
-router.post('/conversation/unhide', passport.authenticate('jwt', { session: false }, null), require('./conversation-unhide'));
-router.post('/conversation/delete', passport.authenticate('jwt', { session: false }, null), require('./conversation-delete'));
-router.post('/conversation/restore', passport.authenticate('jwt', { session: false }, null), require('./conversation-restore'));
-router.post('/conversations/removed', passport.authenticate('jwt', { session: false }, null), require('./removed-list'));
+router.post(
+  '/conversation/hide',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./conversation-hide'),
+);
+router.post(
+  '/conversation/unhide',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./conversation-unhide'),
+);
+router.post(
+  '/conversation/delete',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./conversation-delete'),
+);
+router.post(
+  '/conversation/restore',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./conversation-restore'),
+);
+router.post(
+  '/conversations/removed',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./removed-list'),
+);
 
 router.get('/vault/list', passport.authenticate('jwt', { session: false }, null), require('./vault-list'));
 router.get('/vault/status', passport.authenticate('jwt', { session: false }, null), require('./vault-status'));
@@ -218,8 +260,16 @@ router.post('/meeting/answer', passport.authenticate('jwt', { session: false }, 
 router.post('/meeting/close', passport.authenticate('jwt', { session: false }, null), require('./meeting/close'));
 router.post('/meeting/list', passport.authenticate('jwt', { session: false }, null), require('./meeting/list'));
 router.post('/meeting/delete', passport.authenticate('jwt', { session: false }, null), require('./meeting/delete'));
-router.post('/meeting/:id/summarize', passport.authenticate('jwt', { session: false }, null), require('./meeting/summarize'));
-router.get('/meeting/:id/summary', passport.authenticate('jwt', { session: false }, null), require('./meeting/get-summary'));
+router.post(
+  '/meeting/:id/summarize',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./meeting/summarize'),
+);
+router.get(
+  '/meeting/:id/summary',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./meeting/get-summary'),
+);
 
 router.post('/auth/change', require('./auth/change'));
 router.post('/auth/code', require('./auth/code'));
@@ -236,11 +286,7 @@ router.post(
   passport.authenticate('jwt', { session: false }, null),
   require('./users/change-username'),
 );
-router.post(
-  '/users/update-bio',
-  passport.authenticate('jwt', { session: false }, null),
-  require('./users/update-bio'),
-);
+router.post('/users/update-bio', passport.authenticate('jwt', { session: false }, null), require('./users/update-bio'));
 router.post(
   '/users/delete-account',
   passport.authenticate('jwt', { session: false }, null),
@@ -257,7 +303,12 @@ router.post('/ai/topics', passport.authenticate('jwt', { session: false }, null)
 
 router.post('/logout', passport.authenticate('jwt', { session: false }, null), require('./logout'));
 router.get('/sessions', passport.authenticate('jwt', { session: false }, null), require('./sessions/list'));
-router.post('/sessions/revoke', passport.authenticate('jwt', { session: false }, null), ztManageSessions, require('./sessions/revoke'));
+router.post(
+  '/sessions/revoke',
+  passport.authenticate('jwt', { session: false }, null),
+  ztManageSessions,
+  require('./sessions/revoke'),
+);
 
 router.get('/users/:username', passport.authenticate('jwt', { session: false }, null), require('./users/resolve'));
 
@@ -316,8 +367,18 @@ router.post('/security/step-up', jwtAuth, require('./security/step-up'));
 
 // Phase 3 — Threat Intelligence admin API (spec sections 28-29/36).
 router.get('/security/threat-intelligence', jwtAuth, ztViewThreatIntel, require('./security/threat-intelligence-list'));
-router.get('/security/threat-intelligence/status', jwtAuth, ztViewThreatIntel, require('./security/threat-intelligence-status'));
-router.get('/security/threat-intelligence/:indicator', jwtAuth, ztViewThreatIntel, require('./security/threat-intelligence-get'));
+router.get(
+  '/security/threat-intelligence/status',
+  jwtAuth,
+  ztViewThreatIntel,
+  require('./security/threat-intelligence-status'),
+);
+router.get(
+  '/security/threat-intelligence/:indicator',
+  jwtAuth,
+  ztViewThreatIntel,
+  require('./security/threat-intelligence-get'),
+);
 
 // Phase 4 — eBPF sensor ingestion (spec section 29). Deliberately NOT
 // jwtAuth/passport — sensorAuth is a completely separate, least-privilege
