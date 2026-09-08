@@ -1,35 +1,29 @@
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 
-// Connects to the single shared in-memory MongoDB started by
-// test/helpers/globalSetup.js. Each Jest worker gets its own database
-// (test_<workerId>) on that one server, so parallel workers are isolated
-// without paying for a mongod-per-file.
+// One in-memory MongoDB per test file. Test files run in parallel Jest
+// workers (each its own process), so this stays fully isolated — no shared
+// server, no cross-file leakage. Slower to boot than a single shared mongod
+// but deterministic, which a shared mongod under full parallel load is not.
+let mongod;
+
 const connect = async () => {
-  const baseUri = process.env.MONGO_TEST_URI;
-  if (!baseUri) throw new Error('MONGO_TEST_URI not set — is globalSetup configured in jest.config.js?');
+  mongod = await MongoMemoryServer.create();
+  await mongoose.connect(mongod.getUri());
 
-  const workerId = process.env.JEST_WORKER_ID || '1';
-  const uri = baseUri.replace(/\/[^/?]*(\?|$)/, `/test_${workerId}$1`);
-
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(uri);
-  }
-
-  // The worker's DB is reused across test files; closeDatabase() drops it,
-  // which also drops every index. Rebuild the schema-declared indexes
-  // (unique username, idempotency keys, TTLs, …) so a test file that relies
-  // on them still gets them — the old mongod-per-file setup got this for
-  // free via automatic first-use index builds on a fresh connection.
-  await Promise.all(Object.values(mongoose.connection.models).map((model) => model.syncIndexes().catch(() => {})));
+  // Force every schema's indexes to finish building before any test runs.
+  // Mongoose builds them lazily/async on first model use; under --runInBand
+  // that always completed in time, but with parallel workers a test that
+  // relies on a unique index (case-insensitive username, message
+  // idempotency key) can fire before the build finishes and see a
+  // duplicate write wrongly succeed.
+  await Promise.all(Object.values(mongoose.connection.models).map((m) => m.syncIndexes().catch(() => {})));
 };
 
 const closeDatabase = async () => {
-  // Drop this worker's DB and close the connection — but do NOT stop the
-  // shared server (globalTeardown owns that).
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-  }
+  await mongoose.connection.dropDatabase();
+  await mongoose.connection.close();
+  if (mongod) await mongod.stop();
 };
 
 const clearDatabase = async () => {
