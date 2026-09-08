@@ -1,9 +1,7 @@
 const request = require('supertest');
 const argon2 = require('argon2');
 const db = require('./helpers/db');
-const {
-  buildApp, tokenFor, tokenForDevice,
-} = require('./helpers/app');
+const { buildApp, tokenFor, tokenForDevice } = require('./helpers/app');
 const User = require('../src/models/User');
 const Session = require('../src/models/Session');
 const SecurityEvent = require('../src/models/SecurityEvent');
@@ -39,10 +37,11 @@ const createUser = async (overrides = {}) => {
 // Backdates a real Session's createdAt so it reads as a "known device" to
 // riskEngine.js (session age >= NEW_SESSION_THRESHOLD_MS) — the same real
 // resolution path resolveSession()/the JWT strategy use, not a mock.
-const ageSession = (session) => Session.updateOne(
-  { _id: session._id },
-  { $set: { createdAt: new Date(Date.now() - NEW_SESSION_THRESHOLD_MS - 60000) } },
-);
+const ageSession = (session) =>
+  Session.updateOne(
+    { _id: session._id },
+    { $set: { createdAt: new Date(Date.now() - NEW_SESSION_THRESHOLD_MS - 60000) } },
+  );
 
 describe('zeroTrust middleware — authentication is a hard prerequisite', () => {
   it('an unauthenticated request to a Zero Trust-guarded route is rejected before Zero Trust ever runs', async () => {
@@ -85,7 +84,7 @@ describe('zeroTrust middleware — low risk allows a sensitive action through', 
 });
 
 describe('zeroTrust middleware — high risk requires step-up', () => {
-  it('a brand-new session with recent failed logins on this account is STEP_UP\'d, not silently allowed', async () => {
+  it("a brand-new session with recent failed logins on this account is STEP_UP'd, not silently allowed", async () => {
     const user = await createUser();
     const { token } = await tokenForDevice(user); // brand-new session -> NEW_SESSION + UNKNOWN_DEVICE = 30
     for (let i = 0; i < 3; i += 1) {
@@ -243,7 +242,9 @@ describe('zeroTrust middleware — every decision is telemetered (spec section 2
       .field('password', 'newpassword123')
       .field('currentPassword', 'password123');
 
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
     const event = await SecurityEvent.findOne({ type: 'ZERO_TRUST_ALLOW', 'actor.userId': user._id.toString() });
     expect(event).not.toBeNull();
     expect(event.target.resource).toBe('account');
@@ -273,7 +274,9 @@ describe('zeroTrust middleware — every decision is telemetered (spec section 2
       .set('Authorization', `Bearer ${token}`)
       .field('password', 'newpassword123');
 
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
     const event = await SecurityEvent.findOne({ type: 'ZERO_TRUST_STEP_UP', 'actor.userId': user._id.toString() });
     expect(event).not.toBeNull();
     expect(typeof event.metadata.riskScore).toBe('number');

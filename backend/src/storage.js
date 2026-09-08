@@ -22,9 +22,7 @@ let s3Commands = null;
 const getS3 = () => {
   if (!s3Client) {
     // Lazy-required so a local-disk-only deploy never loads the SDK at all.
-    const {
-      S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand,
-    } = require('@aws-sdk/client-s3');
+    const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
     s3Client = new S3Client({
       region: 'auto',
       endpoint: process.env.R2_ENDPOINT,
@@ -53,12 +51,14 @@ const putObject = async (key, readStream, contentType) => {
     // eslint-disable-next-line no-restricted-syntax
     for await (const chunk of readStream) chunks.push(chunk);
     const body = Buffer.concat(chunks);
-    await client.send(new commands.PutObjectCommand({
-      Bucket: process.env.R2_BUCKET,
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-    }));
+    await client.send(
+      new commands.PutObjectCommand({
+        Bucket: process.env.R2_BUCKET,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      }),
+    );
     return;
   }
 
@@ -77,10 +77,12 @@ const putObject = async (key, readStream, contentType) => {
 const getObjectStream = async (key) => {
   if (useObjectStorage) {
     const { client, commands } = getS3();
-    const res = await client.send(new commands.GetObjectCommand({
-      Bucket: process.env.R2_BUCKET,
-      Key: key,
-    }));
+    const res = await client.send(
+      new commands.GetObjectCommand({
+        Bucket: process.env.R2_BUCKET,
+        Key: key,
+      }),
+    );
     return res.Body; // already a Readable in the Node runtime
   }
 
@@ -113,10 +115,12 @@ const getPresignedUploadUrl = async (key, contentType, expiresInSeconds = 300) =
 const deleteObject = async (key) => {
   if (useObjectStorage) {
     const { client, commands } = getS3();
-    await client.send(new commands.DeleteObjectCommand({
-      Bucket: process.env.R2_BUCKET,
-      Key: key,
-    }));
+    await client.send(
+      new commands.DeleteObjectCommand({
+        Bucket: process.env.R2_BUCKET,
+        Key: key,
+      }),
+    );
     return;
   }
 
@@ -128,5 +132,9 @@ const deleteObject = async (key) => {
 };
 
 module.exports = {
-  useObjectStorage, putObject, getObjectStream, getPresignedUploadUrl, deleteObject,
+  useObjectStorage,
+  putObject,
+  getObjectStream,
+  getPresignedUploadUrl,
+  deleteObject,
 };

@@ -10,11 +10,10 @@ const store = require('../store');
 // so a stolen vault token can't be replayed against a different account.
 const VAULT_PURPOSE = 'vault';
 
-const signVaultToken = (userID) => jwt.sign(
-  { id: userID.toString(), purpose: VAULT_PURPOSE },
-  store.config.secret,
-  { expiresIn: store.config.vaultTokenTtl },
-);
+const signVaultToken = (userID) =>
+  jwt.sign({ id: userID.toString(), purpose: VAULT_PURPOSE }, store.config.secret, {
+    expiresIn: store.config.vaultTokenTtl,
+  });
 
 // Sent as a separate X-Vault-Token header, not Authorization — the frontend's
 // axios.defaults.headers.common.Authorization slot is already permanently
@@ -57,5 +56,8 @@ const hasValidVaultToken = (req) => {
 };
 
 module.exports = {
-  signVaultToken, requireVaultAuth, hasValidVaultToken, VAULT_PURPOSE,
+  signVaultToken,
+  requireVaultAuth,
+  hasValidVaultToken,
+  VAULT_PURPOSE,
 };

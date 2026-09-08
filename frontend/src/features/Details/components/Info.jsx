@@ -24,9 +24,7 @@ function Info() {
         {/* Welcome Title — mid-sentence, so the plain (no-period) shortName
             reads correctly rather than a styled wordmark forcing a period
             right before the "!" ("Welcome to zeph.!" looks wrong). */}
-        <h3 className="text-base font-bold text-foreground sm:text-lg">
-          {`Welcome to ${Config.shortName}!`}
-        </h3>
+        <h3 className="text-base font-bold text-foreground sm:text-lg">{`Welcome to ${Config.shortName}!`}</h3>
 
         {/* Description — same mid-sentence reasoning. */}
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">

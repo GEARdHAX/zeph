@@ -30,7 +30,9 @@ function Conversation() {
   };
 
   useEffect(() => {
-    getInfo().then((res) => setAiEnabled(!!res.data.aiEnabled)).catch(() => {});
+    getInfo()
+      .then((res) => setAiEnabled(!!res.data.aiEnabled))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -106,14 +108,18 @@ function Conversation() {
       {error && (
         <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
           <div className="text-4xl font-bold text-destructive">Network Error</div>
-          <div className="mt-2 text-xs text-muted-foreground">Could not reach the server. Please check your connection.</div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            Could not reach the server. Please check your connection.
+          </div>
         </div>
       )}
 
       {!room && !loading && !error && (
         <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
           <div className="text-3xl font-bold text-foreground">Room Not Found</div>
-          <div className="mt-2 text-xs text-muted-foreground">This conversation does not exist or may have been deleted.</div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            This conversation does not exist or may have been deleted.
+          </div>
         </div>
       )}
 

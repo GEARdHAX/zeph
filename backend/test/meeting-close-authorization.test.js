@@ -40,7 +40,8 @@ describe('Close authorization (meeting/close.js)', () => {
     const emitSpy = jest.fn();
     store.io.to = jest.fn(() => ({ emit: emitSpy }));
 
-    const res = await request(app).post('/api/meeting/close')
+    const res = await request(app)
+      .post('/api/meeting/close')
       .set('Authorization', `Bearer ${tokenFor(caller)}`)
       .send({ userID: target._id.toString(), meetingID: 'm1' });
 
@@ -55,7 +56,8 @@ describe('Close authorization (meeting/close.js)', () => {
     const emitSpy = jest.fn();
     store.io.to = jest.fn(() => ({ emit: emitSpy }));
 
-    const res = await request(app).post('/api/meeting/close')
+    const res = await request(app)
+      .post('/api/meeting/close')
       .set('Authorization', `Bearer ${tokenFor(caller)}`)
       .send({ userID: admin._id.toString(), meetingID: 'm1' });
 
@@ -69,7 +71,8 @@ describe('Close authorization (meeting/close.js)', () => {
     const emitSpy = jest.fn();
     store.io.to = jest.fn(() => ({ emit: emitSpy }));
 
-    const res = await request(app).post('/api/meeting/close')
+    const res = await request(app)
+      .post('/api/meeting/close')
       .set('Authorization', `Bearer ${tokenFor(caller)}`)
       .send({ userID: '507f1f77bcf86cd799439011', meetingID: 'm1' });
 

@@ -19,7 +19,10 @@ module.exports = async (req, res) => {
   const config = store.config;
   if (!aiTextEnabled(config)) {
     return res.status(503).json({
-      error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'AI features are not enabled on this server.', requestId,
+      error: true,
+      reason: REJECTION_REASONS.AI_DISABLED,
+      message: 'AI features are not enabled on this server.',
+      requestId,
     });
   }
 
@@ -34,17 +37,22 @@ module.exports = async (req, res) => {
   const isMember = room.people.some((person) => person.toString() === req.user.id.toString());
   if (!isMember) return res.status(403).json({ error: true, requestId });
 
-  const messages = (await Message.find({ room: roomID, type: 'text' })
-    .sort({ _id: -1 })
-    .limit(20)
-    .populate({ path: 'author', select: 'firstName' })
-    .lean())
+  const messages = (
+    await Message.find({ room: roomID, type: 'text' })
+      .sort({ _id: -1 })
+      .limit(20)
+      .populate({ path: 'author', select: 'firstName' })
+      .lean()
+  )
     .reverse()
     .map((m) => ({ author: m.author ? m.author.firstName : 'Deleted User', content: m.content }));
 
   if (!messages.length) {
     return res.status(422).json({
-      error: true, reason: 'INSUFFICIENT_CONTEXT', message: 'No messages yet to draft a reply from.', requestId,
+      error: true,
+      reason: 'INSUFFICIENT_CONTEXT',
+      message: 'No messages yet to draft a reply from.',
+      requestId,
     });
   }
 

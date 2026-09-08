@@ -1,9 +1,5 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
-import {
-  render, screen, fireEvent, waitFor,
-} from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -31,21 +27,30 @@ const mockMembers = [
     _id: 'm1',
     role: 'OWNER',
     user: {
-      _id: 'u1', username: 'owner_user', firstName: 'Owner', lastName: 'One',
+      _id: 'u1',
+      username: 'owner_user',
+      firstName: 'Owner',
+      lastName: 'One',
     },
   },
   {
     _id: 'm2',
     role: 'ADMIN',
     user: {
-      _id: 'u2', username: 'admin_user', firstName: 'Admin', lastName: 'Two',
+      _id: 'u2',
+      username: 'admin_user',
+      firstName: 'Admin',
+      lastName: 'Two',
     },
   },
   {
     _id: 'm3',
     role: 'MEMBER',
     user: {
-      _id: 'u3', username: 'member_user', firstName: 'Member', lastName: 'Three',
+      _id: 'u3',
+      username: 'member_user',
+      firstName: 'Member',
+      lastName: 'Three',
     },
   },
 ];
@@ -54,7 +59,10 @@ const mockRequests = [
   {
     _id: 'r1',
     user: {
-      _id: 'u4', username: 'pending_user', firstName: 'Pending', lastName: 'Four',
+      _id: 'u4',
+      username: 'pending_user',
+      firstName: 'Pending',
+      lastName: 'Four',
     },
   },
 ];

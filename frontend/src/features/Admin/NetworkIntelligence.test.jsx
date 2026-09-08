@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import NetworkIntelligence from './NetworkIntelligence';
@@ -13,12 +11,14 @@ vi.mock('../../actions/networkIntel', () => ({
 const SUMMARY = {
   windowMs: 86400000,
   countsByType: { PORT_SCAN_ANOMALY: 2, THREAT_INTEL_NETWORK_MATCH: 1 },
-  topSuspiciousDestinations: [
-    { destinationIp: '198.51.100.66', count: 3, lastSeen: '2024-06-01T12:00:00Z' },
-  ],
+  topSuspiciousDestinations: [{ destinationIp: '198.51.100.66', count: 3, lastSeen: '2024-06-01T12:00:00Z' }],
   recentAlerts: [
     {
-      eventId: 'evt-1', type: 'PORT_SCAN_ANOMALY', severity: 'high', timestamp: '2024-06-01T12:00:00Z', metadata: { sensorId: 'sensor-1' },
+      eventId: 'evt-1',
+      type: 'PORT_SCAN_ANOMALY',
+      severity: 'high',
+      timestamp: '2024-06-01T12:00:00Z',
+      metadata: { sensorId: 'sensor-1' },
     },
   ],
 };
@@ -37,7 +37,9 @@ beforeEach(() => {
 
 describe('NetworkIntelligence viewer', () => {
   it('shows the empty state when there are no alerts', async () => {
-    getNetworkSummary.mockResolvedValue({ data: { countsByType: {}, topSuspiciousDestinations: [], recentAlerts: [] } });
+    getNetworkSummary.mockResolvedValue({
+      data: { countsByType: {}, topSuspiciousDestinations: [], recentAlerts: [] },
+    });
     renderPage();
 
     expect(await screen.findByText(/no network anomalies in the last 24 hours/i)).toBeInTheDocument();

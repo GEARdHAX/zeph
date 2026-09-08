@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react';
-import {
-  MessageSquare, UserPlus, Check, UserCheck, ShieldOff, Flag, Users,
-} from 'lucide-react';
+import { MessageSquare, UserPlus, Check, UserCheck, ShieldOff, Flag, Users } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useGlobal } from 'reactn';
 import moment from 'moment';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import resolveUser from '../../../actions/resolveUser';
@@ -50,8 +46,7 @@ function ProfileView({ username, onClose, onOpenChat }) {
     ? `${(profile.firstName || 'U').charAt(0)}${(profile.lastName || '').charAt(0)}`.toUpperCase() || 'U'
     : '';
 
-  const isSelf = !!(profile && loggedInUser
-    && (loggedInUser.id === profile._id || loggedInUser._id === profile._id));
+  const isSelf = !!(profile && loggedInUser && (loggedInUser.id === profile._id || loggedInUser._id === profile._id));
 
   // Dynamic secondary-action states per the relationship: NONE, PENDING_SENT,
   // PENDING_RECEIVED, ACCEPTED, BLOCKED. Start Chat stays primary and always
@@ -140,16 +135,19 @@ function ProfileView({ username, onClose, onOpenChat }) {
             <div className="text-center">
               <div className="text-sm font-bold text-foreground">{fullName}</div>
               <div className="text-xs text-muted-foreground">{`@${profile.username}`}</div>
-              {profile.tagLine && !isBlocked && <div className="mt-1 text-xs text-muted-foreground">{profile.tagLine}</div>}
+              {profile.tagLine && !isBlocked && (
+                <div className="mt-1 text-xs text-muted-foreground">{profile.tagLine}</div>
+              )}
             </div>
 
             {profile.bio && !isBlocked && (
-              <BioText text={profile.bio} className="block w-full text-center text-xs leading-relaxed text-foreground" />
+              <BioText
+                text={profile.bio}
+                className="block w-full text-center text-xs leading-relaxed text-foreground"
+              />
             )}
 
-            {isSelf && (
-              <div className="mt-1 text-[11px] font-medium text-muted-foreground">This is you</div>
-            )}
+            {isSelf && <div className="mt-1 text-[11px] font-medium text-muted-foreground">This is you</div>}
 
             {!isSelf && isBlocked && (
               <div className="mt-2 w-full rounded-lg bg-muted py-2.5 text-center text-xs font-medium text-muted-foreground">
@@ -161,9 +159,7 @@ function ProfileView({ username, onClose, onOpenChat }) {
               <>
                 {isAccepted && relationship?.respondedAt && (
                   <div className="text-[11px] text-muted-foreground">
-                    Friends since
-                    {' '}
-                    {moment(relationship.respondedAt).format('MMM YYYY')}
+                    Friends since {moment(relationship.respondedAt).format('MMM YYYY')}
                   </div>
                 )}
 

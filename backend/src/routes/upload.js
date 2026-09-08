@@ -49,12 +49,14 @@ module.exports = async (req, res) => {
     const mainBuffer = await sharp(path).rotate().toBuffer();
     await storage.putObject(baseKey, Readable.from(mainBuffer), 'image/jpeg');
 
-    await Promise.all(store.config.sizes.map(async (size) => {
-      const sizedKey = `${req.user.id}/${shieldedID}-${size}.jpg`;
-      const dimensions = crop === 'square' ? { width: size, height: size } : { width: size };
-      const resizedBuffer = await sharp(path).rotate().resize(dimensions).toBuffer();
-      await storage.putObject(sizedKey, Readable.from(resizedBuffer), 'image/jpeg');
-    }));
+    await Promise.all(
+      store.config.sizes.map(async (size) => {
+        const sizedKey = `${req.user.id}/${shieldedID}-${size}.jpg`;
+        const dimensions = crop === 'square' ? { width: size, height: size } : { width: size };
+        const resizedBuffer = await sharp(path).rotate().resize(dimensions).toBuffer();
+        await storage.putObject(sizedKey, Readable.from(resizedBuffer), 'image/jpeg');
+      }),
+    );
   } catch (err) {
     logger.error({ err, imageId: imageObject._id }, 'Failed to write image to storage');
     return res.status(500).json({ status: 500, error: 'WRITE_ERROR' });

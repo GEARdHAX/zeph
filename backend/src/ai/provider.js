@@ -214,22 +214,28 @@ const buildGeminiProvider = (config) => ({
   async transcribe(audioBuffer, filename, options = {}) {
     const model = options.model || config.transcribeModel || 'gemini-3.5-transcribe';
     const lower = (filename || '').toLowerCase();
-    const mimeType = lower.endsWith('.mp3') ? 'audio/mp3'
-      : lower.endsWith('.wav') ? 'audio/wav'
-        : lower.endsWith('.m4a') ? 'audio/mp4'
-          : lower.endsWith('.ogg') || lower.endsWith('.opus') ? 'audio/ogg'
+    const mimeType = lower.endsWith('.mp3')
+      ? 'audio/mp3'
+      : lower.endsWith('.wav')
+        ? 'audio/wav'
+        : lower.endsWith('.m4a')
+          ? 'audio/mp4'
+          : lower.endsWith('.ogg') || lower.endsWith('.opus')
+            ? 'audio/ogg'
             : 'audio/webm';
     const url = `${config.baseUrl}/v1beta/models/${model}:generateContent?key=${config.apiKey}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: 'Transcribe this meeting audio. Include speaker labels if distinguishable.' },
-            { inlineData: { mimeType, data: audioBuffer.toString('base64') } },
-          ],
-        }],
+        contents: [
+          {
+            parts: [
+              { text: 'Transcribe this meeting audio. Include speaker labels if distinguishable.' },
+              { inlineData: { mimeType, data: audioBuffer.toString('base64') } },
+            ],
+          },
+        ],
         generationConfig: { temperature: 0 },
       }),
       signal: options.signal,
@@ -271,7 +277,10 @@ const getProvider = (config) => {
   if (config.aiProvider === 'groq') {
     if (!config.groqApiKey) return disabledProvider; // fails closed, not open — a misconfigured deploy (flag on, key missing) behaves exactly like AI_PROVIDER=none, never a crash
     return buildGroqProvider({
-      apiKey: config.groqApiKey, model: config.groqModel, maxOutputTokens: config.aiMaxOutputTokens, baseUrl: config.groqBaseUrl || 'https://api.groq.com',
+      apiKey: config.groqApiKey,
+      model: config.groqModel,
+      maxOutputTokens: config.aiMaxOutputTokens,
+      baseUrl: config.groqBaseUrl || 'https://api.groq.com',
     });
   }
   if (config.aiProvider === 'ollama') {

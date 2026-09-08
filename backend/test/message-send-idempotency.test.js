@@ -51,7 +51,10 @@ describe('POST /api/message — idempotent retry via clientID', () => {
       .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(sender)}`)
       .send({
-        roomID: room._id.toString(), content: 'hello', type: 'text', clientID,
+        roomID: room._id.toString(),
+        content: 'hello',
+        type: 'text',
+        clientID,
       });
     expect(first.status).toBe(200);
 
@@ -59,7 +62,10 @@ describe('POST /api/message — idempotent retry via clientID', () => {
       .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(sender)}`)
       .send({
-        roomID: room._id.toString(), content: 'hello', type: 'text', clientID,
+        roomID: room._id.toString(),
+        content: 'hello',
+        type: 'text',
+        clientID,
       });
     expect(second.status).toBe(200);
     expect(second.body.message._id).toBe(first.body.message._id);
@@ -77,13 +83,19 @@ describe('POST /api/message — idempotent retry via clientID', () => {
       .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(sender)}`)
       .send({
-        roomID: room._id.toString(), content: 'first', type: 'text', clientID: 'uuid-a',
+        roomID: room._id.toString(),
+        content: 'first',
+        type: 'text',
+        clientID: 'uuid-a',
       });
     await request(app)
       .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(sender)}`)
       .send({
-        roomID: room._id.toString(), content: 'second', type: 'text', clientID: 'uuid-b',
+        roomID: room._id.toString(),
+        content: 'second',
+        type: 'text',
+        clientID: 'uuid-b',
       });
 
     const count = await Message.countDocuments({ room: room._id, author: sender._id });

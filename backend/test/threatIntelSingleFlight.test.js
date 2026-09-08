@@ -1,10 +1,12 @@
 require('dotenv').config();
 const store = require('../src/store');
 const config = require('../config');
+const { tryAcquireLock, releaseLock, waitForResult } = require('../src/services/threatIntel/singleFlight');
 const {
-  tryAcquireLock, releaseLock, waitForResult,
-} = require('../src/services/threatIntel/singleFlight');
-const { setCachedThreatResult, getCachedThreatResult, closeThreatIntelCacheConnection } = require('../src/services/threatIntel/cache');
+  setCachedThreatResult,
+  getCachedThreatResult,
+  closeThreatIntelCacheConnection,
+} = require('../src/services/threatIntel/cache');
 
 describe('threatIntel single-flight — no Redis configured', () => {
   it('tryAcquireLock returns undefined (distinct from null/"contended" — no coordination possible at all) rather than throwing', async () => {
@@ -73,7 +75,9 @@ describeIfRedis('threatIntel single-flight — real Redis (spec sections 7-8: ca
   it('waitForResult returns the cached value once another "in-flight" lookup populates it', async () => {
     const key = `test-wait-${Date.now()}`;
     const expected = { malicious: true, confidence: 90 };
-    setTimeout(() => { setCachedThreatResult(key, expected, 60); }, 200);
+    setTimeout(() => {
+      setCachedThreatResult(key, expected, 60);
+    }, 200);
 
     const result = await waitForResult(key, getCachedThreatResult);
     expect(result).toEqual(expected);

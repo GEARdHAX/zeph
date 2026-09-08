@@ -4,7 +4,12 @@ import { toast } from 'react-toastify';
 import { UserPlus2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { previewFriendInvite, acceptFriendInvite } from '../../../actions/invites';
@@ -48,20 +53,22 @@ function PendingFriendInviteDialog() {
       toast.success(`You're now friends with ${inviter.firstName || inviter.username}!`);
       close();
     } catch (err) {
-      toast.error(err.response?.data?.reason === 'ALREADY_FRIENDS' ? 'You are already friends.' : 'Could not accept invite.');
+      toast.error(
+        err.response?.data?.reason === 'ALREADY_FRIENDS' ? 'You are already friends.' : 'Could not accept invite.',
+      );
       close();
     }
   };
 
   const fullName = inviter ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.username : '';
-  const initials = inviter ? `${(inviter.firstName || 'U').charAt(0)}${(inviter.lastName || '').charAt(0)}`.toUpperCase() : '';
+  const initials = inviter
+    ? `${(inviter.firstName || 'U').charAt(0)}${(inviter.lastName || '').charAt(0)}`.toUpperCase()
+    : '';
 
   return (
     <Dialog open onOpenChange={(next) => !next && close()}>
       <DialogContent className="sm:max-w-sm text-center">
-        {state === 'loading' && (
-          <div className="py-6 text-sm text-muted-foreground">Loading invite…</div>
-        )}
+        {state === 'loading' && <div className="py-6 text-sm text-muted-foreground">Loading invite…</div>}
 
         {state === 'error' && (
           <>
@@ -70,7 +77,9 @@ function PendingFriendInviteDialog() {
               <DialogDescription>This invite link is invalid or has expired.</DialogDescription>
             </DialogHeader>
             <DialogFooter className="justify-center">
-              <Button variant="outline" onClick={close}>Dismiss</Button>
+              <Button variant="outline" onClick={close}>
+                Dismiss
+              </Button>
             </DialogFooter>
           </>
         )}
@@ -92,7 +101,9 @@ function PendingFriendInviteDialog() {
               <DialogDescription>{`@${inviter.username} invited you to connect on zeph.`}</DialogDescription>
             </DialogHeader>
             <DialogFooter className="justify-center gap-2">
-              <Button variant="ghost" onClick={close} disabled={state === 'accepting'}>Not now</Button>
+              <Button variant="ghost" onClick={close} disabled={state === 'accepting'}>
+                Not now
+              </Button>
               <Button onClick={onAccept} disabled={state === 'accepting'} className="gap-1.5">
                 <UserPlus2 className="h-4 w-4" />
                 {state === 'accepting' ? 'Adding…' : 'Add Friend'}

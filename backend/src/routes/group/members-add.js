@@ -52,7 +52,10 @@ module.exports = async (req, res) => {
       { group: room._id, user: target._id },
       {
         $setOnInsert: {
-          role: 'MEMBER', joinedAt: new Date(), joinedVia: 'ADDED', invitedBy: actorId,
+          role: 'MEMBER',
+          joinedAt: new Date(),
+          joinedVia: 'ADDED',
+          invitedBy: actorId,
         },
         $set: { active: true, status: 'ACTIVE', updatedAt: new Date() },
       },
@@ -74,9 +77,16 @@ module.exports = async (req, res) => {
     logger.info({ groupId: room._id, actorId, targetId: target._id }, 'group_member_added');
     // room.people is the pre-add list — the newly-added user is included
     // explicitly since they aren't in it yet.
-    broadcastToGroup([...room.people, target._id], 'group:member:added', {
-      groupId: room._id, userId: target._id, role: membership.role,
-    }, { excludeUserId: actorId });
+    broadcastToGroup(
+      [...room.people, target._id],
+      'group:member:added',
+      {
+        groupId: room._id,
+        userId: target._id,
+        role: membership.role,
+      },
+      { excludeUserId: actorId },
+    );
   }
 
   res.status(200).json({ status: 'success', member: { user: target._id, role: membership.role } });

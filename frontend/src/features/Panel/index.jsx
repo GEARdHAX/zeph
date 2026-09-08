@@ -1,6 +1,4 @@
-import {
-  useEffect, useMemo, useState,
-} from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
@@ -151,7 +149,13 @@ function Panel() {
         {nav === 'rooms' && roomsLoading && <Loading />}
         {nav === 'rooms' && !roomsLoading && roomsList}
         {nav === 'rooms' && !roomsLoading && filteredRooms.length === 0 && (
-          <Notice text={activeFilter === 'All' ? 'No conversations yet. Start a chat!' : `No ${activeFilter.toLowerCase()} conversations.`} />
+          <Notice
+            text={
+              activeFilter === 'All'
+                ? 'No conversations yet. Start a chat!'
+                : `No ${activeFilter.toLowerCase()} conversations.`
+            }
+          />
         )}
         {/* People to start a NEW conversation with — only while actively
             searching, shown below your (locally-filtered) existing chats.

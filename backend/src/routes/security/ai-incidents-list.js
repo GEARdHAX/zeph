@@ -17,7 +17,8 @@ module.exports = async (req, res) => {
 
   const query = {};
   if (severity) {
-    if (!['low', 'medium', 'high', 'critical'].includes(severity)) return res.status(400).json({ error: true, reason: 'INVALID_SEVERITY' });
+    if (!['low', 'medium', 'high', 'critical'].includes(severity))
+      return res.status(400).json({ error: true, reason: 'INVALID_SEVERITY' });
     query.severity = severity;
   }
   if (anomalous !== undefined) {
@@ -29,10 +30,7 @@ module.exports = async (req, res) => {
     query.lastSeenAt = { $lt: parsedCursor };
   }
 
-  const incidents = await SecurityIncident.find(query)
-    .sort({ lastSeenAt: -1 })
-    .limit(limit)
-    .lean();
+  const incidents = await SecurityIncident.find(query).sort({ lastSeenAt: -1 }).limit(limit).lean();
 
   const nextCursor = incidents.length === limit ? incidents[incidents.length - 1].lastSeenAt.toISOString() : null;
 

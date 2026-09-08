@@ -59,7 +59,7 @@ const init = async () => {
   const state = {
     version: '2.9.1',
     entryPath: window.location.pathname,
-    theme: storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : (Config.theme || 'dark'),
+    theme: storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : Config.theme || 'dark',
     token,
     user: user || (token ? jwtDecode(token) : {}),
     rooms: [],

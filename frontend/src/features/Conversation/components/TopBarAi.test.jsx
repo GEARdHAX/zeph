@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -20,7 +18,9 @@ import TopBar from './TopBar';
 vi.mock('../../../actions/hideConversation', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/deleteConversation', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/setupVaultPin', () => ({ default: vi.fn() }));
-vi.mock('../../../actions/getVaultStatus', () => ({ default: vi.fn(() => Promise.resolve({ data: { configured: true } })) }));
+vi.mock('../../../actions/getVaultStatus', () => ({
+  default: vi.fn(() => Promise.resolve({ data: { configured: true } })),
+}));
 vi.mock('../../../actions/blockUser', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/unblockUser', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/getMeetingRoom', () => ({ default: vi.fn() }));
@@ -29,7 +29,10 @@ vi.mock('../../../actions/summarizeConversation', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/extractTopics', () => ({ default: vi.fn() }));
 vi.mock('react-toastify', () => ({
   toast: {
-    warn: vi.fn(), error: vi.fn(), success: vi.fn(), info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -40,18 +43,29 @@ import extractTopics from '../../../actions/extractTopics';
 
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
 const OTHER = {
-  _id: 'user-2', firstName: 'Other', lastName: 'Person', username: 'other',
+  _id: 'user-2',
+  firstName: 'Other',
+  lastName: 'Person',
+  username: 'other',
 };
 const DM_ROOM = {
-  _id: 'room-1', people: [ME, OTHER], isGroup: false,
+  _id: 'room-1',
+  people: [ME, OTHER],
+  isGroup: false,
 };
 const GROUP_ROOM = {
-  _id: 'room-2', people: [ME, OTHER], isGroup: true, title: 'Team Chat',
+  _id: 'room-2',
+  people: [ME, OTHER],
+  isGroup: true,
+  title: 'Team Chat',
 };
 
 function makeStore(room) {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   store.dispatch({ type: Actions.SET_ROOM, room });
@@ -93,7 +107,8 @@ describe('TopBar — Summarize (AI), eligibility and states', () => {
 
   it('shows the summary dialog with an AI-generated disclaimer on success', async () => {
     summarizeConversation.mockResolvedValueOnce({
-      status: 200, data: { summary: 'Alice and Bob discussed the project timeline.', cached: false },
+      status: 200,
+      data: { summary: 'Alice and Bob discussed the project timeline.', cached: false },
     });
     const user = userEvent.setup();
     renderTopBar(DM_ROOM);
@@ -112,7 +127,8 @@ describe('TopBar — Summarize (AI), eligibility and states', () => {
         status: 422,
         data: {
           reason: 'INSUFFICIENT_CONTEXT',
-          message: 'Not enough conversation yet. Zeph needs at least 30 messages to generate a useful conversation summary.',
+          message:
+            'Not enough conversation yet. Zeph needs at least 30 messages to generate a useful conversation summary.',
         },
       },
     });
@@ -160,7 +176,12 @@ describe('TopBar — Summarize (AI), eligibility and states', () => {
 
   it('prevents a duplicate submission — a second menu trigger while one call is in flight makes only one request', async () => {
     let resolveRequest;
-    summarizeConversation.mockImplementationOnce(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    summarizeConversation.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
     const user = userEvent.setup();
     renderTopBar(DM_ROOM);
 
@@ -209,7 +230,10 @@ describe('TopBar — Extract topics (AI, group-only)', () => {
     extractTopics.mockRejectedValueOnce({
       response: {
         status: 422,
-        data: { reason: 'INSUFFICIENT_CONTEXT', message: 'Not enough conversation yet. Zeph needs at least 50 messages to extract topics.' },
+        data: {
+          reason: 'INSUFFICIENT_CONTEXT',
+          message: 'Not enough conversation yet. Zeph needs at least 50 messages to extract topics.',
+        },
       },
     });
     const user = userEvent.setup();

@@ -53,7 +53,9 @@ const transcribeMeetingAudio = async ({ meetingId, mediaId, userId }) => {
   const transcriptDoc = await MeetingTranscript.findOneAndUpdate(
     { meeting: meetingId },
     {
-      meeting: meetingId, status: 'TRANSCRIBING', updatedAt: new Date(),
+      meeting: meetingId,
+      status: 'TRANSCRIBING',
+      updatedAt: new Date(),
     },
     { upsert: true, setDefaultsOnInsert: true, new: true },
   );
@@ -67,7 +69,10 @@ const transcribeMeetingAudio = async ({ meetingId, mediaId, userId }) => {
     audioBuffer = Buffer.concat(chunks);
   } catch (err) {
     logger.error({ err, meetingId, mediaId }, 'meeting_ai_audio_fetch_failed');
-    await MeetingTranscript.updateOne({ meeting: meetingId }, { status: 'FAILED', failureReason: 'AUDIO_FETCH_FAILED', updatedAt: new Date() });
+    await MeetingTranscript.updateOne(
+      { meeting: meetingId },
+      { status: 'FAILED', failureReason: 'AUDIO_FETCH_FAILED', updatedAt: new Date() },
+    );
     return { ok: false, reason: 'AUDIO_FETCH_FAILED' };
   }
 
@@ -77,7 +82,10 @@ const transcribeMeetingAudio = async ({ meetingId, mediaId, userId }) => {
   } catch (err) {
     const reason = err.code === 'RATE_LIMITED' ? 'RATE_LIMITED' : 'TRANSCRIPTION_FAILED';
     logger.warn({ err: err.message, meetingId }, 'meeting_ai_transcription_failed');
-    await MeetingTranscript.updateOne({ meeting: meetingId }, { status: 'FAILED', failureReason: reason, updatedAt: new Date() });
+    await MeetingTranscript.updateOne(
+      { meeting: meetingId },
+      { status: 'FAILED', failureReason: reason, updatedAt: new Date() },
+    );
     return { ok: false, reason };
   }
 
@@ -92,7 +100,9 @@ const transcribeMeetingAudio = async ({ meetingId, mediaId, userId }) => {
   // the whole operation (an orphaned Media row is a storage-cost concern,
   // not a correctness one — same posture as other cleanup-after-success
   // steps in this codebase, e.g. upload-media-complete.js's temp file unlink).
-  await storage.deleteObject(media.storageKey).catch((err) => logger.warn({ err, mediaId }, 'meeting_ai_audio_cleanup_failed'));
+  await storage
+    .deleteObject(media.storageKey)
+    .catch((err) => logger.warn({ err, mediaId }, 'meeting_ai_audio_cleanup_failed'));
   await Media.deleteOne({ _id: mediaId }).catch(() => {});
 
   logger.info({ meetingId, wordCount: countWords(transcriptText) }, 'meeting_ai_transcribed');
@@ -106,7 +116,12 @@ const generateMeetingSummary = async ({ meetingId, userId, requestId }) => {
 
   const transcriptDoc = await MeetingTranscript.findOne({ meeting: meetingId });
   if (!transcriptDoc || !transcriptDoc.transcript) {
-    return { ok: false, reason: 'INSUFFICIENT_TRANSCRIPT', minTranscriptWords: buildPolicy(store.config).meetingSummary.minTranscriptWords, transcriptWordCount: 0 };
+    return {
+      ok: false,
+      reason: 'INSUFFICIENT_TRANSCRIPT',
+      minTranscriptWords: buildPolicy(store.config).meetingSummary.minTranscriptWords,
+      transcriptWordCount: 0,
+    };
   }
 
   const policy = buildPolicy(store.config);
@@ -148,12 +163,17 @@ const generateMeetingSummary = async ({ meetingId, userId, requestId }) => {
   await MeetingTranscript.updateOne(
     { meeting: meetingId },
     {
-      summary: result.text, status: 'SUMMARIZED', updatedAt: new Date(),
+      summary: result.text,
+      status: 'SUMMARIZED',
+      updatedAt: new Date(),
     },
   );
 
   return {
-    ok: true, summary: result.text, cached: false, requestId: result.requestId,
+    ok: true,
+    summary: result.text,
+    cached: false,
+    requestId: result.requestId,
   };
 };
 

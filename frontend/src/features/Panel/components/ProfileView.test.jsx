@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setGlobal } from 'reactn';
@@ -37,7 +35,11 @@ describe('ProfileView — self viewing', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'me-1', username: 'myself', firstName: 'Me', lastName: 'Self', bio: '',
+          _id: 'me-1',
+          username: 'myself',
+          firstName: 'Me',
+          lastName: 'Self',
+          bio: '',
         },
         relationship: null,
         commonGroups: [],
@@ -58,7 +60,11 @@ describe('ProfileView — blocked relationship', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u2', username: 'blocked', firstName: 'Blocked', lastName: 'User', bio: 'Hello there',
+          _id: 'u2',
+          username: 'blocked',
+          firstName: 'Blocked',
+          lastName: 'User',
+          bio: 'Hello there',
         },
         relationship: { status: 'blocked', direction: null },
         commonGroups: [],
@@ -78,7 +84,11 @@ describe('ProfileView — stranger (no relationship)', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u3', username: 'stranger', firstName: 'Stranger', lastName: 'Danger', bio: '',
+          _id: 'u3',
+          username: 'stranger',
+          firstName: 'Stranger',
+          lastName: 'Danger',
+          bio: '',
         },
         relationship: null,
         commonGroups: [],
@@ -96,7 +106,11 @@ describe('ProfileView — stranger (no relationship)', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u3', username: 'stranger', firstName: 'Stranger', lastName: 'Danger', bio: '',
+          _id: 'u3',
+          username: 'stranger',
+          firstName: 'Stranger',
+          lastName: 'Danger',
+          bio: '',
         },
         relationship: null,
         commonGroups: [],
@@ -114,7 +128,11 @@ describe('ProfileView — accepted friend with common groups', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u4', username: 'friend', firstName: 'Good', lastName: 'Friend', bio: '',
+          _id: 'u4',
+          username: 'friend',
+          firstName: 'Good',
+          lastName: 'Friend',
+          bio: '',
         },
         relationship: { status: 'accepted', direction: null, respondedAt: '2024-03-15T00:00:00.000Z' },
         commonGroups: [{ _id: 'g1', title: 'Design Team', picture: null }],
@@ -132,7 +150,11 @@ describe('ProfileView — accepted friend with common groups', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u4', username: 'friend', firstName: 'Good', lastName: 'Friend', bio: '',
+          _id: 'u4',
+          username: 'friend',
+          firstName: 'Good',
+          lastName: 'Friend',
+          bio: '',
         },
         relationship: { status: 'accepted', direction: null, respondedAt: '2024-03-15T00:00:00.000Z' },
         commonGroups: [
@@ -152,7 +174,11 @@ describe('ProfileView — bio rendering', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u5', username: 'bioperson', firstName: 'Bio', lastName: 'Person', bio: 'I like **bold** text.',
+          _id: 'u5',
+          username: 'bioperson',
+          firstName: 'Bio',
+          lastName: 'Person',
+          bio: 'I like **bold** text.',
         },
         relationship: null,
         commonGroups: [],
@@ -168,7 +194,11 @@ describe('ProfileView — bio rendering', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u7', username: 'htmlperson', firstName: 'Html', lastName: 'Person', bio: '<strong>not bold</strong>',
+          _id: 'u7',
+          username: 'htmlperson',
+          firstName: 'Html',
+          lastName: 'Person',
+          bio: '<strong>not bold</strong>',
         },
         relationship: null,
         commonGroups: [],
@@ -187,7 +217,11 @@ describe('ProfileView — block action', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u6', username: 'target', firstName: 'Target', lastName: 'Person', bio: '',
+          _id: 'u6',
+          username: 'target',
+          firstName: 'Target',
+          lastName: 'Person',
+          bio: '',
         },
         relationship: null,
         commonGroups: [{ _id: 'g1', title: 'Shared Group', picture: null }],

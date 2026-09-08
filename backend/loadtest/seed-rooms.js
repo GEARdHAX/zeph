@@ -25,7 +25,9 @@ const main = async () => {
     const dmKey = [userIds[i], userIds[i + 1]].sort().join(':');
     // eslint-disable-next-line no-await-in-loop
     const room = await Room.create({
-      people: [userIds[i], userIds[i + 1]], isGroup: false, dmKey,
+      people: [userIds[i], userIds[i + 1]],
+      isGroup: false,
+      dmKey,
     });
     rooms.push({ roomID: room._id.toString(), senderToken: tokens[i] });
   }

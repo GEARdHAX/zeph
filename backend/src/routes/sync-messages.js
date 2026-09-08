@@ -47,7 +47,9 @@ module.exports = async (req, res, next) => {
   // Admin privacy boundary — reconnect/resync must not be a side door back
   // into an admin DM. See DECISIONS.md.
   const boundaryViolation = await roomHasBoundaryViolation({
-    room, callerID: req.user.id, callerLevel: req.user.level,
+    room,
+    callerID: req.user.id,
+    callerLevel: req.user.level,
   });
   if (boundaryViolation) {
     return res.status(404).json({ error: true });
@@ -58,7 +60,9 @@ module.exports = async (req, res, next) => {
   // Delete-history cutoff — see more-messages.js/ConversationUserState's
   // model comment. Reconnect/resync must not resurrect pre-delete history
   // either, same as a fresh open.
-  const state = await ConversationUserState.findOne({ conversation: roomID, user: req.user.id }).select('deletedBefore');
+  const state = await ConversationUserState.findOne({ conversation: roomID, user: req.user.id }).select(
+    'deletedBefore',
+  );
   const deletedBefore = state && state.deletedBefore;
 
   Message.find(query)

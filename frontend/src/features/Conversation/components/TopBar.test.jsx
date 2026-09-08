@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -45,13 +43,19 @@ import postCall from '../../../actions/postCall';
 
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
 const OTHER = {
-  _id: 'user-2', firstName: 'Other', lastName: 'Person', username: 'other',
+  _id: 'user-2',
+  firstName: 'Other',
+  lastName: 'Person',
+  username: 'other',
 };
 const ROOM = { _id: 'room-1', people: [ME, OTHER], isGroup: false };
 
 function makeStore(room = ROOM) {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   store.dispatch({ type: Actions.SET_ROOM, room });

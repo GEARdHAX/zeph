@@ -39,7 +39,8 @@ describe('POST /api/picture/change', () => {
     const user = await createUser();
     const image = await Image.create({ shieldedID: 'abc123' });
 
-    const res = await request(app).post('/api/picture/change')
+    const res = await request(app)
+      .post('/api/picture/change')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ imageID: image._id.toString() });
 
@@ -54,7 +55,8 @@ describe('POST /api/picture/remove', () => {
     const image = await Image.create({ shieldedID: 'abc123' });
     const user = await createUser({ picture: image._id });
 
-    const res = await request(app).post('/api/picture/remove')
+    const res = await request(app)
+      .post('/api/picture/remove')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({});
 
@@ -69,7 +71,8 @@ describe('POST /api/picture/remove', () => {
     const other = await createUser();
     await Room.create({ people: [user._id, other._id], isGroup: false });
 
-    const res = await request(app).post('/api/picture/remove')
+    const res = await request(app)
+      .post('/api/picture/remove')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({});
 

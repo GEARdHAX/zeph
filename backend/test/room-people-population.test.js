@@ -54,7 +54,8 @@ describe('People array is genuinely populated on the wire (not cast back to bare
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
 
-    const res = await request(app).post('/api/room/join')
+    const res = await request(app)
+      .post('/api/room/join')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ id: room._id.toString() });
 
@@ -69,7 +70,8 @@ describe('People array is genuinely populated on the wire (not cast back to bare
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false, lastMessage: null });
 
-    const res = await request(app).post('/api/room/get')
+    const res = await request(app)
+      .post('/api/room/get')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ id: room._id.toString() });
 
@@ -83,11 +85,13 @@ describe('People array is genuinely populated on the wire (not cast back to bare
     const a = await createUser({ firstName: 'Adarsh' });
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
-    await request(app).post('/api/message')
+    await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(a)}`)
       .send({ roomID: room._id.toString(), content: 'hi', type: 'text' });
 
-    const res = await request(app).post('/api/rooms/list')
+    const res = await request(app)
+      .post('/api/rooms/list')
       .set('Authorization', `Bearer ${tokenFor(b)}`);
 
     expect(res.status).toBe(200);
@@ -103,11 +107,13 @@ describe('People array is genuinely populated on the wire (not cast back to bare
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
 
-    await request(app).post('/api/favorite/toggle')
+    await request(app)
+      .post('/api/favorite/toggle')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ roomID: room._id.toString() });
 
-    const res = await request(app).post('/api/favorites/list')
+    const res = await request(app)
+      .post('/api/favorites/list')
       .set('Authorization', `Bearer ${tokenFor(b)}`);
 
     expect(res.status).toBe(200);
@@ -130,7 +136,8 @@ describe('vaultPinHash never leaks through a populated person object', () => {
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false, lastMessage: null });
 
-    const res = await request(app).post('/api/room/join')
+    const res = await request(app)
+      .post('/api/room/join')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ id: room._id.toString() });
 
@@ -144,7 +151,8 @@ describe('vaultPinHash never leaks through a populated person object', () => {
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false, lastMessage: null });
 
-    const res = await request(app).post('/api/room/get')
+    const res = await request(app)
+      .post('/api/room/get')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ id: room._id.toString() });
 
@@ -157,11 +165,13 @@ describe('vaultPinHash never leaks through a populated person object', () => {
     await setUpVaultPin(a);
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
-    await request(app).post('/api/message')
+    await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(a)}`)
       .send({ roomID: room._id.toString(), content: 'hi', type: 'text' });
 
-    const res = await request(app).post('/api/rooms/list')
+    const res = await request(app)
+      .post('/api/rooms/list')
       .set('Authorization', `Bearer ${tokenFor(b)}`);
 
     const listedRoom = res.body.rooms.find((r) => r._id === room._id.toString());
@@ -175,11 +185,13 @@ describe('vaultPinHash never leaks through a populated person object', () => {
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
 
-    await request(app).post('/api/favorite/toggle')
+    await request(app)
+      .post('/api/favorite/toggle')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ roomID: room._id.toString() });
 
-    const res = await request(app).post('/api/favorites/list')
+    const res = await request(app)
+      .post('/api/favorites/list')
       .set('Authorization', `Bearer ${tokenFor(b)}`);
 
     const other = res.body.favorites[0].people.find((p) => p._id === a._id.toString());
@@ -199,10 +211,14 @@ describe('blockedByMe / blockedMe flags on populated person objects', () => {
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false, lastMessage: null });
     await Relationship.create({
-      requester: b._id, recipient: a._id, status: 'blocked', blockedBy: b._id,
+      requester: b._id,
+      recipient: a._id,
+      status: 'blocked',
+      blockedBy: b._id,
     });
 
-    const res = await request(app).post('/api/room/join')
+    const res = await request(app)
+      .post('/api/room/join')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ id: room._id.toString() });
 
@@ -216,10 +232,14 @@ describe('blockedByMe / blockedMe flags on populated person objects', () => {
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false, lastMessage: null });
     await Relationship.create({
-      requester: a._id, recipient: b._id, status: 'blocked', blockedBy: a._id,
+      requester: a._id,
+      recipient: b._id,
+      status: 'blocked',
+      blockedBy: a._id,
     });
 
-    const res = await request(app).post('/api/room/join')
+    const res = await request(app)
+      .post('/api/room/join')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ id: room._id.toString() });
 
@@ -233,10 +253,14 @@ describe('blockedByMe / blockedMe flags on populated person objects', () => {
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false, lastMessage: null });
     await Relationship.create({
-      requester: b._id, recipient: a._id, status: 'blocked', blockedBy: b._id,
+      requester: b._id,
+      recipient: a._id,
+      status: 'blocked',
+      blockedBy: b._id,
     });
 
-    const res = await request(app).post('/api/room/get')
+    const res = await request(app)
+      .post('/api/room/get')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ id: room._id.toString() });
 
@@ -248,14 +272,19 @@ describe('blockedByMe / blockedMe flags on populated person objects', () => {
     const a = await createUser({ firstName: 'Adarsh' });
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
-    await request(app).post('/api/message')
+    await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(a)}`)
       .send({ roomID: room._id.toString(), content: 'hi', type: 'text' });
     await Relationship.create({
-      requester: b._id, recipient: a._id, status: 'blocked', blockedBy: b._id,
+      requester: b._id,
+      recipient: a._id,
+      status: 'blocked',
+      blockedBy: b._id,
     });
 
-    const res = await request(app).post('/api/rooms/list')
+    const res = await request(app)
+      .post('/api/rooms/list')
       .set('Authorization', `Bearer ${tokenFor(b)}`);
 
     const listedRoom = res.body.rooms.find((r) => r._id === room._id.toString());
@@ -267,14 +296,19 @@ describe('blockedByMe / blockedMe flags on populated person objects', () => {
     const a = await createUser({ firstName: 'Adarsh' });
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
-    await request(app).post('/api/favorite/toggle')
+    await request(app)
+      .post('/api/favorite/toggle')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ roomID: room._id.toString() });
     await Relationship.create({
-      requester: b._id, recipient: a._id, status: 'blocked', blockedBy: b._id,
+      requester: b._id,
+      recipient: a._id,
+      status: 'blocked',
+      blockedBy: b._id,
     });
 
-    const res = await request(app).post('/api/favorites/list')
+    const res = await request(app)
+      .post('/api/favorites/list')
       .set('Authorization', `Bearer ${tokenFor(b)}`);
 
     const other = res.body.favorites[0].people.find((p) => p._id === a._id.toString());
@@ -286,7 +320,8 @@ describe('blockedByMe / blockedMe flags on populated person objects', () => {
     const b = await createUser({ firstName: 'Demo' });
     const room = await Room.create({ people: [a._id, b._id], isGroup: false, lastMessage: null });
 
-    const res = await request(app).post('/api/room/join')
+    const res = await request(app)
+      .post('/api/room/join')
       .set('Authorization', `Bearer ${tokenFor(b)}`)
       .send({ id: room._id.toString() });
 

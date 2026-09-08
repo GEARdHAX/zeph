@@ -24,7 +24,9 @@ module.exports = async (req, res, next) => {
   // Delete-history cutoff — a restored (delete-then-new-activity)
   // conversation only shows messages from this point forward for THIS
   // user. See ConversationUserState's model comment and DECISIONS.md.
-  const conversationState = await ConversationUserState.findOne({ conversation: id, user: req.user.id }).select('deletedBefore');
+  const conversationState = await ConversationUserState.findOne({ conversation: id, user: req.user.id }).select(
+    'deletedBefore',
+  );
   const deletedBefore = conversationState && conversationState.deletedBefore;
 
   const findMessagesAndEmit = (room, accessRevoked, joinInfo) => {
@@ -138,8 +140,7 @@ module.exports = async (req, res, next) => {
       // isCurrentMember alone (not a fallback membership row) decides
       // whether to reconstruct accessRevoked below.
       const isCurrentMember = room.people.some((person) => req.user.id.toString() === person._id.toString());
-      const canRead = isCurrentMember
-        || (room.isGroup && await groupPolicy.wasEverMember(room._id, req.user.id));
+      const canRead = isCurrentMember || (room.isGroup && (await groupPolicy.wasEverMember(room._id, req.user.id)));
       if (!canRead) {
         return res.status(404).json({ error: true });
       }
@@ -148,7 +149,9 @@ module.exports = async (req, res, next) => {
       // must 404 exactly like it never existed, not just be blocked at
       // creation time. See DECISIONS.md.
       const boundaryViolation = await roomHasBoundaryViolation({
-        room, callerID: req.user.id, callerLevel: req.user.level,
+        room,
+        callerID: req.user.id,
+        callerLevel: req.user.level,
       });
       if (boundaryViolation) {
         return res.status(404).json({ error: true });

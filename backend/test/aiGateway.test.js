@@ -29,7 +29,10 @@ describe('runGoverned — quota accounting (Phase 13 fix)', () => {
     getProvider.mockReturnValue({ enabled: true, generate: async () => 'a fine response' });
 
     const result = await runGoverned({
-      userId: 'u1', ip: '1.1.1.1', prompt: 'hi', metricsFeature: 'translation',
+      userId: 'u1',
+      ip: '1.1.1.1',
+      prompt: 'hi',
+      metricsFeature: 'translation',
     });
 
     expect(result.ok).toBe(true);
@@ -40,11 +43,16 @@ describe('runGoverned — quota accounting (Phase 13 fix)', () => {
   it('does NOT record usage when the provider call fails (timeout/5xx)', async () => {
     getProvider.mockReturnValue({
       enabled: true,
-      generate: async () => { throw new Error('Groq request failed: 500 Internal Server Error'); },
+      generate: async () => {
+        throw new Error('Groq request failed: 500 Internal Server Error');
+      },
     });
 
     const result = await runGoverned({
-      userId: 'u1', ip: '1.1.1.1', prompt: 'hi', metricsFeature: 'translation',
+      userId: 'u1',
+      ip: '1.1.1.1',
+      prompt: 'hi',
+      metricsFeature: 'translation',
     });
 
     expect(result.ok).toBe(false);
@@ -55,7 +63,10 @@ describe('runGoverned — quota accounting (Phase 13 fix)', () => {
     getProvider.mockReturnValue({ enabled: true, generate: async () => '   ' });
 
     const result = await runGoverned({
-      userId: 'u1', ip: '1.1.1.1', prompt: 'hi', metricsFeature: 'translation',
+      userId: 'u1',
+      ip: '1.1.1.1',
+      prompt: 'hi',
+      metricsFeature: 'translation',
     });
 
     expect(result.ok).toBe(false);
@@ -68,7 +79,10 @@ describe('runGoverned — quota accounting (Phase 13 fix)', () => {
     getProvider.mockReturnValue({ enabled: true, generate: async () => 'should not be called' });
 
     const result = await runGoverned({
-      userId: 'u1', ip: '1.1.1.1', prompt: 'hi', metricsFeature: 'translation',
+      userId: 'u1',
+      ip: '1.1.1.1',
+      prompt: 'hi',
+      metricsFeature: 'translation',
     });
 
     expect(result.ok).toBe(false);
@@ -77,10 +91,18 @@ describe('runGoverned — quota accounting (Phase 13 fix)', () => {
   });
 
   it('always releases concurrency, even when the provider throws', async () => {
-    getProvider.mockReturnValue({ enabled: true, generate: async () => { throw new Error('boom'); } });
+    getProvider.mockReturnValue({
+      enabled: true,
+      generate: async () => {
+        throw new Error('boom');
+      },
+    });
 
     await runGoverned({
-      userId: 'u1', ip: '1.1.1.1', prompt: 'hi', metricsFeature: 'translation',
+      userId: 'u1',
+      ip: '1.1.1.1',
+      prompt: 'hi',
+      metricsFeature: 'translation',
     });
 
     expect(quota.acquireConcurrency).toHaveBeenCalledWith('u1');
@@ -90,7 +112,10 @@ describe('runGoverned — quota accounting (Phase 13 fix)', () => {
   it('returns a requestId on every outcome, generating one when the caller supplies none', async () => {
     getProvider.mockReturnValue({ enabled: true, generate: async () => 'ok' });
     const result = await runGoverned({
-      userId: 'u1', ip: '1.1.1.1', prompt: 'hi', metricsFeature: 'translation',
+      userId: 'u1',
+      ip: '1.1.1.1',
+      prompt: 'hi',
+      metricsFeature: 'translation',
     });
     expect(typeof result.requestId).toBe('string');
     expect(result.requestId.length).toBeGreaterThan(0);
@@ -99,7 +124,11 @@ describe('runGoverned — quota accounting (Phase 13 fix)', () => {
   it('propagates a caller-supplied requestId unchanged (for cross-stage correlation)', async () => {
     getProvider.mockReturnValue({ enabled: true, generate: async () => 'ok' });
     const result = await runGoverned({
-      userId: 'u1', ip: '1.1.1.1', prompt: 'hi', metricsFeature: 'translation', requestId: 'caller-supplied-id',
+      userId: 'u1',
+      ip: '1.1.1.1',
+      prompt: 'hi',
+      metricsFeature: 'translation',
+      requestId: 'caller-supplied-id',
     });
     expect(result.requestId).toBe('caller-supplied-id');
   });

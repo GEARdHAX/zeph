@@ -46,7 +46,9 @@ const setupRedisAdapter = async (io, redisUrl) => {
     // instead of ever rejecting — connectTimeout+retryStrategy:null below
     // still bounds the INITIAL connect attempt so boot never hangs.
     pubClient = new Redis(redisUrl, {
-      lazyConnect: true, connectTimeout: 5000, retryStrategy: () => null,
+      lazyConnect: true,
+      connectTimeout: 5000,
+      retryStrategy: () => null,
     });
     subClient = pubClient.duplicate();
     await Promise.all([pubClient.connect(), subClient.connect()]);

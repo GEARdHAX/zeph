@@ -48,13 +48,14 @@ const createUser = async () => {
   });
 };
 
-const createMeeting = (overrides = {}) => Meeting.create({
-  caller: overrides.caller,
-  callee: overrides.callee,
-  users: overrides.users || [],
-  startedAt: overrides.startedAt || new Date('2026-01-01T10:00:00Z'),
-  endedAt: overrides.endedAt === undefined ? new Date('2026-01-01T10:30:00Z') : overrides.endedAt,
-});
+const createMeeting = (overrides = {}) =>
+  Meeting.create({
+    caller: overrides.caller,
+    callee: overrides.callee,
+    users: overrides.users || [],
+    startedAt: overrides.startedAt || new Date('2026-01-01T10:00:00Z'),
+    endedAt: overrides.endedAt === undefined ? new Date('2026-01-01T10:30:00Z') : overrides.endedAt,
+  });
 
 // storage.js's local-disk mode (no R2 configured, the test default) needs a
 // REAL file at the storageKey path — getObjectStream() does an actual fs
@@ -84,7 +85,9 @@ const enableGroqChatAndTranscribe = (summaryText, transcriptText) => {
       return { ok: true, status: 200, text: async () => transcriptText };
     }
     return {
-      ok: true, status: 200, json: async () => ({ choices: [{ message: { content: summaryText } }] }),
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: summaryText } }] }),
     };
   };
 };
@@ -264,7 +267,10 @@ describe('GET /api/meeting/:id/summary', () => {
     const user = await createUser();
     const meeting = await createMeeting({ caller: user._id, users: [user._id] });
     await MeetingTranscript.create({
-      meeting: meeting._id, transcript: 'word '.repeat(200), summary: 'done summary', status: 'SUMMARIZED',
+      meeting: meeting._id,
+      transcript: 'word '.repeat(200),
+      summary: 'done summary',
+      status: 'SUMMARIZED',
     });
 
     const res = await request(app)
@@ -283,12 +289,17 @@ describe('POST /api/meeting/:id/summarize — duplicate generation prevention', 
     const other = await createUser();
     const meeting = await createMeeting({ caller: user._id, users: [user._id, other._id] });
     await MeetingTranscript.create({
-      meeting: meeting._id, transcript: 'word '.repeat(200), summary: 'first summary', status: 'SUMMARIZED',
+      meeting: meeting._id,
+      transcript: 'word '.repeat(200),
+      summary: 'first summary',
+      status: 'SUMMARIZED',
     });
 
     store.config.aiProvider = 'groq';
     store.config.groqApiKey = 'test-key';
-    global.fetch = async () => { throw new Error('provider must not be called for an already-summarized meeting'); };
+    global.fetch = async () => {
+      throw new Error('provider must not be called for an already-summarized meeting');
+    };
 
     const res = await request(app)
       .post(`/api/meeting/${meeting._id}/summarize`)

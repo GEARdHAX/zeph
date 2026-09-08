@@ -8,7 +8,11 @@ describe('recordDnsQuery — Redis unavailable (test default)', () => {
     const original = store.config;
     store.config = { ...config, redisUrl: null };
     const result = await recordDnsQuery({
-      sensorId: 's1', pid: 100, domain: 'example.com', nxdomain: false, windowMs: 60000,
+      sensorId: 's1',
+      pid: 100,
+      domain: 'example.com',
+      nxdomain: false,
+      windowMs: 60000,
     });
     expect(result).toEqual({ distinctDomains: 0, nxdomainCount: 0 });
     store.config = original;
@@ -35,10 +39,16 @@ describeIfRedis('recordDnsQuery — real Redis', () => {
     const sensorId = `sensor-${Date.now()}`;
     const pid = 900;
     await recordDnsQuery({
-      sensorId, pid, domain: 'a.example.com', windowMs: 60000,
+      sensorId,
+      pid,
+      domain: 'a.example.com',
+      windowMs: 60000,
     });
     const result = await recordDnsQuery({
-      sensorId, pid, domain: 'b.example.com', windowMs: 60000,
+      sensorId,
+      pid,
+      domain: 'b.example.com',
+      windowMs: 60000,
     });
     expect(result.distinctDomains).toBe(2);
   });
@@ -47,10 +57,18 @@ describeIfRedis('recordDnsQuery — real Redis', () => {
     const sensorId = `sensor-${Date.now()}`;
     const pid = 901;
     await recordDnsQuery({
-      sensorId, pid, domain: 'clean.example.com', nxdomain: false, windowMs: 60000,
+      sensorId,
+      pid,
+      domain: 'clean.example.com',
+      nxdomain: false,
+      windowMs: 60000,
     });
     const result = await recordDnsQuery({
-      sensorId, pid, domain: 'bogus1.example.com', nxdomain: true, windowMs: 60000,
+      sensorId,
+      pid,
+      domain: 'bogus1.example.com',
+      nxdomain: true,
+      windowMs: 60000,
     });
     expect(result.nxdomainCount).toBe(1);
     expect(result.distinctDomains).toBe(2);

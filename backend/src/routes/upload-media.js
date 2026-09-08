@@ -31,22 +31,23 @@ module.exports = async (req, res) => {
   // only the display-safe originalName, declared mimeType, size, and
   // extension, same fields the rejection branches below already had at
   // hand for their own response/log.
-  const recordRejection = (reason, extra = {}) => SecurityEventService.record({
-    type: 'FILE_UPLOAD_REJECTED',
-    severity: reason === 'ARCHIVE_UNSAFE' || reason === 'FILE_CONTENT_MISMATCH' ? 'high' : 'medium',
-    actor: { userId: req.user.id },
-    source: context,
-    target: { resource: 'media_upload', action: 'upload' },
-    result: 'blocked',
-    metadata: {
-      reason,
-      fileName: file?.name || null,
-      mimeType: file?.type || null,
-      size: file?.size || null,
-      extension: extra.extension || null,
-      ...extra,
-    },
-  });
+  const recordRejection = (reason, extra = {}) =>
+    SecurityEventService.record({
+      type: 'FILE_UPLOAD_REJECTED',
+      severity: reason === 'ARCHIVE_UNSAFE' || reason === 'FILE_CONTENT_MISMATCH' ? 'high' : 'medium',
+      actor: { userId: req.user.id },
+      source: context,
+      target: { resource: 'media_upload', action: 'upload' },
+      result: 'blocked',
+      metadata: {
+        reason,
+        fileName: file?.name || null,
+        mimeType: file?.type || null,
+        size: file?.size || null,
+        extension: extra.extension || null,
+        ...extra,
+      },
+    });
 
   if (!file) {
     recordRejection('FILE_REQUIRED');
@@ -160,7 +161,10 @@ module.exports = async (req, res) => {
     target: { resource: 'media_upload', resourceId: media._id.toString(), action: 'upload' },
     result: 'success',
     metadata: {
-      category, mimeType: media.mimeType, size: media.size, extension: originalExtension,
+      category,
+      mimeType: media.mimeType,
+      size: media.size,
+      extension: originalExtension,
     },
   });
 

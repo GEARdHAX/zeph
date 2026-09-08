@@ -31,14 +31,18 @@ const enqueueIncidentAnalysis = async (incidentId, priority) => {
     return;
   }
   try {
-    await q.add('analyze-incident', { incidentId }, {
-      jobId: `incident-${incidentId}`,
-      priority, // BullMQ: LOWER number = higher priority (spec section 23's CRITICAL/HIGH/MEDIUM/LOW mapped to 1/2/3/4 by the caller)
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-      removeOnComplete: { age: 24 * 60 * 60 }, // spec section 65 — bounded, not permanent queue-state retention
-      removeOnFail: { age: 24 * 60 * 60 },
-    });
+    await q.add(
+      'analyze-incident',
+      { incidentId },
+      {
+        jobId: `incident-${incidentId}`,
+        priority, // BullMQ: LOWER number = higher priority (spec section 23's CRITICAL/HIGH/MEDIUM/LOW mapped to 1/2/3/4 by the caller)
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { age: 24 * 60 * 60 }, // spec section 65 — bounded, not permanent queue-state retention
+        removeOnFail: { age: 24 * 60 * 60 },
+      },
+    );
   } catch (err) {
     logger.warn({ err, incidentId }, 'Failed to enqueue security AI analysis job');
   }

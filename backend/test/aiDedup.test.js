@@ -2,7 +2,9 @@ const store = require('../src/store');
 const config = require('../config');
 const { acquireLock, releaseLock } = require('../src/ai/dedup');
 
-beforeAll(() => { store.config = { ...config, redisUrl: null }; });
+beforeAll(() => {
+  store.config = { ...config, redisUrl: null };
+});
 
 describe('acquireLock — no Redis configured', () => {
   it('grants the lock uncoordinated (degrade, not block)', async () => {

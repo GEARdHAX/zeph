@@ -1,6 +1,13 @@
 import {
-  FileText, FileArchive, FileSpreadsheet, FileCode, FileImage, FileAudio, FileVideo,
-  Presentation, File as FileIcon,
+  FileText,
+  FileArchive,
+  FileSpreadsheet,
+  FileCode,
+  FileImage,
+  FileAudio,
+  FileVideo,
+  Presentation,
+  File as FileIcon,
 } from 'lucide-react';
 
 const ICON_BY_EXTENSION = {

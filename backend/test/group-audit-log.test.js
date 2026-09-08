@@ -31,10 +31,11 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
 describe('Group audit log', () => {
   it('records role_changed with correct actor/target', async () => {

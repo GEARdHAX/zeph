@@ -30,22 +30,25 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
-const deleteGroup = (owner, groupId) => request(app)
-  .post('/api/group/delete')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ id: groupId });
+const deleteGroup = (owner, groupId) =>
+  request(app)
+    .post('/api/group/delete')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ id: groupId });
 
-const send = (user, roomID, content) => request(app)
-  .post('/api/message')
-  .set('Authorization', `Bearer ${tokenFor(user)}`)
-  .field('roomID', roomID)
-  .field('content', content)
-  .field('type', 'text');
+const send = (user, roomID, content) =>
+  request(app)
+    .post('/api/message')
+    .set('Authorization', `Bearer ${tokenFor(user)}`)
+    .field('roomID', roomID)
+    .field('content', content)
+    .field('type', 'text');
 
 // Reproduces a reported bug: after the OWNER deletes a group, a remaining
 // member could still send messages into it — message.js never checked

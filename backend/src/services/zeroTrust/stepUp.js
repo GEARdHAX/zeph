@@ -22,9 +22,7 @@ const TOKEN_TTL_MS = 5 * 60 * 1000; // short-lived (spec section 18) — long en
 // user's — userId always comes from req.user, the already-authenticated
 // identity, never from client input) and, on success, mints a single-use
 // token bound to exactly this user+session+resource+action.
-const issueStepUpToken = async ({
-  userId, sessionId, resource, action, password,
-}) => {
+const issueStepUpToken = async ({ userId, sessionId, resource, action, password }) => {
   const user = await User.findById(userId).select('password');
   if (!user) return { ok: false, reason: 'user_not_found' };
 
@@ -53,9 +51,7 @@ const issueStepUpToken = async ({
 // (backend/src/routes/auth/change.js), so a token can never authorize two
 // requests even under concurrent replay. Verifies user+session+resource+
 // action all match what the token was actually issued for.
-const verifyAndConsumeStepUpToken = async ({
-  rawToken, userId, sessionId, resource, action,
-}) => {
+const verifyAndConsumeStepUpToken = async ({ rawToken, userId, sessionId, resource, action }) => {
   if (!rawToken) return { ok: false, reason: 'missing_token' };
 
   const tokenHash = StepUpToken.hashToken(rawToken);

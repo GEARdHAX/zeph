@@ -23,7 +23,7 @@
 //      called with no active connection (the common case in this test
 //      suite, which runs with no live app boot).
 describe('graceful shutdown — close function wiring', () => {
-  it('every Redis client close function index.js\'s shutdown handler calls actually exists and is callable', () => {
+  it("every Redis client close function index.js's shutdown handler calls actually exists and is callable", () => {
     const { closeQueueConnection } = require('../src/queues/connection');
     const { closeRedisAdapterConnections } = require('../src/setupRedisAdapter');
     const { closeProfileCacheConnection } = require('../src/userProfileCache');
@@ -34,9 +34,14 @@ describe('graceful shutdown — close function wiring', () => {
     const { closeSecurityAiCacheConnection } = require('../src/services/securityAi/cache');
 
     [
-      closeQueueConnection, closeRedisAdapterConnections, closeProfileCacheConnection,
-      closeThreatIntelCacheConnection, closeRiskCacheConnection, closeSensorDedupConnection,
-      closeNetworkIntelConnection, closeSecurityAiCacheConnection,
+      closeQueueConnection,
+      closeRedisAdapterConnections,
+      closeProfileCacheConnection,
+      closeThreatIntelCacheConnection,
+      closeRiskCacheConnection,
+      closeSensorDedupConnection,
+      closeNetworkIntelConnection,
+      closeSecurityAiCacheConnection,
     ].forEach((fn) => expect(typeof fn).toBe('function'));
   });
 
@@ -55,16 +60,18 @@ describe('graceful shutdown — close function wiring', () => {
     const { closeNetworkIntelConnection } = require('../src/services/networkIntel/cache');
     const { closeSecurityAiCacheConnection } = require('../src/services/securityAi/cache');
 
-    await expect(Promise.all([
-      closeQueueConnection(),
-      closeRedisAdapterConnections(),
-      closeProfileCacheConnection(),
-      closeThreatIntelCacheConnection(),
-      closeRiskCacheConnection(),
-      closeSensorDedupConnection(),
-      closeNetworkIntelConnection(),
-      closeSecurityAiCacheConnection(),
-    ])).resolves.toBeDefined();
+    await expect(
+      Promise.all([
+        closeQueueConnection(),
+        closeRedisAdapterConnections(),
+        closeProfileCacheConnection(),
+        closeThreatIntelCacheConnection(),
+        closeRiskCacheConnection(),
+        closeSensorDedupConnection(),
+        closeNetworkIntelConnection(),
+        closeSecurityAiCacheConnection(),
+      ]),
+    ).resolves.toBeDefined();
   });
 
   it('mediasoup.close() resolves cleanly when init() was never called (MEDIASOUP_ENABLED=false — the current Render production config)', async () => {
@@ -72,7 +79,7 @@ describe('graceful shutdown — close function wiring', () => {
     await expect(mediasoup.close()).resolves.toBeUndefined();
   });
 
-  it('calling mediasoup.close() twice in a row does not throw (idempotent, matches every other close*Connection()\'s own contract)', async () => {
+  it("calling mediasoup.close() twice in a row does not throw (idempotent, matches every other close*Connection()'s own contract)", async () => {
     const mediasoup = require('../src/mediasoup');
     await mediasoup.close();
     await expect(mediasoup.close()).resolves.toBeUndefined();

@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -30,21 +28,33 @@ const DOCX_MESSAGE = {
   _id: 'file-1',
   type: 'file',
   media: {
-    _id: 'media-1', category: 'document', originalName: 'report.docx', size: 2048,
+    _id: 'media-1',
+    category: 'document',
+    originalName: 'report.docx',
+    size: 2048,
   },
 };
 
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
 const OTHER = {
-  _id: 'user-2', firstName: 'Other', lastName: 'User', username: 'other',
+  _id: 'user-2',
+  firstName: 'Other',
+  lastName: 'User',
+  username: 'other',
 };
 const ROOM = {
-  _id: 'room-1', people: [ME, OTHER], images: [IMAGE_MESSAGE, DOCX_MESSAGE], isGroup: false,
+  _id: 'room-1',
+  people: [ME, OTHER],
+  images: [IMAGE_MESSAGE, DOCX_MESSAGE],
+  isGroup: false,
 };
 
 function renderRoom() {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   store.dispatch({ type: Actions.SET_ROOM, room: ROOM });
@@ -70,21 +80,30 @@ function makeFakeSocket() {
   const handlers = {};
   return {
     id: 'socket-1',
-    on: (event, handler) => { handlers[event] = handler; },
+    on: (event, handler) => {
+      handlers[event] = handler;
+    },
     off: () => {},
     emitFake: (event, payload) => handlers[event]?.(payload),
   };
 }
 
 const GROUP_ROOM = {
-  _id: 'group-1', title: 'Study Group', isGroup: true, people: [ME], images: [],
+  _id: 'group-1',
+  title: 'Study Group',
+  isGroup: true,
+  people: [ME],
+  images: [],
 };
 
 describe('Details Room — live member-list refresh on group:member:added/removed/banned', () => {
   it('re-fetches the room (via room/join) when a member is added to the currently-open group', async () => {
     const fakeSocket = makeFakeSocket();
     const rootReducer = combineReducers({
-      emoji, io, messages, rtc,
+      emoji,
+      io,
+      messages,
+      rtc,
     });
     const store = createStore(rootReducer, applyMiddleware(thunk));
     store.dispatch({ type: Actions.IO_INIT, io: fakeSocket });
@@ -116,7 +135,10 @@ describe('Details Room — live member-list refresh on group:member:added/remove
   it('ignores the event when it is for a different group than the one currently open', async () => {
     const fakeSocket = makeFakeSocket();
     const rootReducer = combineReducers({
-      emoji, io, messages, rtc,
+      emoji,
+      io,
+      messages,
+      rtc,
     });
     const store = createStore(rootReducer, applyMiddleware(thunk));
     store.dispatch({ type: Actions.IO_INIT, io: fakeSocket });
@@ -158,7 +180,10 @@ describe('Details Room — Media tab', () => {
   it('shows the empty state when there are no media messages', async () => {
     const user = userEvent.setup();
     const rootReducer = combineReducers({
-      emoji, io, messages, rtc,
+      emoji,
+      io,
+      messages,
+      rtc,
     });
     const store = createStore(rootReducer, applyMiddleware(thunk));
     store.dispatch({ type: Actions.SET_ROOM, room: { ...ROOM, images: [] } });
@@ -178,7 +203,10 @@ describe('Details Room — Media tab', () => {
 describe('Details Room — Leave Group (plain MEMBER entry point)', () => {
   function renderGroupRoom(myRole) {
     const rootReducer = combineReducers({
-      emoji, io, messages, rtc,
+      emoji,
+      io,
+      messages,
+      rtc,
     });
     const store = createStore(rootReducer, applyMiddleware(thunk));
     store.dispatch({ type: Actions.SET_ROOM, room: GROUP_ROOM });
@@ -221,10 +249,14 @@ describe('Details Room — Leave Group (plain MEMBER entry point)', () => {
     axios.mockResolvedValueOnce({ data: { status: 'success' } });
     await user.click(screen.getByRole('button', { name: 'Leave Group' }));
 
-    await waitFor(() => expect(axios).toHaveBeenCalledWith(expect.objectContaining({
-      method: 'post',
-      url: expect.stringContaining('/api/group/leave'),
-      data: { id: 'group-1' },
-    })));
+    await waitFor(() =>
+      expect(axios).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'post',
+          url: expect.stringContaining('/api/group/leave'),
+          data: { id: 'group-1' },
+        }),
+      ),
+    );
   });
 });

@@ -89,8 +89,7 @@ function ForgotPassword() {
               <span className="text-primary">password.</span>
             </h1>
             <p className="mt-4 max-w-[340px] text-sm leading-relaxed text-zinc-400">
-              Enter your email to receive a verification code, then choose a new password to get back into your
-              account.
+              Enter your email to receive a verification code, then choose a new password to get back into your account.
             </p>
           </div>
 
@@ -130,7 +129,7 @@ function ForgotPassword() {
               </h2>
               <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
                 {sent
-                  ? "We sent a verification code to your email — enter it below with your new password."
+                  ? 'We sent a verification code to your email — enter it below with your new password.'
                   : "No worries, we'll send a code to reset it."}
               </p>
             </div>
@@ -186,7 +185,10 @@ function ForgotPassword() {
             )}
 
             <div className="mt-6 text-center text-xs sm:text-sm text-muted-foreground">
-              <Link to="/login" className="inline-flex items-center gap-1 font-bold text-primary transition-colors hover:underline">
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-1 font-bold text-primary transition-colors hover:underline"
+              >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back to Log In
               </Link>

@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -20,12 +18,18 @@ vi.mock('../../../actions/restoreConversation', () => ({ default: vi.fn() }));
 
 const OTHER = { _id: 'user-2', firstName: 'Other', lastName: 'Person' };
 const makeRoom = (overrides = {}) => ({
-  _id: 'room-1', isGroup: false, people: [{ _id: 'user-1' }, OTHER], ...overrides,
+  _id: 'room-1',
+  isGroup: false,
+  people: [{ _id: 'user-1' }, OTHER],
+  ...overrides,
 });
 
 function renderRemoved() {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   render(

@@ -108,7 +108,11 @@ function Join({ onJoin, onClose }) {
         <div className="h-4 w-px bg-border" />
 
         <div className="flex items-center gap-2.5">
-          {isVideo ? <Video className="h-4 w-4 text-primary" /> : <VideoOff className="h-4 w-4 text-muted-foreground" />}
+          {isVideo ? (
+            <Video className="h-4 w-4 text-primary" />
+          ) : (
+            <VideoOff className="h-4 w-4 text-muted-foreground" />
+          )}
           <span className="text-xs font-medium text-foreground">Cam</span>
           <Switch checked={isVideo} onCheckedChange={onChangeVideo} />
         </div>

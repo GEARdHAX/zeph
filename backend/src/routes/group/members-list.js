@@ -26,14 +26,22 @@ module.exports = async (req, res) => {
   const members = await GroupMember.find(query)
     .sort({ _id: -1 })
     .limit(limit)
-    .populate({ path: 'user', select: '-email -password -friends -__v -level -vaultPinHash', populate: [{ path: 'picture' }] })
+    .populate({
+      path: 'user',
+      select: '-email -password -friends -__v -level -vaultPinHash',
+      populate: [{ path: 'picture' }],
+    })
     .lean();
 
   const nextCursor = members.length === limit ? members[members.length - 1]._id : null;
 
   res.status(200).json({
     members: members.map((m) => ({
-      _id: m._id, user: m.user, role: m.role, joinedAt: m.joinedAt, mutedUntil: m.mutedUntil,
+      _id: m._id,
+      user: m.user,
+      role: m.role,
+      joinedAt: m.joinedAt,
+      mutedUntil: m.mutedUntil,
     })),
     cursor: nextCursor,
     limit,

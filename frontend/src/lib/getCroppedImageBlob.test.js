@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import getCroppedImageBlob from './getCroppedImageBlob';
 
 // jsdom ships no real canvas 2D backend, so getContext()/toBlob() are stubbed
@@ -61,32 +59,64 @@ describe('getCroppedImageBlob', () => {
   it('rejects when the image fails to decode', async () => {
     mockImage({ fail: true });
     await expect(
-      getCroppedImageBlob('blob:x', {
-        x: 0, y: 0, width: 100, height: 100,
-      }, 0, 'image/jpeg'),
+      getCroppedImageBlob(
+        'blob:x',
+        {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+        },
+        0,
+        'image/jpeg',
+      ),
     ).rejects.toThrow('Could not decode this image.');
   });
 
   it('produces a jpeg blob for an opaque source', async () => {
-    const blob = await getCroppedImageBlob('blob:x', {
-      x: 0, y: 0, width: 100, height: 100,
-    }, 0, 'image/jpeg');
+    const blob = await getCroppedImageBlob(
+      'blob:x',
+      {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      },
+      0,
+      'image/jpeg',
+    );
     expect(blob.type).toBe('image/jpeg');
   });
 
   it('preserves png output when the source has transparency', async () => {
     mockCanvas({ alpha: true });
-    const blob = await getCroppedImageBlob('blob:x', {
-      x: 0, y: 0, width: 100, height: 100,
-    }, 0, 'image/png');
+    const blob = await getCroppedImageBlob(
+      'blob:x',
+      {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      },
+      0,
+      'image/png',
+    );
     expect(blob.type).toBe('image/png');
   });
 
   it('exports opaque png sources as jpeg, not png', async () => {
     mockCanvas({ alpha: false });
-    const blob = await getCroppedImageBlob('blob:x', {
-      x: 0, y: 0, width: 100, height: 100,
-    }, 0, 'image/png');
+    const blob = await getCroppedImageBlob(
+      'blob:x',
+      {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      },
+      0,
+      'image/png',
+    );
     expect(blob.type).toBe('image/jpeg');
   });
 
@@ -99,26 +129,50 @@ describe('getCroppedImageBlob', () => {
       setWidth.set.call(this, v);
     });
 
-    await getCroppedImageBlob('blob:x', {
-      x: 0, y: 0, width: 100, height: 50,
-    }, 0, 'image/jpeg');
+    await getCroppedImageBlob(
+      'blob:x',
+      {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+      },
+      0,
+      'image/jpeg',
+    );
     // second canvas created is the output canvas — should keep the crop's
     // own size, not upscale it toward the 2048 cap
     expect(widths[widths.length - 1]).toBe(100);
 
     widths.length = 0;
-    await getCroppedImageBlob('blob:x', {
-      x: 0, y: 0, width: 4000, height: 2000,
-    }, 0, 'image/jpeg');
+    await getCroppedImageBlob(
+      'blob:x',
+      {
+        x: 0,
+        y: 0,
+        width: 4000,
+        height: 2000,
+      },
+      0,
+      'image/jpeg',
+    );
     expect(widths[widths.length - 1]).toBeLessThanOrEqual(2048);
   });
 
   it('rejects when canvas.toBlob yields null', async () => {
     mockCanvas({ toBlobResult: null });
     await expect(
-      getCroppedImageBlob('blob:x', {
-        x: 0, y: 0, width: 100, height: 100,
-      }, 0, 'image/jpeg'),
+      getCroppedImageBlob(
+        'blob:x',
+        {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+        },
+        0,
+        'image/jpeg',
+      ),
     ).rejects.toThrow('Could not process this image.');
   });
 });

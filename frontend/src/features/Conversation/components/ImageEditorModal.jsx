@@ -1,11 +1,7 @@
-import {
-  useCallback, useEffect, useRef, useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Cropper from 'react-easy-crop';
 import { RotateCcw, RefreshCw } from 'lucide-react';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import getCroppedImageBlob from '../../../lib/getCroppedImageBlob';
@@ -17,9 +13,7 @@ const INITIAL_ROTATION = 0;
 // One image at a time (see BottomBar.jsx's editorQueue) — `file` is the raw
 // File currently being edited, `aspect` defaults to a wide rectangle (chat's
 // case) but can be 1 for a square avatar/profile crop in future reuse.
-function ImageEditorModal({
-  file, aspect = 4 / 3, onCancel, onDone,
-}) {
+function ImageEditorModal({ file, aspect = 4 / 3, onCancel, onDone }) {
   const [crop, setCrop] = useState(INITIAL_CROP);
   const [zoom, setZoom] = useState(INITIAL_ZOOM);
   const [rotation, setRotation] = useState(INITIAL_ROTATION);

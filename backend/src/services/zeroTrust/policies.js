@@ -52,5 +52,9 @@ const DENY_ABOVE = 80;
 const categoryFor = (resource, action) => POLICY_CATEGORIES[`${resource}:${action}`] || PolicyCategory.NORMAL;
 
 module.exports = {
-  PolicyCategory, POLICY_CATEGORIES, POLICY_THRESHOLDS, DENY_ABOVE, categoryFor,
+  PolicyCategory,
+  POLICY_CATEGORIES,
+  POLICY_THRESHOLDS,
+  DENY_ABOVE,
+  categoryFor,
 };

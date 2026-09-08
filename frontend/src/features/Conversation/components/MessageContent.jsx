@@ -40,7 +40,9 @@ function InlineTokens({ tokens, isMine, onMentionClick, keyPrefix = 'tok' }) {
             key={key}
             className={cn(
               'rounded px-1 py-0.5 text-inherit',
-              isMine ? 'bg-amber-400/30 text-white' : 'bg-yellow-200 text-zinc-900 dark:bg-yellow-500/30 dark:text-yellow-100',
+              isMine
+                ? 'bg-amber-400/30 text-white'
+                : 'bg-yellow-200 text-zinc-900 dark:bg-yellow-500/30 dark:text-yellow-100',
             )}
           >
             <InlineTokens tokens={token.children} isMine={isMine} onMentionClick={onMentionClick} keyPrefix={key} />
@@ -93,13 +95,7 @@ function InlineTokens({ tokens, isMine, onMentionClick, keyPrefix = 'tok' }) {
         );
       case 'hashtag':
         return (
-          <span
-            key={key}
-            className={cn(
-              'font-medium',
-              isMine ? 'text-rose-200' : 'text-primary',
-            )}
-          >
+          <span key={key} className={cn('font-medium', isMine ? 'text-rose-200' : 'text-primary')}>
             {`#${token.tag}`}
           </span>
         );
@@ -243,7 +239,12 @@ function MessageContent({ content, isMine, onMentionClick }) {
                       block.level >= 3 && 'text-[13px] sm:text-[13.5px]',
                     )}
                   >
-                    <InlineTokens tokens={block.tokens} isMine={isMine} onMentionClick={onMentionClick} keyPrefix={`h-${idx}`} />
+                    <InlineTokens
+                      tokens={block.tokens}
+                      isMine={isMine}
+                      onMentionClick={onMentionClick}
+                      keyPrefix={`h-${idx}`}
+                    />
                   </HeaderTag>
                 );
               }
@@ -254,10 +255,17 @@ function MessageContent({ content, isMine, onMentionClick }) {
                     key={idx}
                     className={cn(
                       'my-2 rounded-r-lg border-l-2 pl-3 py-1 italic text-xs sm:text-[13px]',
-                      isMine ? 'border-white/50 bg-black/15 text-rose-100' : 'border-primary bg-muted/30 text-muted-foreground',
+                      isMine
+                        ? 'border-white/50 bg-black/15 text-rose-100'
+                        : 'border-primary bg-muted/30 text-muted-foreground',
                     )}
                   >
-                    <InlineTokens tokens={block.tokens} isMine={isMine} onMentionClick={onMentionClick} keyPrefix={`q-${idx}`} />
+                    <InlineTokens
+                      tokens={block.tokens}
+                      isMine={isMine}
+                      onMentionClick={onMentionClick}
+                      keyPrefix={`q-${idx}`}
+                    />
                   </blockquote>
                 );
 
@@ -275,7 +283,12 @@ function MessageContent({ content, isMine, onMentionClick }) {
                           {item.marker}
                         </span>
                         <div className="flex-1">
-                          <InlineTokens tokens={item.tokens} isMine={isMine} onMentionClick={onMentionClick} keyPrefix={`li-${idx}-${itemIdx}`} />
+                          <InlineTokens
+                            tokens={item.tokens}
+                            isMine={isMine}
+                            onMentionClick={onMentionClick}
+                            keyPrefix={`li-${idx}-${itemIdx}`}
+                          />
                         </div>
                       </div>
                     ))}
@@ -284,17 +297,19 @@ function MessageContent({ content, isMine, onMentionClick }) {
 
               case 'divider':
                 return (
-                  <hr
-                    key={idx}
-                    className={cn('my-3 border-t', isMine ? 'border-white/20' : 'border-border/60')}
-                  />
+                  <hr key={idx} className={cn('my-3 border-t', isMine ? 'border-white/20' : 'border-border/60')} />
                 );
 
               case 'paragraph':
               default:
                 return (
                   <p key={idx} className="my-1 text-inherit">
-                    <InlineTokens tokens={block.tokens} isMine={isMine} onMentionClick={onMentionClick} keyPrefix={`p-${idx}`} />
+                    <InlineTokens
+                      tokens={block.tokens}
+                      isMine={isMine}
+                      onMentionClick={onMentionClick}
+                      keyPrefix={`p-${idx}`}
+                    />
                   </p>
                 );
             }

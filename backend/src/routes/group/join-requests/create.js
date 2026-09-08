@@ -33,7 +33,10 @@ module.exports = async (req, res) => {
       { group: room._id, user: userId, status: { $in: ['LEFT', 'REMOVED'] } },
       {
         $set: {
-          role: 'MEMBER', status: 'PENDING', active: false, updatedAt: new Date(),
+          role: 'MEMBER',
+          status: 'PENDING',
+          active: false,
+          updatedAt: new Date(),
         },
       },
       { upsert: true, new: true },
@@ -51,11 +54,20 @@ module.exports = async (req, res) => {
   logger.info({ groupId: room._id, userId }, 'group_join_request_created');
 
   const admins = await GroupMember.find({
-    group: room._id, role: { $in: ['OWNER', 'ADMIN'] }, active: true, status: { $in: ['ACTIVE', null] },
+    group: room._id,
+    role: { $in: ['OWNER', 'ADMIN'] },
+    active: true,
+    status: { $in: ['ACTIVE', null] },
   }).select('user');
-  broadcastToGroup(admins.map((a) => a.user), 'group:join-request:created', {
-    groupId: room._id, userId, requestId: request._id,
-  });
+  broadcastToGroup(
+    admins.map((a) => a.user),
+    'group:join-request:created',
+    {
+      groupId: room._id,
+      userId,
+      requestId: request._id,
+    },
+  );
 
   res.status(200).json({ status: 'pending' });
 };

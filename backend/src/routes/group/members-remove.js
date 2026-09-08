@@ -24,9 +24,14 @@ module.exports = async (req, res) => {
   const targetMembership = await groupPolicy.getMembership(room._id, userId);
   if (!targetMembership) return res.status(404).json({ error: true });
 
-  if (!groupPolicy.hasCapability(actorMembership.role, groupPolicy.Capabilities.REMOVE_MEMBER)
-    || !groupPolicy.canRemoveMember({ actorRole: actorMembership.role, targetRole: targetMembership.role })) {
-    logger.warn({ groupId: room._id, actorId, targetId: userId, reason: 'role_hierarchy' }, 'group_unauthorized_access_attempt');
+  if (
+    !groupPolicy.hasCapability(actorMembership.role, groupPolicy.Capabilities.REMOVE_MEMBER) ||
+    !groupPolicy.canRemoveMember({ actorRole: actorMembership.role, targetRole: targetMembership.role })
+  ) {
+    logger.warn(
+      { groupId: room._id, actorId, targetId: userId, reason: 'role_hierarchy' },
+      'group_unauthorized_access_attempt',
+    );
     return res.status(403).json({ error: true });
   }
 
@@ -36,7 +41,9 @@ module.exports = async (req, res) => {
     User.findById(userId).select('firstName lastName username'),
   ]);
   const actorName = actor ? `${actor.firstName || ''} ${actor.lastName || ''}`.trim() || actor.username : null;
-  const targetName = target ? `${target.firstName || ''} ${target.lastName || ''}`.trim() || target.username : 'A member';
+  const targetName = target
+    ? `${target.firstName || ''} ${target.lastName || ''}`.trim() || target.username
+    : 'A member';
 
   await GroupMember.updateOne(
     { _id: targetMembership._id },
@@ -45,11 +52,18 @@ module.exports = async (req, res) => {
   await Room.updateOne({ _id: room._id }, { $pull: { people: targetMembership.user } });
 
   forceLeaveGroupRoom(targetMembership.user.toString(), room._id.toString(), {
-    reason: 'removed', groupName: room.title, actorName,
+    reason: 'removed',
+    groupName: room.title,
+    actorName,
   });
 
   logger.info({ groupId: room._id, actorId, targetId: userId, selfLeave: false }, 'group_member_removed');
-  broadcastToGroup(remainingMemberIds, 'group:member:removed', { groupId: room._id, userId, self: false }, { excludeUserId: actorId });
+  broadcastToGroup(
+    remainingMemberIds,
+    'group:member:removed',
+    { groupId: room._id, userId, self: false },
+    { excludeUserId: actorId },
+  );
   await postSystemMessage(
     room._id,
     actorName ? `${targetName} was removed by ${actorName}` : `${targetName} was removed`,

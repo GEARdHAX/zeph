@@ -45,7 +45,10 @@ const inspectZipArchive = (filePath, archiveSize) => {
 
     if (totalEntries > MAX_ENTRIES) {
       return {
-        safe: false, checked: true, reason: 'too_many_entries', totalEntries,
+        safe: false,
+        checked: true,
+        reason: 'too_many_entries',
+        totalEntries,
       };
     }
 
@@ -77,12 +80,20 @@ const inspectZipArchive = (filePath, archiveSize) => {
 
     if (totalCompressed > 0 && totalUncompressed / totalCompressed > MAX_COMPRESSION_RATIO) {
       return {
-        safe: false, checked: true, reason: 'compression_ratio_exceeded', totalUncompressed, totalCompressed,
+        safe: false,
+        checked: true,
+        reason: 'compression_ratio_exceeded',
+        totalUncompressed,
+        totalCompressed,
       };
     }
 
     return {
-      safe: true, checked: true, totalEntries, totalUncompressed, totalCompressed,
+      safe: true,
+      checked: true,
+      totalEntries,
+      totalUncompressed,
+      totalCompressed,
     };
   } finally {
     fs.closeSync(fd);

@@ -28,7 +28,11 @@ module.exports = async (req, res) => {
   const requests = await GroupMember.find(query)
     .sort({ _id: -1 })
     .limit(limit)
-    .populate({ path: 'user', select: '-email -password -friends -__v -level -vaultPinHash', populate: [{ path: 'picture' }] })
+    .populate({
+      path: 'user',
+      select: '-email -password -friends -__v -level -vaultPinHash',
+      populate: [{ path: 'picture' }],
+    })
     .lean();
 
   const nextCursor = requests.length === limit ? requests[requests.length - 1]._id : null;

@@ -58,7 +58,10 @@ const buildAbuseIpDbProvider = (config) => {
         const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
         logger.warn({ errType: err.name, isTimeout, latencyMs: Date.now() - startedAt }, 'abuseipdb_request_failed');
         return {
-          ok: false, reason: isTimeout ? 'timeout' : 'network_error', status: null, rateLimit: null,
+          ok: false,
+          reason: isTimeout ? 'timeout' : 'network_error',
+          status: null,
+          rateLimit: null,
         };
       }
 
@@ -72,13 +75,19 @@ const buildAbuseIpDbProvider = (config) => {
       if (res.status === 429) {
         logger.warn({ latencyMs, rateLimit }, 'abuseipdb_rate_limited');
         return {
-          ok: false, reason: 'rate_limited', status: 429, rateLimit,
+          ok: false,
+          reason: 'rate_limited',
+          status: 429,
+          rateLimit,
         };
       }
       if (res.status >= 500) {
         logger.warn({ latencyMs, status: res.status }, 'abuseipdb_server_error');
         return {
-          ok: false, reason: 'server_error', status: res.status, rateLimit,
+          ok: false,
+          reason: 'server_error',
+          status: res.status,
+          rateLimit,
         };
       }
       if (!res.ok) {
@@ -88,7 +97,10 @@ const buildAbuseIpDbProvider = (config) => {
         // crashing every request that would have triggered a lookup.
         logger.warn({ latencyMs, status: res.status }, 'abuseipdb_request_rejected');
         return {
-          ok: false, reason: 'rejected', status: res.status, rateLimit,
+          ok: false,
+          reason: 'rejected',
+          status: res.status,
+          rateLimit,
         };
       }
 
@@ -98,7 +110,10 @@ const buildAbuseIpDbProvider = (config) => {
       } catch (err) {
         logger.warn({ latencyMs }, 'abuseipdb_malformed_response');
         return {
-          ok: false, reason: 'malformed_response', status: res.status, rateLimit,
+          ok: false,
+          reason: 'malformed_response',
+          status: res.status,
+          rateLimit,
         };
       }
 
@@ -106,7 +121,10 @@ const buildAbuseIpDbProvider = (config) => {
       if (!data || typeof data.abuseConfidenceScore !== 'number') {
         logger.warn({ latencyMs }, 'abuseipdb_malformed_response');
         return {
-          ok: false, reason: 'malformed_response', status: res.status, rateLimit,
+          ok: false,
+          reason: 'malformed_response',
+          status: res.status,
+          rateLimit,
         };
       }
 

@@ -18,7 +18,9 @@ module.exports = async (req, res, next) => {
 
   if (!group) return res.status(400).json({ error: true, reason: 'group_required' });
 
-  const room = await Room.findOne({ _id: group }).select('people disabledAt').catch(() => null);
+  const room = await Room.findOne({ _id: group })
+    .select('people disabledAt')
+    .catch(() => null);
   if (!room || room.disabledAt) return res.status(404).json({ error: true });
 
   const isMember = room.people.some((personId) => personId.toString() === caller.toString());

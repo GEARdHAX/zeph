@@ -15,9 +15,7 @@ const KEY_PREFIX = 'netintel:dns:';
 const domainsKey = (sensorId, pid) => `${KEY_PREFIX}domains:${sensorId}:${pid}`;
 const nxdomainKey = (sensorId, pid) => `${KEY_PREFIX}nxdomain:${sensorId}:${pid}`;
 
-const recordDnsQuery = async ({
-  sensorId, pid, domain, nxdomain, windowMs,
-}) => {
+const recordDnsQuery = async ({ sensorId, pid, domain, nxdomain, windowMs }) => {
   const redis = getClient();
   if (!redis || !sensorId || !Number.isInteger(pid)) {
     return { distinctDomains: 0, nxdomainCount: 0 };
@@ -37,10 +35,7 @@ const recordDnsQuery = async ({
     }
     await pipeline.exec();
 
-    const [distinctDomains, nxdomainCountRaw] = await Promise.all([
-      redis.scard(dk),
-      redis.get(nk),
-    ]);
+    const [distinctDomains, nxdomainCountRaw] = await Promise.all([redis.scard(dk), redis.get(nk)]);
     return { distinctDomains, nxdomainCount: Number(nxdomainCountRaw) || 0 };
   } catch (err) {
     logger.warn({ err, sensorId, pid }, 'network_intel_dns_counter_failed');

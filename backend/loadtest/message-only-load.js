@@ -22,7 +22,9 @@ const baseUrl = process.argv[3] || 'http://127.0.0.1:4099';
 
 const form = (fields) => {
   const f = new FormData();
-  Object.entries(fields).forEach(([k, v]) => { if (v !== undefined) f.append(k, v); });
+  Object.entries(fields).forEach(([k, v]) => {
+    if (v !== undefined) f.append(k, v);
+  });
   return f;
 };
 
@@ -38,14 +40,18 @@ const timeRequest = async (fn) => {
   }
   const ms = Number(process.hrtime.bigint() - start) / 1e6;
   return {
-    ms, ok, detail,
+    ms,
+    ok,
+    detail,
   };
 };
 
 const main = async () => {
   const health = await fetch(`${baseUrl}/health/ready`).catch(() => null);
   if (!health || !health.ok) {
-    console.error(`Target ${baseUrl} is not reachable/ready — aborting. Start the backend first (fresh, for a clean limiter window).`);
+    console.error(
+      `Target ${baseUrl} is not reachable/ready — aborting. Start the backend first (fresh, for a clean limiter window).`,
+    );
     process.exit(1);
   }
 
@@ -65,16 +71,23 @@ const main = async () => {
   fs.unlinkSync(usersFile);
   console.log(`Prepared ${rooms.length}/${concurrency} rooms.`);
 
-  const results = await Promise.all(rooms.map((r, i) => timeRequest(async () => {
-    const res = await fetch(`${baseUrl}/api/message`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${r.senderToken}` },
-      body: form({
-        roomID: r.roomID, content: `load test message ${i}`, type: 'text', clientID: `lt-${Date.now()}-${i}`,
+  const results = await Promise.all(
+    rooms.map((r, i) =>
+      timeRequest(async () => {
+        const res = await fetch(`${baseUrl}/api/message`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${r.senderToken}` },
+          body: form({
+            roomID: r.roomID,
+            content: `load test message ${i}`,
+            type: 'text',
+            clientID: `lt-${Date.now()}-${i}`,
+          }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
       }),
-    });
-    if (!res.ok) throw new Error(String(res.status));
-  })));
+    ),
+  );
 
   const latencies = results.map((r) => r.ms);
   const errors = results.filter((r) => !r.ok);

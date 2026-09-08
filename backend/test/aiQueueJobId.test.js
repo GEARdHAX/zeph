@@ -30,7 +30,11 @@ const lastJobId = () => addMock.mock.calls[addMock.mock.calls.length - 1][2].job
 describe('AI queue job ids never contain ":"', () => {
   it('summary job id', async () => {
     await enqueueSummaryJob({
-      roomId: 'room-1', conversationType: 'group', userId: 'u1', messageCountAtSummary: 120, requestId: 'r1',
+      roomId: 'room-1',
+      conversationType: 'group',
+      userId: 'u1',
+      messageCountAtSummary: 120,
+      requestId: 'r1',
     });
     expect(lastJobId()).toBe('summary-room-1-120');
     expect(lastJobId()).not.toContain(':');
@@ -38,7 +42,10 @@ describe('AI queue job ids never contain ":"', () => {
 
   it('meeting summary job id', async () => {
     await enqueueMeetingSummaryJob({
-      meetingId: 'meet-1', mediaId: 'm1', userId: 'u1', requestId: 'r1',
+      meetingId: 'meet-1',
+      mediaId: 'm1',
+      userId: 'u1',
+      requestId: 'r1',
     });
     expect(lastJobId()).toBe('meeting-meet-1');
     expect(lastJobId()).not.toContain(':');

@@ -22,7 +22,9 @@ module.exports = async (socket, data) => {
     return socket.emit('more-images', { status: 403, images: [] });
   }
   const boundaryViolation = await roomHasBoundaryViolation({
-    room, callerID, callerLevel: socket.decoded_token.level,
+    room,
+    callerID,
+    callerLevel: socket.decoded_token.level,
   });
   if (boundaryViolation) {
     return socket.emit('more-images', { status: 404, images: [] });

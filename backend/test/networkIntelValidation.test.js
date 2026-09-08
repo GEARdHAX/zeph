@@ -5,7 +5,15 @@ const validFlowEvent = (overrides = {}) => ({
   type: 'NETWORK_FLOW',
   timestamp: new Date().toISOString(),
   flow: {
-    destinationIp: '203.0.113.5', destinationPort: 443, protocol: 'TCP', direction: 'OUTBOUND', bytesSent: 1024, bytesReceived: 4096, durationMs: 1200, pid: 100, processName: 'node',
+    destinationIp: '203.0.113.5',
+    destinationPort: 443,
+    protocol: 'TCP',
+    direction: 'OUTBOUND',
+    bytesSent: 1024,
+    bytesReceived: 4096,
+    durationMs: 1200,
+    pid: 100,
+    processName: 'node',
   },
   ...overrides,
 });
@@ -21,10 +29,26 @@ const validDnsEvent = (overrides = {}) => ({
 describe('sanitizeFlow', () => {
   it('accepts a well-formed flow', () => {
     const out = sanitizeFlow({
-      destinationIp: '203.0.113.5', destinationPort: 443, protocol: 'tcp', bytesSent: 10, bytesReceived: 20, durationMs: 5, direction: 'OUTBOUND', pid: 1, processName: 'x',
+      destinationIp: '203.0.113.5',
+      destinationPort: 443,
+      protocol: 'tcp',
+      bytesSent: 10,
+      bytesReceived: 20,
+      durationMs: 5,
+      direction: 'OUTBOUND',
+      pid: 1,
+      processName: 'x',
     });
     expect(out).toEqual({
-      destinationIp: '203.0.113.5', destinationPort: 443, protocol: 'TCP', direction: 'OUTBOUND', bytesSent: 10, bytesReceived: 20, durationMs: 5, pid: 1, processName: 'x',
+      destinationIp: '203.0.113.5',
+      destinationPort: 443,
+      protocol: 'TCP',
+      direction: 'OUTBOUND',
+      bytesSent: 10,
+      bytesReceived: 20,
+      durationMs: 5,
+      pid: 1,
+      processName: 'x',
     });
   });
 
@@ -48,14 +72,22 @@ describe('sanitizeFlow', () => {
 
   it('drops an invalid direction rather than accepting an arbitrary string', () => {
     const out = sanitizeFlow({
-      destinationIp: '203.0.113.5', destinationPort: 443, protocol: 'TCP', direction: 'SIDEWAYS',
+      destinationIp: '203.0.113.5',
+      destinationPort: 443,
+      protocol: 'TCP',
+      direction: 'SIDEWAYS',
     });
     expect(out.direction).toBeUndefined();
   });
 
   it('never surfaces sensor-provided riskScore/malicious/decision fields', () => {
     const out = sanitizeFlow({
-      destinationIp: '203.0.113.5', destinationPort: 443, protocol: 'TCP', riskScore: 100, malicious: true, decision: 'DENY',
+      destinationIp: '203.0.113.5',
+      destinationPort: 443,
+      protocol: 'TCP',
+      riskScore: 100,
+      malicious: true,
+      decision: 'DENY',
     });
     expect(out.riskScore).toBeUndefined();
     expect(out.malicious).toBeUndefined();
@@ -66,7 +98,10 @@ describe('sanitizeFlow', () => {
 describe('sanitizeDns', () => {
   it('accepts a well-formed DNS query', () => {
     expect(sanitizeDns({ domain: 'Example.COM', queryType: 'a', pid: 1, processName: 'node' })).toEqual({
-      domain: 'example.com', queryType: 'A', pid: 1, processName: 'node',
+      domain: 'example.com',
+      queryType: 'A',
+      pid: 1,
+      processName: 'node',
     });
   });
 

@@ -12,7 +12,8 @@ const CONFIDENCE_BANDS = Object.freeze([
   { max: 100, label: 'VERY_HIGH' },
 ]);
 
-const confidenceBandFor = (confidence) => (CONFIDENCE_BANDS.find((b) => confidence <= b.max) || CONFIDENCE_BANDS[CONFIDENCE_BANDS.length - 1]).label;
+const confidenceBandFor = (confidence) =>
+  (CONFIDENCE_BANDS.find((b) => confidence <= b.max) || CONFIDENCE_BANDS[CONFIDENCE_BANDS.length - 1]).label;
 
 // AbuseIPDB's `abuseConfidenceScore` is ALREADY a documented 0-100 integer
 // (the percentage of reports the API judges credible) — this is the one

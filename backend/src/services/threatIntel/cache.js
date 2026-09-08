@@ -19,7 +19,10 @@ const getClient = () => {
   if (!store.config?.redisUrl) return null;
   if (!client) {
     client = new IORedis(store.config.redisUrl, {
-      maxRetriesPerRequest: 1, connectTimeout: 3000, retryStrategy: () => null, lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+      retryStrategy: () => null,
+      lazyConnect: true,
     });
     client.on('error', (err) => logger.warn({ err }, 'Threat intel cache Redis error'));
   }
@@ -49,7 +52,8 @@ const getCachedThreatResult = async (indicatorKey) => {
 const setCachedThreatResult = async (indicatorKey, result, ttlSeconds) => {
   const redis = getClient();
   if (!redis) return;
-  await redis.set(cacheKey(indicatorKey), JSON.stringify(result), 'EX', ttlSeconds)
+  await redis
+    .set(cacheKey(indicatorKey), JSON.stringify(result), 'EX', ttlSeconds)
     .catch((err) => logger.warn({ err, indicatorKey }, 'Failed to write threat intel cache'));
 };
 
@@ -61,5 +65,8 @@ const closeThreatIntelCacheConnection = async () => {
 };
 
 module.exports = {
-  getCachedThreatResult, setCachedThreatResult, closeThreatIntelCacheConnection, getClient,
+  getCachedThreatResult,
+  setCachedThreatResult,
+  closeThreatIntelCacheConnection,
+  getClient,
 };

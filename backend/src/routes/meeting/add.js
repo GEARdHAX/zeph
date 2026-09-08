@@ -18,11 +18,16 @@ module.exports = async (req, res, next) => {
     return res.status(200).json({ ok: true });
   }
 
-  const user = await User.findOne({ _id: req.user.id }, {
-    email: 0, password: 0, friends: 0, __v: 0, vaultPinHash: 0,
-  }).populate([
-    { path: 'picture', strictPopulate: false },
-  ]);
+  const user = await User.findOne(
+    { _id: req.user.id },
+    {
+      email: 0,
+      password: 0,
+      friends: 0,
+      __v: 0,
+      vaultPinHash: 0,
+    },
+  ).populate([{ path: 'picture', strictPopulate: false }]);
 
   store.io
     .to(userID)

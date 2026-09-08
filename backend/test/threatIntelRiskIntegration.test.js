@@ -3,7 +3,11 @@ const store = require('../src/store');
 const config = require('../config');
 const db = require('./helpers/db');
 const { computeRiskFactors } = require('../src/services/zeroTrust/riskEngine');
-const { MOCK_MALICIOUS_IP, MOCK_CLEAN_IP, buildMockProvider } = require('../src/services/threatIntel/providers/mockProvider');
+const {
+  MOCK_MALICIOUS_IP,
+  MOCK_CLEAN_IP,
+  buildMockProvider,
+} = require('../src/services/threatIntel/providers/mockProvider');
 
 jest.mock('../src/services/threatIntel/provider');
 // eslint-disable-next-line import/order
@@ -34,10 +38,15 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
-describe('riskEngine + threatIntel integration — no Redis (the test-suite default; matches every other Phase 2/3 test\'s baseline)', () => {
+describe("riskEngine + threatIntel integration — no Redis (the test-suite default; matches every other Phase 2/3 test's baseline)", () => {
   beforeEach(() => {
     store.config = {
-      ...config, redisUrl: null, abuseIpDbEnabled: true, abuseIpDbApiKey: 'test-key', abuseIpDbDailyBudget: 800, threatIntelCacheTtlSeconds: 21600,
+      ...config,
+      redisUrl: null,
+      abuseIpDbEnabled: true,
+      abuseIpDbApiKey: 'test-key',
+      abuseIpDbDailyBudget: 800,
+      threatIntelCacheTtlSeconds: 21600,
     };
   });
 
@@ -91,39 +100,47 @@ describe('riskEngine + threatIntel integration — no Redis (the test-suite defa
 const hasRedis = !!process.env.REDIS_URL;
 const describeIfRedis = hasRedis ? describe : describe.skip;
 
-describeIfRedis('riskEngine + threatIntel integration — real Redis (Phase 3 spec section 24: the actual cache-hit path)', () => {
-  beforeEach(() => {
-    store.config = {
-      ...config, redisUrl: process.env.REDIS_URL, abuseIpDbEnabled: true, abuseIpDbApiKey: 'test-key', abuseIpDbDailyBudget: 800, threatIntelCacheTtlSeconds: 21600,
-    };
-  });
+describeIfRedis(
+  'riskEngine + threatIntel integration — real Redis (Phase 3 spec section 24: the actual cache-hit path)',
+  () => {
+    beforeEach(() => {
+      store.config = {
+        ...config,
+        redisUrl: process.env.REDIS_URL,
+        abuseIpDbEnabled: true,
+        abuseIpDbApiKey: 'test-key',
+        abuseIpDbDailyBudget: 800,
+        threatIntelCacheTtlSeconds: 21600,
+      };
+    });
 
-  it('once an IP is already cached as malicious (e.g. by securityEventEnrichment.js\'s HIGH-priority lookup), the risk engine\'s own LOW-priority read picks it up as MALICIOUS_IP', async () => {
-    getProvider.mockReturnValue(buildMockProvider());
-    // Pre-warm the cache at a real priority, matching how
-    // securityEventEnrichment.js's LOGIN_FAILED trigger would actually
-    // populate it before any risk evaluation runs for the same IP.
-    await threatIntelService.lookup(MOCK_MALICIOUS_IP, { type: 'IP', priority: 'HIGH' });
+    it("once an IP is already cached as malicious (e.g. by securityEventEnrichment.js's HIGH-priority lookup), the risk engine's own LOW-priority read picks it up as MALICIOUS_IP", async () => {
+      getProvider.mockReturnValue(buildMockProvider());
+      // Pre-warm the cache at a real priority, matching how
+      // securityEventEnrichment.js's LOGIN_FAILED trigger would actually
+      // populate it before any risk evaluation runs for the same IP.
+      await threatIntelService.lookup(MOCK_MALICIOUS_IP, { type: 'IP', priority: 'HIGH' });
 
-    const knownSession = { createdAt: new Date(Date.now() - 999999), revokedAt: null };
-    const result = await computeRiskFactors({ userId: 'user-1', session: knownSession, ip: MOCK_MALICIOUS_IP });
+      const knownSession = { createdAt: new Date(Date.now() - 999999), revokedAt: null };
+      const result = await computeRiskFactors({ userId: 'user-1', session: knownSession, ip: MOCK_MALICIOUS_IP });
 
-    const factor = result.factors.find((f) => f.type === 'MALICIOUS_IP');
-    expect(factor).toBeDefined();
-    expect(factor.confidence).toBe(94);
-    expect(result.score).toBe(30); // KNOWN_DEVICE(-10) + MALICIOUS_IP(+40)
-  });
+      const factor = result.factors.find((f) => f.type === 'MALICIOUS_IP');
+      expect(factor).toBeDefined();
+      expect(factor.confidence).toBe(94);
+      expect(result.score).toBe(30); // KNOWN_DEVICE(-10) + MALICIOUS_IP(+40)
+    });
 
-  it('threat intelligence ALONE (even with a real cache-hit malicious verdict) never pushes a SENSITIVE-category request past its own threshold without other factors — evidence, not authority (Phase 3 spec section 2)', async () => {
-    getProvider.mockReturnValue(buildMockProvider());
-    await threatIntelService.lookup(MOCK_MALICIOUS_IP, { type: 'IP', priority: 'HIGH' }); // real cache hit this time, not the no-Redis no-op
+    it('threat intelligence ALONE (even with a real cache-hit malicious verdict) never pushes a SENSITIVE-category request past its own threshold without other factors — evidence, not authority (Phase 3 spec section 2)', async () => {
+      getProvider.mockReturnValue(buildMockProvider());
+      await threatIntelService.lookup(MOCK_MALICIOUS_IP, { type: 'IP', priority: 'HIGH' }); // real cache hit this time, not the no-Redis no-op
 
-    // A KNOWN device (-10) from a genuinely-cached malicious IP (+40) = 30,
-    // still LOW — nowhere near the SENSITIVE policy's allowBelow:50
-    // STEP_UP threshold (see policies.js) on its own.
-    const knownSession = { createdAt: new Date(Date.now() - 999999), revokedAt: null };
-    const result = await computeRiskFactors({ userId: 'user-1', session: knownSession, ip: MOCK_MALICIOUS_IP });
-    expect(result.score).toBeLessThan(50);
-    expect(result.level).toBe('LOW');
-  });
-});
+      // A KNOWN device (-10) from a genuinely-cached malicious IP (+40) = 30,
+      // still LOW — nowhere near the SENSITIVE policy's allowBelow:50
+      // STEP_UP threshold (see policies.js) on its own.
+      const knownSession = { createdAt: new Date(Date.now() - 999999), revokedAt: null };
+      const result = await computeRiskFactors({ userId: 'user-1', session: knownSession, ip: MOCK_MALICIOUS_IP });
+      expect(result.score).toBeLessThan(50);
+      expect(result.level).toBe('LOW');
+    });
+  },
+);

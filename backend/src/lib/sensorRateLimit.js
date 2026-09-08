@@ -26,29 +26,31 @@ setInterval(() => {
 // already occupies (rate limiter, then auth, or vice versa depending on
 // whether the limiter needs the authenticated identity to key on — this
 // one does, so it comes second).
-const sensorRateLimit = ({ perSensorMax, globalMax, windowMs }) => (req, res, next) => {
-  const now = Date.now();
+const sensorRateLimit =
+  ({ perSensorMax, globalMax, windowMs }) =>
+  (req, res, next) => {
+    const now = Date.now();
 
-  if (!globalBucket || globalBucket.resetAt <= now) {
-    globalBucket = { count: 0, resetAt: now + windowMs };
-  }
-  globalBucket.count += 1;
-  if (globalBucket.count > globalMax) {
-    return res.status(429).json({ error: true, reason: 'GLOBAL_RATE_LIMITED' });
-  }
+    if (!globalBucket || globalBucket.resetAt <= now) {
+      globalBucket = { count: 0, resetAt: now + windowMs };
+    }
+    globalBucket.count += 1;
+    if (globalBucket.count > globalMax) {
+      return res.status(429).json({ error: true, reason: 'GLOBAL_RATE_LIMITED' });
+    }
 
-  const sensorId = req.sensor?.sensorId || 'unknown';
-  let bucket = perSensorBuckets.get(sensorId);
-  if (!bucket || bucket.resetAt <= now) {
-    bucket = { count: 0, resetAt: now + windowMs };
-    perSensorBuckets.set(sensorId, bucket);
-  }
-  bucket.count += 1;
-  if (bucket.count > perSensorMax) {
-    return res.status(429).json({ error: true, reason: 'SENSOR_RATE_LIMITED' });
-  }
+    const sensorId = req.sensor?.sensorId || 'unknown';
+    let bucket = perSensorBuckets.get(sensorId);
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      perSensorBuckets.set(sensorId, bucket);
+    }
+    bucket.count += 1;
+    if (bucket.count > perSensorMax) {
+      return res.status(429).json({ error: true, reason: 'SENSOR_RATE_LIMITED' });
+    }
 
-  return next();
-};
+    return next();
+  };
 
 module.exports = sensorRateLimit;

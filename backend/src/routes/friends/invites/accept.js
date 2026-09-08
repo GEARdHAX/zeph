@@ -41,7 +41,10 @@ module.exports = async (req, res) => {
       relationship = await existing.save();
     } else {
       relationship = await new Relationship({
-        requester: invite.inviter, recipient: accepterId, status: 'accepted', respondedAt: new Date(),
+        requester: invite.inviter,
+        recipient: accepterId,
+        status: 'accepted',
+        respondedAt: new Date(),
       }).save();
     }
   } catch (err) {

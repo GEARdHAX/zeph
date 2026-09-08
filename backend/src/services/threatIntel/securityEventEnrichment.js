@@ -42,7 +42,8 @@ const ENRICHABLE_EVENT_PRIORITY = Object.freeze({
 // already IS threat-intel data).
 const NEVER_ENRICH = new Set(['THREAT_INTEL_MATCH', 'THREAT_INTEL_LOOKUP_FAILED', 'THREAT_INTEL_RATE_LIMITED']);
 
-const shouldEnrich = (type) => !NEVER_ENRICH.has(type) && Object.prototype.hasOwnProperty.call(ENRICHABLE_EVENT_PRIORITY, type);
+const shouldEnrich = (type) =>
+  !NEVER_ENRICH.has(type) && Object.prototype.hasOwnProperty.call(ENRICHABLE_EVENT_PRIORITY, type);
 
 // Called by securityEventService.js's record() AFTER the event is already
 // persisted — fire-and-forget, exactly like record() itself, so a slow/

@@ -1,12 +1,8 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
-import {
-  MemoryRouter, Routes, Route, useNavigate,
-} from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
 import { setGlobal } from 'reactn';
@@ -30,7 +26,10 @@ const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
 
 function renderAtRoom(roomId) {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   const view = render(
@@ -49,7 +48,10 @@ function renderAtRoom(roomId) {
 const roomResponse = (id) => ({
   data: {
     room: {
-      _id: id, isGroup: false, people: [{ _id: 'user-1' }, { _id: 'user-2' }], messages: [],
+      _id: id,
+      isGroup: false,
+      people: [{ _id: 'user-1' }, { _id: 'user-2' }],
+      messages: [],
     },
   },
 });
@@ -80,13 +82,19 @@ describe('Conversation — room state cleanup', () => {
 describe('Conversation — stale-response race protection', () => {
   it('does not let an in-flight fetch for a previous room overwrite the newly-navigated room once it resolves late', async () => {
     let resolveRoomA;
-    getRoom.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveRoomA = resolve;
-    }));
+    getRoom.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRoomA = resolve;
+        }),
+    );
     getRoom.mockResolvedValueOnce(roomResponse('room-b'));
 
     const rootReducer = combineReducers({
-      emoji, io, messages, rtc,
+      emoji,
+      io,
+      messages,
+      rtc,
     });
     const store = createStore(rootReducer, applyMiddleware(thunk));
 
@@ -94,7 +102,9 @@ describe('Conversation — stale-response race protection', () => {
       const navigate = useNavigate();
       return (
         <>
-          <button type="button" onClick={() => navigate('/room/room-b')}>Go to room-b</button>
+          <button type="button" onClick={() => navigate('/room/room-b')}>
+            Go to room-b
+          </button>
           <Routes>
             <Route path="/room/:id" element={<Conversation />} />
           </Routes>
@@ -121,7 +131,9 @@ describe('Conversation — stale-response race protection', () => {
 
     // room-a's fetch finally resolves late — it must NOT clobber room-b.
     resolveRoomA(roomResponse('room-a'));
-    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     expect(store.getState().io.room?._id).toBe('room-b');
   });

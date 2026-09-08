@@ -19,12 +19,17 @@ module.exports = async (req, res) => {
 
   const rawCredential = crypto.randomBytes(32).toString('base64url');
   await SensorCredential.create({
-    sensorId, hostId, credentialHash: SensorCredential.hashCredential(rawCredential),
+    sensorId,
+    hostId,
+    credentialHash: SensorCredential.hashCredential(rawCredential),
   });
 
   logger.info({ sensorId, hostId, adminId: req.user.id }, 'sensor_registered');
 
   res.status(201).json({
-    status: 'success', sensorId, hostId, credential: rawCredential,
+    status: 'success',
+    sensorId,
+    hostId,
+    credential: rawCredential,
   });
 };

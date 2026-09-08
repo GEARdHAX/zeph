@@ -56,8 +56,10 @@ module.exports = async (req, res, next) => {
     // this to author-OR-DELETE_MESSAGE-capability (moderator action) — see
     // groupPolicy.js, DECISIONS.md D-035. DM behavior is unchanged.
     const isAuthor = message.author && message.author.toString() === userID.toString();
-    const isModerator = room.isGroup && groupMembership
-      && groupPolicy.hasCapability(groupMembership.role, groupPolicy.Capabilities.DELETE_MESSAGE);
+    const isModerator =
+      room.isGroup &&
+      groupMembership &&
+      groupPolicy.hasCapability(groupMembership.role, groupPolicy.Capabilities.DELETE_MESSAGE);
     if (!isAuthor && !isModerator) {
       SecurityEventService.record({
         type: 'PERMISSION_DENIED',
@@ -98,7 +100,10 @@ module.exports = async (req, res, next) => {
       // deleting their own message isn't a moderation action.
       if (room.isGroup && isModerator && !isAuthor) {
         await GroupAuditLog.create({
-          group: room._id, actor: userID, action: 'message_deleted_by_admin', metadata: { messageId: messageID },
+          group: room._id,
+          actor: userID,
+          action: 'message_deleted_by_admin',
+          metadata: { messageId: messageID },
         });
       }
 
@@ -106,14 +111,20 @@ module.exports = async (req, res, next) => {
         const personUserID = person.toString();
         if (personUserID !== userID.toString()) {
           store.io.to(personUserID).emit('message-deleted', {
-            roomID, messageID, forEveryone: true, deletedBy: userID,
+            roomID,
+            messageID,
+            forEveryone: true,
+            deletedBy: userID,
           });
         }
       });
     }
 
     return res.status(200).json({
-      status: 'success', messageID, deletedForEveryone: true, deletedAt: message.deletedAt,
+      status: 'success',
+      messageID,
+      deletedForEveryone: true,
+      deletedAt: message.deletedAt,
     });
   }
 

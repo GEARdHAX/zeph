@@ -4,9 +4,7 @@ import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
 import { UserPlus2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
-} from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { previewFriendInvite, acceptFriendInvite } from '../../actions/invites';
 import Config from '../../config';
@@ -41,13 +39,17 @@ function FriendInvitePreview() {
       toast.success(`You're now friends with ${inviter.firstName || inviter.username}!`);
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.reason === 'ALREADY_FRIENDS' ? 'You are already friends.' : 'Could not accept invite.');
+      toast.error(
+        err.response?.data?.reason === 'ALREADY_FRIENDS' ? 'You are already friends.' : 'Could not accept invite.',
+      );
       setState('ready');
     }
   };
 
   const fullName = inviter ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.username : '';
-  const initials = inviter ? `${(inviter.firstName || 'U').charAt(0)}${(inviter.lastName || '').charAt(0)}`.toUpperCase() : '';
+  const initials = inviter
+    ? `${(inviter.firstName || 'U').charAt(0)}${(inviter.lastName || '').charAt(0)}`.toUpperCase()
+    : '';
 
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-4">
@@ -65,7 +67,9 @@ function FriendInvitePreview() {
               </CardDescription>
             </CardHeader>
             <CardFooter className="justify-center">
-              <Button variant="outline" onClick={() => navigate('/')}>Go to zeph.</Button>
+              <Button variant="outline" onClick={() => navigate('/')}>
+                Go to zeph.
+              </Button>
             </CardFooter>
           </>
         )}

@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import {
-  Settings, Plus, Cpu, UserPlus, Users, Lock, Link2, UserPlus2, ArchiveRestore,
-} from 'lucide-react';
+import { Settings, Plus, Cpu, UserPlus, Users, Lock, Link2, UserPlus2, ArchiveRestore } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -86,9 +84,7 @@ function TopBar() {
               className="aspect-square size-full object-cover"
             />
           )}
-          <AvatarFallback className="bg-muted text-xs font-bold text-foreground">
-            {initials}
-          </AvatarFallback>
+          <AvatarFallback className="bg-muted text-xs font-bold text-foreground">{initials}</AvatarFallback>
         </Avatar>
       </div>
 
@@ -124,7 +120,9 @@ function TopBar() {
             aria-label="Add person or create group"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
-            <Plus className={`h-4 w-4 transition-transform duration-200 ${isMenuOpen ? 'rotate-45 text-primary' : ''}`} />
+            <Plus
+              className={`h-4 w-4 transition-transform duration-200 ${isMenuOpen ? 'rotate-45 text-primary' : ''}`}
+            />
           </Button>
 
           {isMenuOpen && (
@@ -185,7 +183,10 @@ function TopBar() {
         <Button
           variant="ghost"
           size="icon"
-          className={cn('h-8 w-8 rounded-full hover:bg-muted hover:text-foreground', nav === 'removed' && 'text-primary')}
+          className={cn(
+            'h-8 w-8 rounded-full hover:bg-muted hover:text-foreground',
+            nav === 'removed' && 'text-primary',
+          )}
           onClick={() => setNav('removed')}
           title="Removed Conversations (Archive)"
           aria-label="Removed Conversations"

@@ -38,7 +38,9 @@ const timeRequest = async (fn) => {
   }
   const ms = Number(process.hrtime.bigint() - start) / 1e6;
   return {
-    ms, ok, detail,
+    ms,
+    ok,
+    detail,
   };
 };
 
@@ -54,7 +56,9 @@ const runBatch = async (label, fn, n) => {
 
 const form = (fields) => {
   const f = new FormData();
-  Object.entries(fields).forEach(([k, v]) => { if (v !== undefined) f.append(k, v); });
+  Object.entries(fields).forEach(([k, v]) => {
+    if (v !== undefined) f.append(k, v);
+  });
   return f;
 };
 
@@ -69,7 +73,12 @@ const registerAndLogin = async (i) => {
   const reg = await fetch(`${baseUrl}/api/register`, {
     method: 'POST',
     body: form({
-      username, email, password: 'LoadTest123!', repeatPassword: 'LoadTest123!', firstName: 'Load', lastName: 'Test',
+      username,
+      email,
+      password: 'LoadTest123!',
+      repeatPassword: 'LoadTest123!',
+      firstName: 'Load',
+      lastName: 'Test',
     }),
   });
   if (!reg.ok) throw new Error(`register ${reg.status}`);
@@ -107,58 +116,80 @@ const main = async () => {
 
   // B. HTTP API: authenticated read (list rooms) — cheap, common, every
   // client hits this on load/reconnect.
-  await runBatch('B. POST /api/rooms/list (list rooms, authenticated)', async () => {
-    const token = tokens[Math.floor(Math.random() * tokens.length)];
-    const res = await fetch(`${baseUrl}/api/rooms/list`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form({}),
-    });
-    if (!res.ok) throw new Error(String(res.status));
-  }, concurrency);
+  await runBatch(
+    'B. POST /api/rooms/list (list rooms, authenticated)',
+    async () => {
+      const token = tokens[Math.floor(Math.random() * tokens.length)];
+      const res = await fetch(`${baseUrl}/api/rooms/list`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form({}),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+    },
+    concurrency,
+  );
 
   // C. DM creation (idempotent upsert path — create-room.js's dmKey) between
   // distinct pairs.
-  await runBatch('C. POST /api/room/create (create/open DM)', async (i) => {
-    const res = await fetch(`${baseUrl}/api/room/create`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${tokens[i]}` },
-      body: form({ counterpart: userIds[i + 1] }),
-    });
-    if (!res.ok) throw new Error(String(res.status));
-  }, concurrency);
+  await runBatch(
+    'C. POST /api/room/create (create/open DM)',
+    async (i) => {
+      const res = await fetch(`${baseUrl}/api/room/create`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens[i]}` },
+        body: form({ counterpart: userIds[i + 1] }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+    },
+    concurrency,
+  );
 
   // D. DM messaging — reuses the DMs C. just created, exercising the
   // idempotent clientID path (Phase 8) under real concurrency.
   const rooms = [];
-  const prepResults = await Promise.all(Array.from({ length: concurrency }, async (_, i) => {
-    try {
-      const res = await fetch(`${baseUrl}/api/room/create`, {
-        method: 'POST', headers: { Authorization: `Bearer ${tokens[i]}` }, body: form({ counterpart: userIds[i + 1] }),
-      });
-      if (!res.ok) return { ok: false, detail: `${res.status} ${await res.text().catch(() => '')}` };
-      const body = await res.json();
-      if (!body.room || !body.room._id) return { ok: false, detail: `no room in body: ${JSON.stringify(body).slice(0, 200)}` };
-      rooms.push({ roomID: body.room._id, senderToken: tokens[i] });
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, detail: err.message };
-    }
-  }));
+  const prepResults = await Promise.all(
+    Array.from({ length: concurrency }, async (_, i) => {
+      try {
+        const res = await fetch(`${baseUrl}/api/room/create`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tokens[i]}` },
+          body: form({ counterpart: userIds[i + 1] }),
+        });
+        if (!res.ok) return { ok: false, detail: `${res.status} ${await res.text().catch(() => '')}` };
+        const body = await res.json();
+        if (!body.room || !body.room._id)
+          return { ok: false, detail: `no room in body: ${JSON.stringify(body).slice(0, 200)}` };
+        rooms.push({ roomID: body.room._id, senderToken: tokens[i] });
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, detail: err.message };
+      }
+    }),
+  );
   const prepFailure = prepResults.find((r) => !r.ok);
   if (prepFailure) console.error(`  [setup] a room-create prep call failed: ${prepFailure.detail}`);
   console.log(`Prepared ${rooms.length} rooms for message-send batch.`);
 
-  await runBatch('D. POST /api/message (DM send)', async (i) => {
-    const r = rooms[i % rooms.length];
-    if (!r) throw new Error('no room available');
-    const res = await fetch(`${baseUrl}/api/message`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${r.senderToken}` },
-      body: form({
-        roomID: r.roomID, content: `load test message ${i}`, type: 'text', clientID: `lt-${Date.now()}-${i}`,
-      }),
-    });
-    if (!res.ok) throw new Error(String(res.status));
-  }, concurrency);
+  await runBatch(
+    'D. POST /api/message (DM send)',
+    async (i) => {
+      const r = rooms[i % rooms.length];
+      if (!r) throw new Error('no room available');
+      const res = await fetch(`${baseUrl}/api/message`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${r.senderToken}` },
+        body: form({
+          roomID: r.roomID,
+          content: `load test message ${i}`,
+          type: 'text',
+          clientID: `lt-${Date.now()}-${i}`,
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+    },
+    concurrency,
+  );
 
   console.log('\nDone.');
   process.exit(0);

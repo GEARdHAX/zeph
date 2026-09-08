@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import {
-  previewText, NewMessageToast, IncomingCallToast, AddedToGroupToast, RemovedFromGroupToast,
-  FriendRequestReceivedToast, FriendRequestAcceptedToast,
+  previewText,
+  NewMessageToast,
+  IncomingCallToast,
+  AddedToGroupToast,
+  RemovedFromGroupToast,
+  FriendRequestReceivedToast,
+  FriendRequestAcceptedToast,
 } from './initIO';
 
 describe('previewText — message toast preview text', () => {
@@ -37,10 +42,13 @@ describe('previewText — message toast preview text', () => {
     ['document', 'Sent a document'],
     ['archive', 'Sent an archive'],
     ['text', 'Sent a text file'],
-  ])('shows the correct label for a new-format %s attachment (regression: previously fell through to "Sent a file")', (category, label) => {
-    const message = { type: 'file', media: { category } };
-    expect(previewText(message)).toBe(label);
-  });
+  ])(
+    'shows the correct label for a new-format %s attachment (regression: previously fell through to "Sent a file")',
+    (category, label) => {
+      const message = { type: 'file', media: { category } };
+      expect(previewText(message)).toBe(label);
+    },
+  );
 
   it('falls back to a generic label only for a genuinely unrecognized category', () => {
     expect(previewText({ type: 'file', media: { category: 'unknown-future-category' } })).toBe('Sent a file');
@@ -68,7 +76,9 @@ describe('NewMessageToast', () => {
   it('shows a correct media label, not "Sent a file", for a document attachment', () => {
     const room = { _id: 'r3', isGroup: false };
     const message = {
-      type: 'file', media: { category: 'document' }, author: { firstName: 'Rohan', lastName: 'K' },
+      type: 'file',
+      media: { category: 'document' },
+      author: { firstName: 'Rohan', lastName: 'K' },
     };
     render(<NewMessageToast room={room} message={message} />);
 

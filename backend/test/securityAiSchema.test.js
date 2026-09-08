@@ -26,7 +26,12 @@ describe('normalizeConfidence', () => {
 
 describe('validateAnalysisOutput', () => {
   const valid = () => ({
-    anomalous: true, confidence: 82, category: 'network_behavior', signals: ['malicious_ip'], explanation: 'Elevated risk due to a confirmed malicious destination.', recommendedAction: 'STEP_UP',
+    anomalous: true,
+    confidence: 82,
+    category: 'network_behavior',
+    signals: ['malicious_ip'],
+    explanation: 'Elevated risk due to a confirmed malicious destination.',
+    recommendedAction: 'STEP_UP',
   });
 
   it('accepts a well-formed response', () => {
@@ -68,7 +73,12 @@ describe('validateAnalysisOutput', () => {
 
   it('never surfaces riskScore/policyDecision/adminRole/trusted/allow even if the model returns them', () => {
     const raw = {
-      ...valid(), riskScore: 100, policyDecision: 'DENY', adminRole: 'root', trusted: true, allow: true,
+      ...valid(),
+      riskScore: 100,
+      policyDecision: 'DENY',
+      adminRole: 'root',
+      trusted: true,
+      allow: true,
     };
     const result = validateAnalysisOutput(raw);
     expect(result.result.riskScore).toBeUndefined();

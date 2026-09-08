@@ -25,7 +25,9 @@ const broadcastPresence = async () => {
   const blockedRelationships = await Relationship.find({
     status: 'blocked',
     $or: [{ requester: { $in: onlineIds } }, { recipient: { $in: onlineIds } }],
-  }).select('requester recipient').lean();
+  })
+    .select('requester recipient')
+    .lean();
 
   // Map of userId -> Set of peer ids they've blocked or been blocked by.
   const blockedPeersOf = new Map();
@@ -38,9 +40,7 @@ const broadcastPresence = async () => {
     blockedPeersOf.get(b).add(a);
   });
 
-  const privilegedIds = new Set(
-    allEntries.filter((e) => isPrivileged({ level: e.level })).map((e) => e.id),
-  );
+  const privilegedIds = new Set(allEntries.filter((e) => isPrivileged({ level: e.level })).map((e) => e.id));
 
   // Never send `level` itself to the client — it's server-side-only
   // filtering metadata, not something any socket needs to render presence.
@@ -53,9 +53,7 @@ const broadcastPresence = async () => {
     const visible = isPrivileged(socket.decoded_token)
       ? allEntries
       : allEntries.filter((e) => !privilegedIds.has(e.id));
-    const view = blockedPeers
-      ? visible.filter((e) => !blockedPeers.has(e.id))
-      : visible;
+    const view = blockedPeers ? visible.filter((e) => !blockedPeers.has(e.id)) : visible;
     socket.emit('onlineUsers', strip(view));
   });
 };

@@ -27,7 +27,9 @@ const pingRedis = async () => {
   try {
     await Promise.race([
       redis.ping(),
-      new Promise((_, reject) => { setTimeout(() => reject(new Error('redis_ping_timeout')), REDIS_PING_TIMEOUT_MS); }),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('redis_ping_timeout')), REDIS_PING_TIMEOUT_MS);
+      }),
     ]);
     return 'connected';
   } catch (err) {
@@ -87,12 +89,18 @@ const ready = async (req, res) => {
   // that's this app's supported single-instance mode.
   if (redis === 'unreachable') {
     return res.status(503).json({
-      ...base, status: 'degraded', db, redis,
+      ...base,
+      status: 'degraded',
+      db,
+      redis,
     });
   }
 
   return res.status(200).json({
-    ...base, status: 'ok', db, redis,
+    ...base,
+    status: 'ok',
+    db,
+    redis,
   });
 };
 

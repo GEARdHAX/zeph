@@ -19,10 +19,7 @@ let cssInjected = null; // the dynamic-import Promise, memoized so the CSS is fe
 // its shipped stylesheet too).
 const loadDriverAssets = async () => {
   if (!cssInjected) {
-    cssInjected = Promise.all([
-      import('driver.js/dist/driver.css'),
-      import('./tourTheme.css'),
-    ]);
+    cssInjected = Promise.all([import('driver.js/dist/driver.css'), import('./tourTheme.css')]);
   }
   await cssInjected;
   const mod = await import('driver.js');

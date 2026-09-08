@@ -147,16 +147,18 @@ module.exports = {
   // CORS origin so there's no separate hostname to keep in sync by hand;
   // override explicitly via VAULT_RP_ID if the deploy topology ever needs a
   // different value than the primary frontend origin.
-  vaultRpId: process.env.VAULT_RP_ID || (() => {
-    try {
-      const corsOrigin = process.env.CORS_ORIGIN
-        ? process.env.CORS_ORIGIN.split(',')[0].trim()
-        : 'http://localhost:5173';
-      return new URL(corsOrigin).hostname;
-    } catch (e) {
-      return 'localhost';
-    }
-  })(),
+  vaultRpId:
+    process.env.VAULT_RP_ID ||
+    (() => {
+      try {
+        const corsOrigin = process.env.CORS_ORIGIN
+          ? process.env.CORS_ORIGIN.split(',')[0].trim()
+          : 'http://localhost:5173';
+        return new URL(corsOrigin).hostname;
+      } catch (e) {
+        return 'localhost';
+      }
+    })(),
   vaultRpName: 'zeph.',
   // Socket.IO Redis adapter (cross-process group room delivery) and the
   // group-deletion cleanup queue — both best-effort. Unset/unreachable

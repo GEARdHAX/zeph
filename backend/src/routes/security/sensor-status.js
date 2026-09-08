@@ -42,7 +42,7 @@ module.exports = async (req, res) => {
   const now = Date.now();
   const result = sensors.map((s) => {
     const lastHeartbeat = s.lastUsedAt || null;
-    const online = lastHeartbeat && (now - new Date(lastHeartbeat).getTime()) < ONLINE_THRESHOLD_MS;
+    const online = lastHeartbeat && now - new Date(lastHeartbeat).getTime() < ONLINE_THRESHOLD_MS;
     return {
       sensorId: s.sensorId,
       hostId: s.hostId,

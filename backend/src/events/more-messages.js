@@ -30,7 +30,9 @@ module.exports = async (socket, data) => {
     return socket.emit('more-messages', { status: 403, messages: [] });
   }
   const boundaryViolation = await roomHasBoundaryViolation({
-    room, callerID, callerLevel: socket.decoded_token.level,
+    room,
+    callerID,
+    callerLevel: socket.decoded_token.level,
   });
   if (boundaryViolation) {
     return socket.emit('more-messages', { status: 404, messages: [] });

@@ -20,31 +20,32 @@ const concurrency = Number(process.argv[2]) || 50;
 const baseUrl = process.argv[3] || 'http://127.0.0.1:4099';
 const CONNECT_TIMEOUT_MS = 10000;
 
-const connectAndAuth = (token) => new Promise((resolve, reject) => {
-  const start = process.hrtime.bigint();
-  const socket = io(baseUrl, { transports: ['websocket'], reconnection: false, timeout: CONNECT_TIMEOUT_MS });
+const connectAndAuth = (token) =>
+  new Promise((resolve, reject) => {
+    const start = process.hrtime.bigint();
+    const socket = io(baseUrl, { transports: ['websocket'], reconnection: false, timeout: CONNECT_TIMEOUT_MS });
 
-  const timer = setTimeout(() => {
-    socket.disconnect();
-    reject(new Error('connect/auth timeout'));
-  }, CONNECT_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      socket.disconnect();
+      reject(new Error('connect/auth timeout'));
+    }, CONNECT_TIMEOUT_MS);
 
-  socket.on('connect', () => socket.emit('authenticate', { token }));
-  socket.on('authenticated', () => {
-    clearTimeout(timer);
-    const ms = Number(process.hrtime.bigint() - start) / 1e6;
-    resolve({ socket, ms });
+    socket.on('connect', () => socket.emit('authenticate', { token }));
+    socket.on('authenticated', () => {
+      clearTimeout(timer);
+      const ms = Number(process.hrtime.bigint() - start) / 1e6;
+      resolve({ socket, ms });
+    });
+    socket.on('unauthorized', (data) => {
+      clearTimeout(timer);
+      socket.disconnect();
+      reject(new Error(`unauthorized: ${data?.message}`));
+    });
+    socket.on('connect_error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
-  socket.on('unauthorized', (data) => {
-    clearTimeout(timer);
-    socket.disconnect();
-    reject(new Error(`unauthorized: ${data?.message}`));
-  });
-  socket.on('connect_error', (err) => {
-    clearTimeout(timer);
-    reject(err);
-  });
-});
 
 const main = async () => {
   console.log(`Phase 8 Socket.IO load test — concurrency=${concurrency}, target=${baseUrl}`);
@@ -60,19 +61,27 @@ const main = async () => {
   // token carried through each result (not just index-implied) so a
   // partial-failure run doesn't desync sockets[i] from the token that
   // authenticated it.
-  const results = await Promise.all(tokens.map(async (token) => {
-    try {
-      const { socket, ms } = await connectAndAuth(token);
-      return {
-        ok: true, socket, ms, token,
-      };
-    } catch (err) {
-      return { ok: false, err };
-    }
-  }));
+  const results = await Promise.all(
+    tokens.map(async (token) => {
+      try {
+        const { socket, ms } = await connectAndAuth(token);
+        return {
+          ok: true,
+          socket,
+          ms,
+          token,
+        };
+      } catch (err) {
+        return { ok: false, err };
+      }
+    }),
+  );
   const ok = results.filter((r) => r.ok);
   const failed = results.filter((r) => !r.ok);
-  const stats = summarize(ok.map((r) => r.ms), { errors: failed.length, total: results.length });
+  const stats = summarize(
+    ok.map((r) => r.ms),
+    { errors: failed.length, total: results.length },
+  );
   printSummary('Connect + authenticate', stats);
   if (failed.length > 0) console.error(`  [first error] ${failed[0].err.message}`);
 
@@ -106,34 +115,52 @@ const main = async () => {
 
     const form = (fields) => {
       const f = new FormData();
-      Object.entries(fields).forEach(([k, v]) => { if (v !== undefined) f.append(k, v); });
+      Object.entries(fields).forEach(([k, v]) => {
+        if (v !== undefined) f.append(k, v);
+      });
       return f;
     };
 
     let firstSendError = null;
-    const deliveryResults = await Promise.all(rooms.map((r, i) => new Promise((resolve) => {
-      const recipientSocket = sockets[(i + 1) % sockets.length];
-      const timer = setTimeout(() => resolve({ ok: false, ms: 5000 }), 5000);
-      const start = process.hrtime.bigint();
-      recipientSocket.once('message-in', () => {
-        clearTimeout(timer);
-        resolve({ ok: true, ms: Number(process.hrtime.bigint() - start) / 1e6 });
-      });
-      fetch(`${baseUrl}/api/message`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${r.senderToken}` },
-        body: form({
-          roomID: r.roomID, content: `socket delivery test ${i}`, type: 'text', clientID: `lt-socket-${Date.now()}-${i}`,
-        }),
-      }).then((res) => {
-        if (!res.ok && !firstSendError) firstSendError = `HTTP send itself failed: ${res.status}`;
-      }).catch((err) => { if (!firstSendError) firstSendError = err.message; });
-    })));
+    const deliveryResults = await Promise.all(
+      rooms.map(
+        (r, i) =>
+          new Promise((resolve) => {
+            const recipientSocket = sockets[(i + 1) % sockets.length];
+            const timer = setTimeout(() => resolve({ ok: false, ms: 5000 }), 5000);
+            const start = process.hrtime.bigint();
+            recipientSocket.once('message-in', () => {
+              clearTimeout(timer);
+              resolve({ ok: true, ms: Number(process.hrtime.bigint() - start) / 1e6 });
+            });
+            fetch(`${baseUrl}/api/message`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${r.senderToken}` },
+              body: form({
+                roomID: r.roomID,
+                content: `socket delivery test ${i}`,
+                type: 'text',
+                clientID: `lt-socket-${Date.now()}-${i}`,
+              }),
+            })
+              .then((res) => {
+                if (!res.ok && !firstSendError) firstSendError = `HTTP send itself failed: ${res.status}`;
+              })
+              .catch((err) => {
+                if (!firstSendError) firstSendError = err.message;
+              });
+          }),
+      ),
+    );
 
     const delivered = deliveryResults.filter((r) => r.ok);
-    const deliveryStats = summarize(delivered.map((r) => r.ms), { errors: deliveryResults.length - delivered.length, total: deliveryResults.length });
+    const deliveryStats = summarize(
+      delivered.map((r) => r.ms),
+      { errors: deliveryResults.length - delivered.length, total: deliveryResults.length },
+    );
     printSummary('Real-time message-in delivery latency (HTTP send -> socket receipt)', deliveryStats);
-    if (firstSendError) console.error(`  [note] some/all underlying HTTP sends failed, not the socket delivery path: ${firstSendError}`);
+    if (firstSendError)
+      console.error(`  [note] some/all underlying HTTP sends failed, not the socket delivery path: ${firstSendError}`);
   }
 
   sockets.forEach((s) => s.disconnect());

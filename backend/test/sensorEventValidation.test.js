@@ -1,4 +1,8 @@
-const { validateSensorEvent, MAX_EVENTS_PER_BATCH, MAX_EVENT_JSON_BYTES } = require('../src/services/ebpf/sensorEventValidation');
+const {
+  validateSensorEvent,
+  MAX_EVENTS_PER_BATCH,
+  MAX_EVENT_JSON_BYTES,
+} = require('../src/services/ebpf/sensorEventValidation');
 
 const validProcessEvent = () => ({
   eventId: 'evt-1',
@@ -19,7 +23,10 @@ describe('sensorEventValidation', () => {
     const result = validateSensorEvent(validProcessEvent());
     expect(result.ok).toBe(true);
     expect(result.event.process).toEqual({
-      name: 'sshd', pid: 1234, parentPid: 1, parentName: 'systemd',
+      name: 'sshd',
+      pid: 1234,
+      parentPid: 1,
+      parentName: 'systemd',
     });
   });
 
@@ -93,7 +100,10 @@ describe('sensorEventValidation', () => {
     const event = {
       ...validProcessEvent(),
       process: {
-        name: 'x', pid: -1, parentPid: 'nope', parentName: 'y',
+        name: 'x',
+        pid: -1,
+        parentPid: 'nope',
+        parentName: 'y',
       },
     };
     const result = validateSensorEvent(event);

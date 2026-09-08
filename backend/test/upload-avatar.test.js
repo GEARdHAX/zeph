@@ -45,9 +45,14 @@ const createUser = async () => {
 const realJpegFixture = async () => {
   const buffer = await sharp({
     create: {
-      width: 8, height: 8, channels: 3, background: { r: 200, g: 50, b: 50 },
+      width: 8,
+      height: 8,
+      channels: 3,
+      background: { r: 200, g: 50, b: 50 },
     },
-  }).jpeg().toBuffer();
+  })
+    .jpeg()
+    .toBuffer();
   const filePath = path.join(os.tmpdir(), `avatar-test-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`);
   fs.writeFileSync(filePath, buffer);
   return filePath;
@@ -97,13 +102,23 @@ describe('POST /api/upload — avatar image goes through storage.js', () => {
     const legacyPath = path.join(tmpDir, 'legacy.jpg');
     const buffer = await sharp({
       create: {
-        width: 4, height: 4, channels: 3, background: { r: 10, g: 10, b: 10 },
+        width: 4,
+        height: 4,
+        channels: 3,
+        background: { r: 10, g: 10, b: 10 },
       },
-    }).jpeg().toBuffer();
+    })
+      .jpeg()
+      .toBuffer();
     fs.writeFileSync(legacyPath, buffer);
 
     const legacyImage = await Image.create({
-      shield: 'legacyshield', name: 'legacy.jpg', location: legacyPath, author: user._id, size: buffer.length, shieldedID: 'legacyshieldedid123',
+      shield: 'legacyshield',
+      name: 'legacy.jpg',
+      location: legacyPath,
+      author: user._id,
+      size: buffer.length,
+      shieldedID: 'legacyshieldedid123',
     });
 
     const serveRes = await request(app).get(`/api/images/${legacyImage.shieldedID}`);

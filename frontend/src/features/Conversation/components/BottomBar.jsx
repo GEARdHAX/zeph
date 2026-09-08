@@ -1,9 +1,5 @@
-import {
-  useRef, useState, useEffect, lazy, Suspense,
-} from 'react';
-import {
-  Send, Image, Smile, Paperclip, Sparkles, ShieldOff, Trash2, Wand2,
-} from 'lucide-react';
+import { useRef, useState, useEffect, lazy, Suspense } from 'react';
+import { Send, Image, Smile, Paperclip, Sparkles, ShieldOff, Trash2, Wand2 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import moment from 'moment';
 import { useDispatch, useSelector } from 'react-redux';
@@ -54,10 +50,13 @@ function BottomBar({ aiEnabled }) {
   // setState after the component (or the whole conversation view) is gone.
   const draftAbortRef = useRef(null);
   const rewriteAbortRef = useRef(null);
-  useEffect(() => () => {
-    draftAbortRef.current?.abort();
-    rewriteAbortRef.current?.abort();
-  }, []);
+  useEffect(
+    () => () => {
+      draftAbortRef.current?.abort();
+      rewriteAbortRef.current?.abort();
+    },
+    [],
+  );
 
   // Image-editor queue — component-local only (never global/Redux), per
   // the feature's own requirement. editorQueue holds raw Files still
@@ -80,9 +79,8 @@ function BottomBar({ aiEnabled }) {
   // axios's onUploadProgress — see uploadImage.js/uploadMedia.js), so a user
   // had zero feedback between picking a file and the message appearing.
   const [uploadProgress, setUploadProgress] = useState([]);
-  const setProgressFor = (id, percent) => setUploadProgress((prev) => prev.map(
-    (item) => (item.id === id ? { ...item, percent } : item),
-  ));
+  const setProgressFor = (id, percent) =>
+    setUploadProgress((prev) => prev.map((item) => (item.id === id ? { ...item, percent } : item)));
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -167,9 +165,13 @@ function BottomBar({ aiEnabled }) {
     // below fires again because a response was lost but the first attempt
     // actually saved, the server recognizes the same clientID and returns
     // the existing message instead of creating a duplicate.
-    const sendRequest = () => message({
-      roomID: room._id, content: text, type: 'text', clientID,
-    });
+    const sendRequest = () =>
+      message({
+        roomID: room._id,
+        content: text,
+        type: 'text',
+        clientID,
+      });
 
     retryWithBackoff(sendRequest)
       .then((res) => {
@@ -457,7 +459,10 @@ function BottomBar({ aiEnabled }) {
   }
 
   return (
-    <div data-tour="message-composer" className="relative flex w-full items-end gap-1.5 sm:gap-2 border-t border-border/60 bg-card px-2.5 sm:px-4 py-2 sm:py-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-2.5 text-card-foreground">
+    <div
+      data-tour="message-composer"
+      className="relative flex w-full items-end gap-1.5 sm:gap-2 border-t border-border/60 bg-card px-2.5 sm:px-4 py-2 sm:py-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-2.5 text-card-foreground"
+    >
       {uploadProgress.length > 0 && (
         <div className="absolute -top-1.5 left-3.5 right-3.5 flex -translate-y-full flex-col gap-1.5 rounded-xl border border-border/60 bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm">
           {uploadProgress.map((item) => (
@@ -476,7 +481,10 @@ function BottomBar({ aiEnabled }) {
       )}
 
       {isPicker && (
-        <div ref={pickerRef} className="absolute bottom-[84px] left-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-border">
+        <div
+          ref={pickerRef}
+          className="absolute bottom-[84px] left-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-border"
+        >
           <Picker
             data={data}
             onEmojiSelect={(emoji) => setText((prev) => prev + (emoji.native || ''))}
@@ -594,21 +602,13 @@ function BottomBar({ aiEnabled }) {
 
       {editorQueue.length > 0 && (
         <Suspense fallback={<LazyFallback />}>
-          <ImageEditorModal
-            file={editorQueue[0]}
-            onCancel={cancelImageEditor}
-            onDone={finishImageEdit}
-          />
+          <ImageEditorModal file={editorQueue[0]} onCancel={cancelImageEditor} onDone={finishImageEdit} />
         </Suspense>
       )}
 
       {videoQueue.length > 0 && (
         <Suspense fallback={<LazyFallback />}>
-          <VideoEditorModal
-            file={videoQueue[0]}
-            onCancel={cancelVideoEditor}
-            onDone={finishVideoEdit}
-          />
+          <VideoEditorModal file={videoQueue[0]} onCancel={cancelVideoEditor} onDone={finishVideoEdit} />
         </Suspense>
       )}
     </div>

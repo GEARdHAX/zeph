@@ -24,7 +24,10 @@ const getClient = () => {
   if (!store.config?.redisUrl) return null;
   if (!client) {
     client = new IORedis(store.config.redisUrl, {
-      maxRetriesPerRequest: 1, connectTimeout: 3000, retryStrategy: () => null, lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+      retryStrategy: () => null,
+      lazyConnect: true,
     });
     client.on('error', (err) => logger.warn({ err }, 'Zero Trust risk cache Redis error'));
   }
@@ -49,7 +52,8 @@ const getCachedRiskContext = async (sessionId, computeFn) => {
 
   const fresh = await computeFn();
   if (fresh) {
-    redis.set(cacheKey(sessionId), JSON.stringify(fresh), 'EX', TTL_SECONDS)
+    redis
+      .set(cacheKey(sessionId), JSON.stringify(fresh), 'EX', TTL_SECONDS)
       .catch((err) => logger.warn({ err, sessionId }, 'Failed to write Zero Trust risk cache'));
   }
   return fresh;
@@ -66,7 +70,9 @@ const invalidateRiskContext = async (sessionId) => {
   if (!sessionId) return;
   const redis = getClient();
   if (!redis) return;
-  await redis.del(cacheKey(sessionId)).catch((err) => logger.warn({ err, sessionId }, 'Failed to invalidate Zero Trust risk cache'));
+  await redis
+    .del(cacheKey(sessionId))
+    .catch((err) => logger.warn({ err, sessionId }, 'Failed to invalidate Zero Trust risk cache'));
 };
 
 // Test-only escape hatch — same reasoning as queues/connection.js's

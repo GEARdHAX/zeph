@@ -34,17 +34,31 @@ module.exports = async (req, res) => {
   let room;
   try {
     room = await new Room({
-      people: memberIds, isGroup: true, title: xss(title), picture, ownerId, privacy: 'PRIVATE',
+      people: memberIds,
+      isGroup: true,
+      title: xss(title),
+      picture,
+      ownerId,
+      privacy: 'PRIVATE',
     }).save();
 
     await GroupMember.create({
-      group: room._id, user: ownerId, role: 'OWNER', joinedVia: 'CREATED',
+      group: room._id,
+      user: ownerId,
+      role: 'OWNER',
+      joinedVia: 'CREATED',
     });
     const otherIds = memberIds.filter((id) => id !== ownerId.toString());
     if (otherIds.length) {
-      await GroupMember.insertMany(otherIds.map((id) => ({
-        group: room._id, user: id, role: 'MEMBER', joinedVia: 'ADDED', invitedBy: ownerId,
-      })));
+      await GroupMember.insertMany(
+        otherIds.map((id) => ({
+          group: room._id,
+          user: id,
+          role: 'MEMBER',
+          joinedVia: 'ADDED',
+          invitedBy: ownerId,
+        })),
+      );
     }
   } catch (err) {
     if (room) {

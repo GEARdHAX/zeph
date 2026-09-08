@@ -39,7 +39,10 @@ const createUser = async () => {
 const PNG_BYTES = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0];
 
 const uploadPng = async (user) => {
-  const filePath = path.join(os.tmpdir(), `media-serving-test-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
+  const filePath = path.join(
+    os.tmpdir(),
+    `media-serving-test-${Date.now()}-${Math.random().toString(36).slice(2)}.png`,
+  );
   fs.writeFileSync(filePath, Buffer.from(PNG_BYTES));
   const res = await request(app)
     .post('/api/upload/media')

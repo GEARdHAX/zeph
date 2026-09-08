@@ -7,11 +7,7 @@ import ZephWordmark from '../components/ZephWordmark';
 
 function FirstLoginTourSuggestionToastBody({ onAccept }) {
   return (
-    <button
-      type="button"
-      onClick={onAccept}
-      className="flex w-full cursor-pointer items-center gap-2.5 text-left"
-    >
+    <button type="button" onClick={onAccept} className="flex w-full cursor-pointer items-center gap-2.5 text-left">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
         <Compass className="h-4 w-4" />
       </div>
@@ -34,10 +30,10 @@ function FirstLoginTourSuggestion() {
     if (!isNewRegistration) return;
     setIsNewRegistration(false);
 
-    toast(
-      <FirstLoginTourSuggestionToastBody onAccept={() => start()} />,
-      { toastId: 'first-login-tour-suggestion', autoClose: 8000 },
-    );
+    toast(<FirstLoginTourSuggestionToastBody onAccept={() => start()} />, {
+      toastId: 'first-login-tour-suggestion',
+      autoClose: 8000,
+    });
   }, [isNewRegistration]);
 
   return null;

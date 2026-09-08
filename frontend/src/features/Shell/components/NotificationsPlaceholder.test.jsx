@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
@@ -34,8 +32,12 @@ function fakeSocket() {
   const handlers = {};
   return {
     id: 'sock-1',
-    on: vi.fn((event, cb) => { handlers[event] = cb; }),
-    off: vi.fn((event) => { delete handlers[event]; }),
+    on: vi.fn((event, cb) => {
+      handlers[event] = cb;
+    }),
+    off: vi.fn((event) => {
+      delete handlers[event];
+    }),
     fire: (event, data) => handlers[event]?.(data),
   };
 }

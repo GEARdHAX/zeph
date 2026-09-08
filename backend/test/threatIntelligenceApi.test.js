@@ -34,20 +34,21 @@ const createUser = async (overrides = {}) => {
 
 const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root' });
 
-const seedIndicator = (overrides = {}) => ThreatIndicator.create({
-  indicator: overrides.indicator || '203.0.113.10',
-  normalizedIndicator: overrides.normalizedIndicator || '203.0.113.10',
-  type: overrides.type || 'IP',
-  status: overrides.status || 'MALICIOUS',
-  confidence: overrides.confidence ?? 90,
-  severity: overrides.severity || 'high',
-  categories: overrides.categories || ['ABUSE'],
-  source: overrides.source || 'abuseipdb',
-  firstSeen: overrides.firstSeen || new Date(),
-  lastSeen: overrides.lastSeen || new Date(),
-  expiresAt: overrides.expiresAt || new Date(Date.now() + 60 * 60 * 1000),
-  metadata: overrides.metadata || {},
-});
+const seedIndicator = (overrides = {}) =>
+  ThreatIndicator.create({
+    indicator: overrides.indicator || '203.0.113.10',
+    normalizedIndicator: overrides.normalizedIndicator || '203.0.113.10',
+    type: overrides.type || 'IP',
+    status: overrides.status || 'MALICIOUS',
+    confidence: overrides.confidence ?? 90,
+    severity: overrides.severity || 'high',
+    categories: overrides.categories || ['ABUSE'],
+    source: overrides.source || 'abuseipdb',
+    firstSeen: overrides.firstSeen || new Date(),
+    lastSeen: overrides.lastSeen || new Date(),
+    expiresAt: overrides.expiresAt || new Date(Date.now() + 60 * 60 * 1000),
+    metadata: overrides.metadata || {},
+  });
 
 describe('GET /api/security/threat-intelligence — RBAC (spec section 28/41)', () => {
   it('a standard user gets 404, not 403 (same anti-enumeration convention as security/events)', async () => {
@@ -77,7 +78,9 @@ describe('GET /api/security/threat-intelligence — listing and filtering', () =
   it('lists indicators newest-updated-first', async () => {
     const admin = await createAdmin();
     await seedIndicator({ indicator: '203.0.113.1', normalizedIndicator: '203.0.113.1' });
-    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
     await seedIndicator({ indicator: '203.0.113.2', normalizedIndicator: '203.0.113.2' });
 
     const res = await request(app)
@@ -91,7 +94,9 @@ describe('GET /api/security/threat-intelligence — listing and filtering', () =
     const admin = await createAdmin();
     await seedIndicator({ normalizedIndicator: '203.0.113.5', type: 'IP' });
     await seedIndicator({
-      normalizedIndicator: 'evil.example.com', type: 'DOMAIN', indicator: 'evil.example.com',
+      normalizedIndicator: 'evil.example.com',
+      type: 'DOMAIN',
+      indicator: 'evil.example.com',
     });
 
     const res = await request(app)
@@ -142,7 +147,9 @@ describe('GET /api/security/threat-intelligence — listing and filtering', () =
       // eslint-disable-next-line no-await-in-loop
       await seedIndicator({ normalizedIndicator: `203.0.113.${20 + i}` });
       // eslint-disable-next-line no-await-in-loop
-      await new Promise((resolve) => { setTimeout(resolve, 5); });
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5);
+      });
     }
 
     const firstPage = await request(app)
@@ -178,7 +185,9 @@ describe('GET /api/security/threat-intelligence/:indicator — manual lookup (sp
   it('normalizes the path param before looking up (case-insensitive)', async () => {
     const admin = await createAdmin();
     await seedIndicator({
-      normalizedIndicator: 'evil.example.com', type: 'DOMAIN', indicator: 'evil.example.com',
+      normalizedIndicator: 'evil.example.com',
+      type: 'DOMAIN',
+      indicator: 'evil.example.com',
     });
 
     const res = await request(app)

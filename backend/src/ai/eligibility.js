@@ -9,9 +9,7 @@ const { REJECTION_REASONS } = require('./policy');
 // conversationType comes from the caller (room.isGroup), not guessed here —
 // keeps this module a pure function of its inputs, easy to unit test.
 const checkSummaryEligibility = async (policy, roomId, conversationType) => {
-  const minMessages = conversationType === 'group'
-    ? policy.groupSummary.minMessages
-    : policy.dmSummary.minMessages;
+  const minMessages = conversationType === 'group' ? policy.groupSummary.minMessages : policy.dmSummary.minMessages;
 
   const count = await Message.countDocuments({ room: roomId, type: 'text' });
   if (count < minMessages) {
@@ -23,7 +21,12 @@ const checkSummaryEligibility = async (policy, roomId, conversationType) => {
 const checkTitleEligibility = async (policy, roomId) => {
   const count = await Message.countDocuments({ room: roomId, type: 'text' });
   if (count < policy.conversationTitle.minMessages) {
-    return { eligible: false, reason: REJECTION_REASONS.INSUFFICIENT_CONTEXT, minMessages: policy.conversationTitle.minMessages, count };
+    return {
+      eligible: false,
+      reason: REJECTION_REASONS.INSUFFICIENT_CONTEXT,
+      minMessages: policy.conversationTitle.minMessages,
+      count,
+    };
   }
   return { eligible: true, count };
 };
@@ -31,7 +34,12 @@ const checkTitleEligibility = async (policy, roomId) => {
 const checkTopicEligibility = async (policy, roomId) => {
   const count = await Message.countDocuments({ room: roomId, type: 'text' });
   if (count < policy.groupTopicExtraction.minMessages) {
-    return { eligible: false, reason: REJECTION_REASONS.INSUFFICIENT_CONTEXT, minMessages: policy.groupTopicExtraction.minMessages, count };
+    return {
+      eligible: false,
+      reason: REJECTION_REASONS.INSUFFICIENT_CONTEXT,
+      minMessages: policy.groupTopicExtraction.minMessages,
+      count,
+    };
   }
   return { eligible: true, count };
 };
@@ -43,9 +51,8 @@ const checkAlwaysEligible = async () => ({ eligible: true });
 
 // Freshness (Phase 7): given an existing cached summary's message count and
 // the room's current count, decide whether regeneration is warranted.
-const isSummaryStale = (policy, messageCountAtSummary, currentCount) => (
-  currentCount - messageCountAtSummary >= policy.summaryFreshness.minNewMessages
-);
+const isSummaryStale = (policy, messageCountAtSummary, currentCount) =>
+  currentCount - messageCountAtSummary >= policy.summaryFreshness.minNewMessages;
 
 // Meeting summary eligibility (Phase 14) — pure function of the Meeting
 // document plus a word count (the caller supplies wordCount from the
@@ -63,25 +70,37 @@ const checkMeetingSummaryEligibility = (policy, meeting, transcriptWordCount) =>
   const durationSeconds = (new Date(meeting.endedAt) - new Date(meeting.startedAt)) / 1000;
   if (durationSeconds < meetingSummary.minDurationSeconds) {
     return {
-      eligible: false, reason: 'MEETING_TOO_SHORT', minDurationSeconds: meetingSummary.minDurationSeconds, durationSeconds,
+      eligible: false,
+      reason: 'MEETING_TOO_SHORT',
+      minDurationSeconds: meetingSummary.minDurationSeconds,
+      durationSeconds,
     };
   }
 
   const participantCount = (meeting.users || []).length;
   if (participantCount < meetingSummary.minParticipants) {
     return {
-      eligible: false, reason: 'INSUFFICIENT_PARTICIPANTS', minParticipants: meetingSummary.minParticipants, participantCount,
+      eligible: false,
+      reason: 'INSUFFICIENT_PARTICIPANTS',
+      minParticipants: meetingSummary.minParticipants,
+      participantCount,
     };
   }
 
   if (typeof transcriptWordCount === 'number' && transcriptWordCount < meetingSummary.minTranscriptWords) {
     return {
-      eligible: false, reason: 'INSUFFICIENT_TRANSCRIPT', minTranscriptWords: meetingSummary.minTranscriptWords, transcriptWordCount,
+      eligible: false,
+      reason: 'INSUFFICIENT_TRANSCRIPT',
+      minTranscriptWords: meetingSummary.minTranscriptWords,
+      transcriptWordCount,
     };
   }
 
   return {
-    eligible: true, durationSeconds, participantCount, transcriptWordCount,
+    eligible: true,
+    durationSeconds,
+    participantCount,
+    transcriptWordCount,
   };
 };
 

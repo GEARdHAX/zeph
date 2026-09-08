@@ -2,7 +2,10 @@ require('dotenv').config();
 const store = require('../src/store');
 const config = require('../config');
 const {
-  getCachedAnalysis, setCachedAnalysis, closeSecurityAiCacheConnection, contextHash,
+  getCachedAnalysis,
+  setCachedAnalysis,
+  closeSecurityAiCacheConnection,
+  contextHash,
 } = require('../src/services/securityAi/cache');
 
 describe('securityAi cache — Redis unavailable (test default)', () => {
@@ -17,7 +20,9 @@ describe('securityAi cache — Redis unavailable (test default)', () => {
   it('setCachedAnalysis resolves without throwing when Redis is unavailable', async () => {
     const original = store.config;
     store.config = { ...config, redisUrl: null };
-    await expect(setCachedAnalysis('ANOMALY', { failedLoginCount: 1 }, { anomalous: true }, 60)).resolves.toBeUndefined();
+    await expect(
+      setCachedAnalysis('ANOMALY', { failedLoginCount: 1 }, { anomalous: true }, 60),
+    ).resolves.toBeUndefined();
     store.config = original;
   });
 
@@ -74,7 +79,9 @@ describeIfRedis('securityAi cache — real Redis', () => {
   it('respects TTL — an expired entry is a miss', async () => {
     const context = { failedLoginCount: `${Date.now()}-3` };
     await setCachedAnalysis('ANOMALY', context, { anomalous: false }, 1, 'user-w');
-    await new Promise((resolve) => { setTimeout(resolve, 1200); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1200);
+    });
     const retrieved = await getCachedAnalysis('ANOMALY', context, 'user-w');
     expect(retrieved).toBeNull();
   });

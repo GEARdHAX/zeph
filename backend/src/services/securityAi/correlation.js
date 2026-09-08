@@ -38,8 +38,14 @@ const CORRELATION_WINDOW_MS = 15 * 60 * 1000; // spec section 8's "15 minutes" o
 // engines (Phase 4's anomalyRules.js, Phase 5's networkRules.js) already
 // produced are).
 const CORRELATABLE_TYPES = new Set([
-  'PROCESS_ANOMALY', 'NETWORK_ANOMALY', 'PORT_SCAN_ANOMALY', 'HOST_SCAN_ANOMALY',
-  'POSSIBLE_BEACONING', 'POSSIBLE_DATA_EXFILTRATION', 'DNS_ANOMALY', 'THREAT_INTEL_NETWORK_MATCH',
+  'PROCESS_ANOMALY',
+  'NETWORK_ANOMALY',
+  'PORT_SCAN_ANOMALY',
+  'HOST_SCAN_ANOMALY',
+  'POSSIBLE_BEACONING',
+  'POSSIBLE_DATA_EXFILTRATION',
+  'DNS_ANOMALY',
+  'THREAT_INTEL_NETWORK_MATCH',
 ]);
 
 const correlationKeyFor = (sensorId, timestamp) => {
@@ -139,5 +145,10 @@ const contextForIncident = (incident) => ({
 });
 
 module.exports = {
-  correlateEvent, correlationKeyFor, contextForIncident, CORRELATABLE_TYPES, CORRELATION_WINDOW_MS, SIGNAL_LABEL_BY_TYPE,
+  correlateEvent,
+  correlationKeyFor,
+  contextForIncident,
+  CORRELATABLE_TYPES,
+  CORRELATION_WINDOW_MS,
+  SIGNAL_LABEL_BY_TYPE,
 };

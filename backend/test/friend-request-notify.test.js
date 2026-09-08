@@ -46,13 +46,15 @@ const waitFor = async (assertion, { timeoutMs = 1000, intervalMs = 20 } = {}) =>
     } catch (err) {
       if (Date.now() - start > timeoutMs) throw err;
       // eslint-disable-next-line no-await-in-loop
-      await new Promise((resolve) => { setTimeout(resolve, intervalMs); });
+      await new Promise((resolve) => {
+        setTimeout(resolve, intervalMs);
+      });
     }
   }
 };
 
 describe('Friend request realtime notifications', () => {
-  it('POST /api/friend-requests emits friend-request:received to the recipient with the requester\'s public profile', async () => {
+  it("POST /api/friend-requests emits friend-request:received to the recipient with the requester's public profile", async () => {
     const me = await createUser({ username: 'Alice', firstName: 'Alice', lastName: 'A' });
     const rohan = await createUser({ username: 'Rohan' });
     const emitSpy = jest.fn();
@@ -66,9 +68,12 @@ describe('Friend request realtime notifications', () => {
 
     await waitFor(() => {
       expect(store.io.to).toHaveBeenCalledWith(rohan._id.toString());
-      expect(emitSpy).toHaveBeenCalledWith('friend-request:received', expect.objectContaining({
-        requester: expect.objectContaining({ username: 'Alice', firstName: 'Alice' }),
-      }));
+      expect(emitSpy).toHaveBeenCalledWith(
+        'friend-request:received',
+        expect.objectContaining({
+          requester: expect.objectContaining({ username: 'Alice', firstName: 'Alice' }),
+        }),
+      );
     });
   });
 
@@ -86,14 +91,20 @@ describe('Friend request realtime notifications', () => {
     expect(res.status).toBe(409);
 
     // Give any stray async work a moment, then confirm nothing fired.
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     expect(store.io.to).not.toHaveBeenCalled();
   });
 
   it('POST /api/friend-requests/:id/accept emits friend-request:accepted to the original requester', async () => {
     const requester = await createUser({ username: 'Carol' });
     const recipient = await createUser({ username: 'Dave', firstName: 'Dave', lastName: 'D' });
-    const relationship = await Relationship.create({ requester: requester._id, recipient: recipient._id, status: 'pending' });
+    const relationship = await Relationship.create({
+      requester: requester._id,
+      recipient: recipient._id,
+      status: 'pending',
+    });
     const emitSpy = jest.fn();
     store.io.to = jest.fn(() => ({ emit: emitSpy }));
 
@@ -104,9 +115,12 @@ describe('Friend request realtime notifications', () => {
 
     await waitFor(() => {
       expect(store.io.to).toHaveBeenCalledWith(requester._id.toString());
-      expect(emitSpy).toHaveBeenCalledWith('friend-request:accepted', expect.objectContaining({
-        accepter: expect.objectContaining({ username: 'Dave', firstName: 'Dave' }),
-      }));
+      expect(emitSpy).toHaveBeenCalledWith(
+        'friend-request:accepted',
+        expect.objectContaining({
+          accepter: expect.objectContaining({ username: 'Dave', firstName: 'Dave' }),
+        }),
+      );
     });
   });
 
@@ -114,7 +128,11 @@ describe('Friend request realtime notifications', () => {
     const requester = await createUser({ username: 'Eve' });
     const recipient = await createUser({ username: 'Frank' });
     const bystander = await createUser({ username: 'Grace' });
-    const relationship = await Relationship.create({ requester: requester._id, recipient: recipient._id, status: 'pending' });
+    const relationship = await Relationship.create({
+      requester: requester._id,
+      recipient: recipient._id,
+      status: 'pending',
+    });
     const emitSpy = jest.fn();
     store.io.to = jest.fn(() => ({ emit: emitSpy }));
 
@@ -123,7 +141,9 @@ describe('Friend request realtime notifications', () => {
       .set('Authorization', `Bearer ${tokenFor(bystander)}`);
     expect(res.status).toBe(404);
 
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     expect(store.io.to).not.toHaveBeenCalled();
   });
 });

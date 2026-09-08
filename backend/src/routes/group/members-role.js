@@ -26,9 +26,14 @@ module.exports = async (req, res) => {
   const targetMembership = await groupPolicy.getMembership(room._id, userId);
   if (!targetMembership) return res.status(404).json({ error: true });
 
-  if (!groupPolicy.hasCapability(actorMembership.role, groupPolicy.Capabilities.MANAGE_ADMINS)
-    || !groupPolicy.canChangeRole({ actorRole: actorMembership.role, targetRole: targetMembership.role, newRole: role })) {
-    logger.warn({ groupId: room._id, actorId, targetId: userId, reason: 'role_hierarchy' }, 'group_unauthorized_access_attempt');
+  if (
+    !groupPolicy.hasCapability(actorMembership.role, groupPolicy.Capabilities.MANAGE_ADMINS) ||
+    !groupPolicy.canChangeRole({ actorRole: actorMembership.role, targetRole: targetMembership.role, newRole: role })
+  ) {
+    logger.warn(
+      { groupId: room._id, actorId, targetId: userId, reason: 'role_hierarchy' },
+      'group_unauthorized_access_attempt',
+    );
     return res.status(403).json({ error: true });
   }
 
@@ -51,10 +56,22 @@ module.exports = async (req, res) => {
     metadata: { oldRole: targetMembership.role, newRole: role },
   });
 
-  logger.info({
-    groupId: room._id, actorId, targetId: userId, oldRole: targetMembership.role, newRole: role,
-  }, 'group_role_changed');
-  broadcastToGroup(room.people, 'group:member:role-updated', { groupId: room._id, userId, role }, { excludeUserId: actorId });
+  logger.info(
+    {
+      groupId: room._id,
+      actorId,
+      targetId: userId,
+      oldRole: targetMembership.role,
+      newRole: role,
+    },
+    'group_role_changed',
+  );
+  broadcastToGroup(
+    room.people,
+    'group:member:role-updated',
+    { groupId: room._id, userId, role },
+    { excludeUserId: actorId },
+  );
 
   res.status(200).json({ status: 'success', role });
 };

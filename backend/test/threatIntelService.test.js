@@ -4,7 +4,11 @@ const db = require('./helpers/db');
 const ThreatIndicator = require('../src/models/ThreatIndicator');
 const SecurityEvent = require('../src/models/SecurityEvent');
 const { closeThreatIntelCacheConnection } = require('../src/services/threatIntel/cache');
-const { MOCK_MALICIOUS_IP, MOCK_CLEAN_IP, buildMockProvider } = require('../src/services/threatIntel/providers/mockProvider');
+const {
+  MOCK_MALICIOUS_IP,
+  MOCK_CLEAN_IP,
+  buildMockProvider,
+} = require('../src/services/threatIntel/providers/mockProvider');
 
 jest.mock('../src/services/threatIntel/provider');
 // eslint-disable-next-line import/order
@@ -23,7 +27,12 @@ afterAll(async () => {
 
 beforeEach(() => {
   store.config = {
-    ...config, redisUrl: null, abuseIpDbEnabled: true, abuseIpDbApiKey: 'test-key', abuseIpDbDailyBudget: 800, threatIntelCacheTtlSeconds: 21600,
+    ...config,
+    redisUrl: null,
+    abuseIpDbEnabled: true,
+    abuseIpDbApiKey: 'test-key',
+    abuseIpDbDailyBudget: 800,
+    threatIntelCacheTtlSeconds: 21600,
   };
   // Circuit breaker is module-level shared state (see circuitBreaker.js's
   // own header comment on why it's in-process) — reset it directly between
@@ -107,7 +116,9 @@ describe('threatIntelService.lookup — provider results', () => {
   it('records a THREAT_INTEL_MATCH SecurityEvent for a malicious result', async () => {
     getProvider.mockReturnValue(buildMockProvider());
     await threatIntelService.lookup(MOCK_MALICIOUS_IP);
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     const event = await SecurityEvent.findOne({ type: 'THREAT_INTEL_MATCH' });
     expect(event).not.toBeNull();
     expect(event.metadata.confidence).toBe(94);
@@ -116,7 +127,9 @@ describe('threatIntelService.lookup — provider results', () => {
   it('does NOT record a THREAT_INTEL_MATCH event for a clean result (no log spam per clean check)', async () => {
     getProvider.mockReturnValue(buildMockProvider());
     await threatIntelService.lookup(MOCK_CLEAN_IP);
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     const event = await SecurityEvent.findOne({ type: 'THREAT_INTEL_MATCH' });
     expect(event).toBeNull();
   });
@@ -166,7 +179,7 @@ describe('threatIntelService.lookup — circuit breaker integration', () => {
   });
 });
 
-describe('threatIntelService.lookup — quota (Redis unavailable = fail-open on the tracking mechanism, per quota.js\'s own documented contract)', () => {
+describe("threatIntelService.lookup — quota (Redis unavailable = fail-open on the tracking mechanism, per quota.js's own documented contract)", () => {
   it('a lookup still succeeds when Redis (and therefore quota tracking) is unavailable', async () => {
     const mock = buildMockProvider();
     getProvider.mockReturnValue(mock);

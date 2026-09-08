@@ -1,9 +1,5 @@
-import {
-  describe, it, expect, beforeEach,
-} from 'vitest';
-import {
-  getTourState, setTourState, clearTourState, clearAllTourStateForUser, TourStatus,
-} from './tourStorage';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { getTourState, setTourState, clearTourState, clearAllTourStateForUser, TourStatus } from './tourStorage';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -26,7 +22,7 @@ describe('tourStorage', () => {
     expect(getTourState('user-1', 'chat')).toEqual({ status: TourStatus.IN_PROGRESS, currentStep: 2 });
   });
 
-  it('scopes state per user — two users never see each other\'s progress', () => {
+  it("scopes state per user — two users never see each other's progress", () => {
     setTourState('user-1', 'chat', { status: TourStatus.COMPLETED });
     setTourState('user-2', 'chat', { status: TourStatus.NOT_STARTED });
 
@@ -66,7 +62,10 @@ describe('tourStorage', () => {
 
   it('never stores anything beyond the documented status/step/version/timestamp shape', () => {
     setTourState('user-1', 'chat', {
-      status: TourStatus.COMPLETED, currentStep: 5, version: 1, completedAt: 123456,
+      status: TourStatus.COMPLETED,
+      currentStep: 5,
+      version: 1,
+      completedAt: 123456,
     });
     const raw = window.localStorage.getItem('zeph:tours:user-1:chat');
     const parsed = JSON.parse(raw);
@@ -75,7 +74,9 @@ describe('tourStorage', () => {
 
   it('falls back to an in-memory store without throwing when localStorage.setItem throws (spec: unavailable storage)', () => {
     const original = window.localStorage.setItem;
-    window.localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    window.localStorage.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
 
     expect(() => setTourState('user-3', 'chat', { status: TourStatus.IN_PROGRESS })).not.toThrow();
 

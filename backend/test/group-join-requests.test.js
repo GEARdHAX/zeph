@@ -32,15 +32,17 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
-const requestJoin = (user, groupId) => request(app)
-  .post('/api/group/join-requests')
-  .set('Authorization', `Bearer ${tokenFor(user)}`)
-  .send({ groupId });
+const requestJoin = (user, groupId) =>
+  request(app)
+    .post('/api/group/join-requests')
+    .set('Authorization', `Bearer ${tokenFor(user)}`)
+    .send({ groupId });
 
 describe('Join request creation', () => {
   it('creates a PENDING membership row', async () => {
@@ -83,7 +85,11 @@ describe('Join request creation', () => {
     const group = await createGroup(owner);
 
     await GroupMember.create({
-      group: group.body._id, user: requester._id, role: 'MEMBER', status: 'LEFT', active: false,
+      group: group.body._id,
+      user: requester._id,
+      role: 'MEMBER',
+      status: 'LEFT',
+      active: false,
     });
 
     const res = await requestJoin(requester, group.body._id);
@@ -132,22 +138,26 @@ describe('Join request approval', () => {
   // gets approved, stayed permanently invisible in rooms/list — nothing
   // cleared the stale ConversationUserState.deletedAt tombstone on
   // approval. See unhideConversationForUser.js.
-  it('reappears in the requester\'s inbox after being deleted, removed, then re-approved', async () => {
+  it("reappears in the requester's inbox after being deleted, removed, then re-approved", async () => {
     const owner = await createUser();
     const requester = await createUser();
     const group = await createGroup(owner, [requester._id]);
     const groupId = group.body._id;
 
-    await request(app).post('/api/group/members/remove')
+    await request(app)
+      .post('/api/group/members/remove')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: requester._id.toString() });
 
-    await request(app).post('/api/conversation/delete')
+    await request(app)
+      .post('/api/conversation/delete')
       .set('Authorization', `Bearer ${tokenFor(requester)}`)
       .send({ conversationId: groupId });
 
-    const listBefore = await request(app).post('/api/rooms/list')
-      .set('Authorization', `Bearer ${tokenFor(requester)}`).send({});
+    const listBefore = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(requester)}`)
+      .send({});
     expect(listBefore.body.rooms.map((r) => r._id)).not.toContain(groupId);
 
     await requestJoin(requester, groupId);
@@ -157,8 +167,10 @@ describe('Join request approval', () => {
       .send({ groupId });
     expect(approve.status).toBe(200);
 
-    const listAfter = await request(app).post('/api/rooms/list')
-      .set('Authorization', `Bearer ${tokenFor(requester)}`).send({});
+    const listAfter = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(requester)}`)
+      .send({});
     expect(listAfter.body.rooms.map((r) => r._id)).toContain(groupId);
   });
 
@@ -182,10 +194,11 @@ describe('Join request approval', () => {
     const group = await createGroup(owner);
     await requestJoin(requester, group.body._id);
 
-    const approve = (u) => request(app)
-      .post(`/api/group/join-requests/${requester._id}/approve`)
-      .set('Authorization', `Bearer ${tokenFor(owner)}`)
-      .send({ groupId: group.body._id });
+    const approve = (u) =>
+      request(app)
+        .post(`/api/group/join-requests/${requester._id}/approve`)
+        .set('Authorization', `Bearer ${tokenFor(owner)}`)
+        .send({ groupId: group.body._id });
 
     const first = await approve(owner);
     expect(first.status).toBe(200);
@@ -232,7 +245,11 @@ describe('Banned users cannot join-request', () => {
     const banned = await createUser();
     const group = await createGroup(owner);
     await GroupMember.create({
-      group: group.body._id, user: banned._id, role: 'MEMBER', status: 'BANNED', active: false,
+      group: group.body._id,
+      user: banned._id,
+      role: 'MEMBER',
+      status: 'BANNED',
+      active: false,
     });
 
     const res = await requestJoin(banned, group.body._id);

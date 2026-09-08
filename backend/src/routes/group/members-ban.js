@@ -28,9 +28,14 @@ module.exports = async (req, res) => {
   const targetMembership = await groupPolicy.getMembership(room._id, userId);
   if (!targetMembership) return res.status(404).json({ error: true });
 
-  if (!groupPolicy.hasCapability(actorMembership.role, groupPolicy.Capabilities.BAN_MEMBER)
-    || !groupPolicy.canRemoveMember({ actorRole: actorMembership.role, targetRole: targetMembership.role })) {
-    logger.warn({ groupId: room._id, actorId, targetId: userId, reason: 'role_hierarchy' }, 'group_unauthorized_access_attempt');
+  if (
+    !groupPolicy.hasCapability(actorMembership.role, groupPolicy.Capabilities.BAN_MEMBER) ||
+    !groupPolicy.canRemoveMember({ actorRole: actorMembership.role, targetRole: targetMembership.role })
+  ) {
+    logger.warn(
+      { groupId: room._id, actorId, targetId: userId, reason: 'role_hierarchy' },
+      'group_unauthorized_access_attempt',
+    );
     SecurityEventService.record({
       type: 'PERMISSION_DENIED',
       severity: 'medium',
@@ -49,7 +54,9 @@ module.exports = async (req, res) => {
     User.findById(userId).select('firstName lastName username'),
   ]);
   const actorName = actor ? `${actor.firstName || ''} ${actor.lastName || ''}`.trim() || actor.username : null;
-  const targetName = target ? `${target.firstName || ''} ${target.lastName || ''}`.trim() || target.username : 'A member';
+  const targetName = target
+    ? `${target.firstName || ''} ${target.lastName || ''}`.trim() || target.username
+    : 'A member';
 
   await GroupMember.updateOne(
     { _id: targetMembership._id },
@@ -57,15 +64,25 @@ module.exports = async (req, res) => {
   );
   await Room.updateOne({ _id: room._id }, { $pull: { people: userId } });
   await GroupAuditLog.create({
-    group: room._id, actor: actorId, action: 'member_banned', target: userId,
+    group: room._id,
+    actor: actorId,
+    action: 'member_banned',
+    target: userId,
   });
 
   forceLeaveGroupRoom(userId.toString(), room._id.toString(), {
-    reason: 'banned', groupName: room.title, actorName,
+    reason: 'banned',
+    groupName: room.title,
+    actorName,
   });
 
   logger.info({ groupId: room._id, actorId, targetId: userId }, 'group_member_banned');
-  broadcastToGroup(remainingMemberIds, 'group:member:banned', { groupId: room._id, userId }, { excludeUserId: actorId });
+  broadcastToGroup(
+    remainingMemberIds,
+    'group:member:banned',
+    { groupId: room._id, userId },
+    { excludeUserId: actorId },
+  );
   await postSystemMessage(
     room._id,
     actorName ? `${targetName} was banned by ${actorName}` : `${targetName} was banned`,

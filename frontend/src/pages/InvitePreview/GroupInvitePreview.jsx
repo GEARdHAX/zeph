@@ -4,9 +4,7 @@ import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
 import { Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
-} from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { previewGroupInvite, joinGroupInvite } from '../../actions/invites';
 import Config from '../../config';
@@ -59,11 +57,15 @@ function GroupInvitePreview() {
             <CardHeader>
               <CardTitle>Invite unavailable</CardTitle>
               <CardDescription>
-                {errorReason === 'INVITE_LIMIT_REACHED' ? 'This invite link has reached its usage limit.' : 'This invite link is invalid or has expired.'}
+                {errorReason === 'INVITE_LIMIT_REACHED'
+                  ? 'This invite link has reached its usage limit.'
+                  : 'This invite link is invalid or has expired.'}
               </CardDescription>
             </CardHeader>
             <CardFooter className="justify-center">
-              <Button variant="outline" onClick={() => navigate('/')}>Go to zeph.</Button>
+              <Button variant="outline" onClick={() => navigate('/')}>
+                Go to zeph.
+              </Button>
             </CardFooter>
           </>
         )}
@@ -71,7 +73,10 @@ function GroupInvitePreview() {
         {group && state !== 'loading' && state !== 'error' && (
           <>
             <CardHeader className="items-center">
-              <Avatar className="h-16 w-16 border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white" size="lg">
+              <Avatar
+                className="h-16 w-16 border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white"
+                size="lg"
+              >
                 {group.avatar && (
                   <img
                     src={`${Config.url || ''}/api/images/${group.avatar.shieldedID}/256`}
@@ -84,9 +89,7 @@ function GroupInvitePreview() {
                 </AvatarFallback>
               </Avatar>
               <CardTitle className="mt-2">{group.name}</CardTitle>
-              <CardDescription>
-                {`${group.memberCount} member${group.memberCount === 1 ? '' : 's'}`}
-              </CardDescription>
+              <CardDescription>{`${group.memberCount} member${group.memberCount === 1 ? '' : 's'}`}</CardDescription>
             </CardHeader>
             <CardFooter className="justify-center">
               <Button

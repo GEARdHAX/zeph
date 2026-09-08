@@ -8,8 +8,16 @@ module.exports = async (req, res, next) => {
     status: 'accepted',
     $or: [{ requester: req.user.id }, { recipient: req.user.id }],
   })
-    .populate({ path: 'requester', select: 'username firstName lastName tagLine picture', populate: { path: 'picture' } })
-    .populate({ path: 'recipient', select: 'username firstName lastName tagLine picture', populate: { path: 'picture' } })
+    .populate({
+      path: 'requester',
+      select: 'username firstName lastName tagLine picture',
+      populate: { path: 'picture' },
+    })
+    .populate({
+      path: 'recipient',
+      select: 'username firstName lastName tagLine picture',
+      populate: { path: 'picture' },
+    })
     .sort({ respondedAt: -1 });
 
   const friends = relationships.map((r) => {

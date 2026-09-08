@@ -37,7 +37,7 @@ the same topology if Docker is available elsewhere; either works.
   `src/init.js`) — a load test should measure that limit, not defeat it.
 - **`seed-rooms.js <usersJsonFile>`** — creates N DM rooms directly via the
   model layer from a `seed.js` output file. Same reasoning: `POST
-  /api/room/create` sits behind `discoveryLimiter` (100/15min/IP), a real
+/api/room/create` sits behind `discoveryLimiter` (100/15min/IP), a real
   limit on room CREATION specifically — a different concern from whatever
   the calling script is actually trying to measure.
 - **`http-load.js [concurrency] [baseUrl]`** — A) register+login (bounded
@@ -65,19 +65,19 @@ Every number these scripts report is bounded by this app's own real,
 intentional rate limiters (`src/init.js`) — hitting one mid-test and
 seeing 429s IS the measured capacity, not a script failure:
 
-| Limiter | Scope | Routes |
-|---|---|---|
-| `authLimiter` | 20/15min per IP | `/login`, `/register`, `/auth/*` |
+| Limiter            | Scope            | Routes                                                              |
+| ------------------ | ---------------- | ------------------------------------------------------------------- |
+| `authLimiter`      | 20/15min per IP  | `/login`, `/register`, `/auth/*`                                    |
 | `discoveryLimiter` | 100/15min per IP | `/room/create`, `/search`, `/friend-requests`, `/group/create`, ... |
-| `messageSendLimit` | 60/min per USER | `/message` |
-| `apiLimiter` | 300/15min per IP | every other `/api` route (general fallback) |
+| `messageSendLimit` | 60/min per USER  | `/message`                                                          |
+| `apiLimiter`       | 300/15min per IP | every other `/api` route (general fallback)                         |
 
 A single source IP (this test harness) will always exhaust `apiLimiter`
 somewhere between 300-500 combined requests within a 15-minute window,
 regardless of how high `concurrency` is set — that's a fixed window count,
 not a concurrency ceiling. Restart the backend (a fresh process resets the
 in-memory limiter state) between runs that need a clean budget, or run at
-lower concurrency to observe behavior *below* the ceiling.
+lower concurrency to observe behavior _below_ the ceiling.
 
 ## Running higher concurrency levels
 

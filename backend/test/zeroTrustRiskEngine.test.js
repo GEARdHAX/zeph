@@ -21,17 +21,18 @@ afterEach(async () => {
   await db.clearDatabase();
 });
 
-const seedSecurityEvent = (overrides = {}) => SecurityEvent.create({
-  eventId: `evt-${Math.random().toString(36).slice(2)}`,
-  timestamp: overrides.timestamp || new Date(),
-  type: overrides.type || 'LOGIN_FAILED',
-  severity: overrides.severity || 'medium',
-  actor: { userId: overrides.userId || 'user-1', sessionId: null },
-  source: { ip: null, userAgent: null, deviceId: null },
-  target: { resource: null, resourceId: null, action: null },
-  result: overrides.result || 'failure',
-  metadata: {},
-});
+const seedSecurityEvent = (overrides = {}) =>
+  SecurityEvent.create({
+    eventId: `evt-${Math.random().toString(36).slice(2)}`,
+    timestamp: overrides.timestamp || new Date(),
+    type: overrides.type || 'LOGIN_FAILED',
+    severity: overrides.severity || 'medium',
+    actor: { userId: overrides.userId || 'user-1', sessionId: null },
+    source: { ip: null, userAgent: null, deviceId: null },
+    target: { resource: null, resourceId: null, action: null },
+    result: overrides.result || 'failure',
+    metadata: {},
+  });
 
 describe('riskEngine.computeRiskFactors — device/session signal', () => {
   it('no session at all -> UNKNOWN_DEVICE, does not force any other state', async () => {
@@ -106,14 +107,26 @@ describe('riskEngine.computeRiskFactors — behavioral signals (own SecurityEven
   });
 
   it('events outside the lookback window are ignored', async () => {
-    await seedSecurityEvent({ userId: 'user-1', type: 'LOGIN_FAILED', timestamp: new Date(Date.now() - 60 * 60 * 1000) });
-    await seedSecurityEvent({ userId: 'user-1', type: 'LOGIN_FAILED', timestamp: new Date(Date.now() - 60 * 60 * 1000) });
-    await seedSecurityEvent({ userId: 'user-1', type: 'LOGIN_FAILED', timestamp: new Date(Date.now() - 60 * 60 * 1000) });
+    await seedSecurityEvent({
+      userId: 'user-1',
+      type: 'LOGIN_FAILED',
+      timestamp: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    await seedSecurityEvent({
+      userId: 'user-1',
+      type: 'LOGIN_FAILED',
+      timestamp: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    await seedSecurityEvent({
+      userId: 'user-1',
+      type: 'LOGIN_FAILED',
+      timestamp: new Date(Date.now() - 60 * 60 * 1000),
+    });
     const result = await computeRiskFactors({ userId: 'user-1', session: knownSession });
     expect(result.factors.some((f) => f.type === 'RECENT_FAILED_LOGINS')).toBe(false);
   });
 
-  it('never counts another user\'s SecurityEvents toward this user\'s risk', async () => {
+  it("never counts another user's SecurityEvents toward this user's risk", async () => {
     await seedSecurityEvent({ userId: 'user-2', type: 'LOGIN_FAILED' });
     await seedSecurityEvent({ userId: 'user-2', type: 'LOGIN_FAILED' });
     await seedSecurityEvent({ userId: 'user-2', type: 'LOGIN_FAILED' });

@@ -18,8 +18,14 @@ export const MEDIA_CATEGORIES = {
   audio: {
     extensions: ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.opus', '.weba'],
     mimes: [
-      'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/aac',
-      'audio/ogg', 'audio/opus', 'audio/webm',
+      'audio/mpeg',
+      'audio/wav',
+      'audio/x-wav',
+      'audio/mp4',
+      'audio/aac',
+      'audio/ogg',
+      'audio/opus',
+      'audio/webm',
     ],
     maxSize: 25 * MB,
   },
@@ -29,10 +35,7 @@ export const MEDIA_CATEGORIES = {
     maxSize: 25 * MB,
   },
   document: {
-    extensions: [
-      '.doc', '.docx', '.xls', '.xlsx', '.csv', '.ppt', '.pptx',
-      '.txt', '.rtf', '.odt', '.ods', '.odp',
-    ],
+    extensions: ['.doc', '.docx', '.xls', '.xlsx', '.csv', '.ppt', '.pptx', '.txt', '.rtf', '.odt', '.ods', '.odp'],
     mimes: [],
     maxSize: 25 * MB,
   },
@@ -43,9 +46,25 @@ export const MEDIA_CATEGORIES = {
   },
   text: {
     extensions: [
-      '.json', '.xml', '.yaml', '.yml', '.md', '.log', '.sql', '.css',
-      '.html', '.htm', '.js', '.ts', '.tsx', '.jsx', '.py', '.java',
-      '.cpp', '.c', '.h',
+      '.json',
+      '.xml',
+      '.yaml',
+      '.yml',
+      '.md',
+      '.log',
+      '.sql',
+      '.css',
+      '.html',
+      '.htm',
+      '.js',
+      '.ts',
+      '.tsx',
+      '.jsx',
+      '.py',
+      '.java',
+      '.cpp',
+      '.c',
+      '.h',
     ],
     mimes: [],
     maxSize: 10 * MB,
@@ -53,8 +72,23 @@ export const MEDIA_CATEGORIES = {
 };
 
 const BLOCKED_EXTENSIONS = new Set([
-  '.exe', '.dll', '.bat', '.cmd', '.ps1', '.sh', '.msi', '.com', '.scr',
-  '.jar', '.vbs', '.app', '.deb', '.rpm', '.apk', '.msix', '.gadget',
+  '.exe',
+  '.dll',
+  '.bat',
+  '.cmd',
+  '.ps1',
+  '.sh',
+  '.msi',
+  '.com',
+  '.scr',
+  '.jar',
+  '.vbs',
+  '.app',
+  '.deb',
+  '.rpm',
+  '.apk',
+  '.msix',
+  '.gadget',
 ]);
 
 const extensionToCategory = new Map();

@@ -9,7 +9,14 @@
 // returns JSON.stringify'd objects matching schema.js's expected shape by
 // default, with knobs to return malformed/invalid output for negative tests.
 const buildMockAiProvider = ({
-  response = { anomalous: false, confidence: 10, category: 'other', signals: [], explanation: 'No anomaly detected in the provided signals.', recommendedAction: null },
+  response = {
+    anomalous: false,
+    confidence: 10,
+    category: 'other',
+    signals: [],
+    explanation: 'No anomaly detected in the provided signals.',
+    recommendedAction: null,
+  },
   rawText = null, // overrides response entirely — for malformed-JSON / non-JSON tests
   failWith = null, // an Error to throw instead of responding — for timeout/network-failure tests
   latencyMs = 0,
@@ -20,7 +27,10 @@ const buildMockAiProvider = ({
     callCount: () => callCount,
     async generate(prompt, options = {}) {
       callCount += 1;
-      if (latencyMs) await new Promise((resolve) => { setTimeout(resolve, latencyMs); });
+      if (latencyMs)
+        await new Promise((resolve) => {
+          setTimeout(resolve, latencyMs);
+        });
       if (options.signal?.aborted) {
         const err = new Error('The operation was aborted');
         err.name = 'AbortError';

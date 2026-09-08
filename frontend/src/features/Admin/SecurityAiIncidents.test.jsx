@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -22,7 +20,11 @@ const INCIDENT = {
   sources: ['ebpf', 'threat_intelligence'],
   eventCount: 3,
   aiAnalysis: {
-    anomalous: true, confidence: 86, summary: 'Correlated process and network anomaly with a confirmed malicious destination.', model: 'llama3.2:1b', analyzedAt: '2024-06-01T12:06:00Z',
+    anomalous: true,
+    confidence: 86,
+    summary: 'Correlated process and network anomaly with a confirmed malicious destination.',
+    model: 'llama3.2:1b',
+    analyzedAt: '2024-06-01T12:06:00Z',
   },
 };
 

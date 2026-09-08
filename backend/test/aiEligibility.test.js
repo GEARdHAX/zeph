@@ -4,18 +4,30 @@ const Room = require('../src/models/Room');
 const Message = require('../src/models/Message');
 const { buildPolicy } = require('../src/ai/policy');
 const {
-  checkSummaryEligibility, checkTitleEligibility, checkTopicEligibility, isSummaryStale,
+  checkSummaryEligibility,
+  checkTitleEligibility,
+  checkTopicEligibility,
+  isSummaryStale,
 } = require('../src/ai/eligibility');
 
-beforeAll(async () => { await db.connect(); });
-afterAll(async () => { await db.closeDatabase(); });
-afterEach(async () => { await db.clearDatabase(); });
+beforeAll(async () => {
+  await db.connect();
+});
+afterAll(async () => {
+  await db.closeDatabase();
+});
+afterEach(async () => {
+  await db.clearDatabase();
+});
 
 const policy = buildPolicy({});
 
 const seedMessages = async (roomId, authorId, count) => {
   const docs = Array.from({ length: count }, (_, i) => ({
-    author: authorId, room: roomId, content: `msg ${i}`, type: 'text',
+    author: authorId,
+    room: roomId,
+    content: `msg ${i}`,
+    type: 'text',
   }));
   await Message.insertMany(docs);
 };

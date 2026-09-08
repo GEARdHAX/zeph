@@ -69,12 +69,20 @@ describe('policyEngine.evaluate — risk-based decisions', () => {
   });
 
   it('ADMINISTRATIVE actions have a stricter threshold than SENSITIVE — same score, different outcome', () => {
-    const sensitive = evaluate(baseInput({
-      resource: 'account', action: 'change_password', riskContext: { score: 45, level: 'MEDIUM', factors: [] },
-    }));
-    const admin = evaluate(baseInput({
-      resource: 'security_events', action: 'view', riskContext: { score: 45, level: 'MEDIUM', factors: [] },
-    }));
+    const sensitive = evaluate(
+      baseInput({
+        resource: 'account',
+        action: 'change_password',
+        riskContext: { score: 45, level: 'MEDIUM', factors: [] },
+      }),
+    );
+    const admin = evaluate(
+      baseInput({
+        resource: 'security_events',
+        action: 'view',
+        riskContext: { score: 45, level: 'MEDIUM', factors: [] },
+      }),
+    );
     expect(sensitive.decision).toBe(Decisions.ALLOW); // 45 < 50
     expect(admin.decision).toBe(Decisions.STEP_UP); // 45 >= 40
   });
@@ -101,7 +109,9 @@ describe('policyEngine.evaluate — session state', () => {
 
 describe('policyEngine.evaluate — decision shape', () => {
   it('always returns decision/reason/policy/riskScore/riskLevel/factors', () => {
-    const result = evaluate(baseInput({ riskContext: { score: 15, level: 'LOW', factors: [{ type: 'KNOWN_DEVICE', weight: -10 }] } }));
+    const result = evaluate(
+      baseInput({ riskContext: { score: 15, level: 'LOW', factors: [{ type: 'KNOWN_DEVICE', weight: -10 }] } }),
+    );
     expect(result).toEqual({
       decision: Decisions.ALLOW,
       reason: 'risk_acceptable',

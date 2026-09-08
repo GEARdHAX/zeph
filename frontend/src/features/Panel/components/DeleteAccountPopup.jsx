@@ -2,9 +2,7 @@ import { useState } from 'react';
 import { useGlobal } from 'reactn';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -44,10 +42,9 @@ function DeleteAccountPopup({ onClose }) {
         <DialogHeader>
           <DialogTitle>Delete your account?</DialogTitle>
           <DialogDescription>
-            This permanently deletes your account. Your conversations are
-            removed from your contacts&apos; inboxes, but message history is
-            preserved for them, matching how deleting a single conversation
-            already works. This can&apos;t be undone. Enter your password to confirm.
+            This permanently deletes your account. Your conversations are removed from your contacts&apos; inboxes, but
+            message history is preserved for them, matching how deleting a single conversation already works. This
+            can&apos;t be undone. Enter your password to confirm.
           </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-3" onSubmit={onSubmit}>

@@ -32,9 +32,14 @@ const Capabilities = {
 const ROLE_CAPABILITIES = {
   OWNER: Object.values(Capabilities),
   ADMIN: [
-    Capabilities.SEND_MESSAGE, Capabilities.ADD_MEMBER, Capabilities.REMOVE_MEMBER,
-    Capabilities.DELETE_MESSAGE, Capabilities.PIN_MESSAGE, Capabilities.CREATE_INVITE,
-    Capabilities.APPROVE_REQUESTS, Capabilities.BAN_MEMBER,
+    Capabilities.SEND_MESSAGE,
+    Capabilities.ADD_MEMBER,
+    Capabilities.REMOVE_MEMBER,
+    Capabilities.DELETE_MESSAGE,
+    Capabilities.PIN_MESSAGE,
+    Capabilities.CREATE_INVITE,
+    Capabilities.APPROVE_REQUESTS,
+    Capabilities.BAN_MEMBER,
   ],
   // ADD_MEMBER is deliberately open to every role (not just ADMIN/OWNER) —
   // "anyone can invite their friend" is the product intent, same trust
@@ -58,9 +63,13 @@ const ROLE_CAPABILITIES = {
 // scripts/backfillGroupMemberStatus.js (run once to fix existing data) and
 // DECISIONS.md. This tolerance is defense-in-depth for any environment
 // where that backfill hasn't been run — not a substitute for running it.
-const getMembership = (groupId, userId) => GroupMember.findOne({
-  group: groupId, user: userId, active: true, status: { $in: ['ACTIVE', null] },
-});
+const getMembership = (groupId, userId) =>
+  GroupMember.findOne({
+    group: groupId,
+    user: userId,
+    active: true,
+    status: { $in: ['ACTIVE', null] },
+  });
 
 // Falls back to Room.people for a group that has zero GroupMember rows at
 // all (predates the Groups feature and hasn't gone through init.js's
@@ -79,9 +88,14 @@ const getMembershipWithFallback = async (groupId, userId) => {
 
   const room = await Room.findOne({ _id: groupId, isGroup: true }).select('people');
   const isLegacyMember = !!room && room.people.some((p) => p.toString() === userId.toString());
-  return isLegacyMember ? {
-    role: Roles.MEMBER, status: 'ACTIVE', user: userId, group: groupId,
-  } : null;
+  return isLegacyMember
+    ? {
+        role: Roles.MEMBER,
+        status: 'ACTIVE',
+        user: userId,
+        group: groupId,
+      }
+    : null;
 };
 
 const hasCapability = (role, capability) => (ROLE_CAPABILITIES[role] || []).includes(capability);
@@ -153,15 +167,14 @@ const canReadRoomHistory = async (room, userId) => {
 const getAccessRevokedInfo = async (room, userId, isCurrentMember) => {
   if (!room.isGroup || isCurrentMember) return undefined;
   const formerMembership = await GroupMember.findOne({ group: room._id, user: userId })
-    .select('status removedBy').lean();
+    .select('status removedBy')
+    .lean();
   if (!formerMembership || !['REMOVED', 'BANNED'].includes(formerMembership.status)) return undefined;
 
   const remover = formerMembership.removedBy
     ? await User.findById(formerMembership.removedBy).select('firstName lastName username').lean()
     : null;
-  const actorName = remover
-    ? `${remover.firstName || ''} ${remover.lastName || ''}`.trim() || remover.username
-    : null;
+  const actorName = remover ? `${remover.firstName || ''} ${remover.lastName || ''}`.trim() || remover.username : null;
   return { reason: formerMembership.status === 'BANNED' ? 'banned' : 'removed', actorName };
 };
 
@@ -175,8 +188,7 @@ const getAccessRevokedInfo = async (room, userId, isCurrentMember) => {
 // all (legacy/fallback membership, see getMembershipWithFallback).
 const getJoinInfo = async (room, userId) => {
   if (!room.isGroup) return undefined;
-  const membership = await GroupMember.findOne({ group: room._id, user: userId })
-    .select('joinedVia invitedBy').lean();
+  const membership = await GroupMember.findOne({ group: room._id, user: userId }).select('joinedVia invitedBy').lean();
   if (!membership) return undefined;
 
   const inviter = membership.invitedBy

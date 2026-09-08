@@ -1,9 +1,5 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
-import {
-  render, screen, act, waitFor,
-} from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -31,7 +27,10 @@ import createRoom from '../../../actions/createRoom';
 
 function makeStore() {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   return createStore(rootReducer, applyMiddleware(thunk));
 }
@@ -125,8 +124,18 @@ describe('AddPeople search — explicit trigger only', () => {
     let resolveFirst;
     let resolveSecond;
     search
-      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
-      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          }),
+      );
 
     const userEv = userEvent.setup();
     renderAddPeople();
@@ -158,15 +167,23 @@ describe('AddPeople search — explicit trigger only', () => {
   it('renders search results and opens a profile preview on click', async () => {
     search.mockResolvedValue({
       data: {
-        users: [{
-          _id: 'u2', username: 'bob', firstName: 'Bob', lastName: 'Builder',
-        }],
+        users: [
+          {
+            _id: 'u2',
+            username: 'bob',
+            firstName: 'Bob',
+            lastName: 'Builder',
+          },
+        ],
       },
     });
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u2', username: 'bob', firstName: 'Bob', lastName: 'Builder',
+          _id: 'u2',
+          username: 'bob',
+          firstName: 'Bob',
+          lastName: 'Builder',
         },
         relationship: null,
       },
@@ -188,7 +205,10 @@ describe('AddPeople search — explicit trigger only', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u2', username: 'carol', firstName: 'Carol', lastName: '',
+          _id: 'u2',
+          username: 'carol',
+          firstName: 'Carol',
+          lastName: '',
         },
         relationship: null,
       },
@@ -196,14 +216,22 @@ describe('AddPeople search — explicit trigger only', () => {
     // Never resolves during this test — proves the label/disabled state
     // change is optimistic, not waiting on the response.
     let resolveSend;
-    sendFriendRequest.mockImplementation(() => new Promise((resolve) => {
-      resolveSend = resolve;
-    }));
+    sendFriendRequest.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSend = resolve;
+        }),
+    );
     search.mockResolvedValue({
       data: {
-        users: [{
-          _id: 'u2', username: 'carol', firstName: 'Carol', lastName: '',
-        }],
+        users: [
+          {
+            _id: 'u2',
+            username: 'carol',
+            firstName: 'Carol',
+            lastName: '',
+          },
+        ],
       },
     });
 
@@ -233,7 +261,10 @@ describe('AddPeople search — explicit trigger only', () => {
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u3', username: 'dave', firstName: 'Dave', lastName: '',
+          _id: 'u3',
+          username: 'dave',
+          firstName: 'Dave',
+          lastName: '',
         },
         relationship: null,
       },
@@ -241,9 +272,14 @@ describe('AddPeople search — explicit trigger only', () => {
     sendFriendRequest.mockRejectedValue(new Error('network down'));
     search.mockResolvedValue({
       data: {
-        users: [{
-          _id: 'u3', username: 'dave', firstName: 'Dave', lastName: '',
-        }],
+        users: [
+          {
+            _id: 'u3',
+            username: 'dave',
+            firstName: 'Dave',
+            lastName: '',
+          },
+        ],
       },
     });
 
@@ -262,9 +298,15 @@ describe('AddPeople search result cards — already-mutual friends', () => {
   it('shows a "Friends" badge on a result the backend marked relationshipStatus: "accepted"', async () => {
     search.mockResolvedValue({
       data: {
-        users: [{
-          _id: 'u4', username: 'erin', firstName: 'Erin', lastName: '', relationshipStatus: 'accepted',
-        }],
+        users: [
+          {
+            _id: 'u4',
+            username: 'erin',
+            firstName: 'Erin',
+            lastName: '',
+            relationshipStatus: 'accepted',
+          },
+        ],
       },
     });
     const userEv = userEvent.setup();
@@ -278,9 +320,15 @@ describe('AddPeople search result cards — already-mutual friends', () => {
   it('does not show a "Friends" badge for a non-friend result', async () => {
     search.mockResolvedValue({
       data: {
-        users: [{
-          _id: 'u5', username: 'frank', firstName: 'Frank', lastName: '', relationshipStatus: null,
-        }],
+        users: [
+          {
+            _id: 'u5',
+            username: 'frank',
+            firstName: 'Frank',
+            lastName: '',
+            relationshipStatus: null,
+          },
+        ],
       },
     });
     const userEv = userEvent.setup();
@@ -292,12 +340,18 @@ describe('AddPeople search result cards — already-mutual friends', () => {
     expect(screen.queryByText('Friends')).not.toBeInTheDocument();
   });
 
-  it('clicking a friend\'s result card opens the DM directly, skipping the profile-preview dialog', async () => {
+  it("clicking a friend's result card opens the DM directly, skipping the profile-preview dialog", async () => {
     search.mockResolvedValue({
       data: {
-        users: [{
-          _id: 'u6', username: 'grace', firstName: 'Grace', lastName: '', relationshipStatus: 'accepted',
-        }],
+        users: [
+          {
+            _id: 'u6',
+            username: 'grace',
+            firstName: 'Grace',
+            lastName: '',
+            relationshipStatus: 'accepted',
+          },
+        ],
       },
     });
     createRoom.mockResolvedValue({ data: { room: { _id: 'room-9', messages: [] } } });
@@ -314,18 +368,27 @@ describe('AddPeople search result cards — already-mutual friends', () => {
     expect(resolveUser).not.toHaveBeenCalled();
   });
 
-  it('clicking a non-friend\'s result card opens the profile preview instead of a DM', async () => {
+  it("clicking a non-friend's result card opens the profile preview instead of a DM", async () => {
     search.mockResolvedValue({
       data: {
-        users: [{
-          _id: 'u7', username: 'heidi', firstName: 'Heidi', lastName: '', relationshipStatus: null,
-        }],
+        users: [
+          {
+            _id: 'u7',
+            username: 'heidi',
+            firstName: 'Heidi',
+            lastName: '',
+            relationshipStatus: null,
+          },
+        ],
       },
     });
     resolveUser.mockResolvedValue({
       data: {
         user: {
-          _id: 'u7', username: 'heidi', firstName: 'Heidi', lastName: '',
+          _id: 'u7',
+          username: 'heidi',
+          firstName: 'Heidi',
+          lastName: '',
         },
         relationship: null,
       },

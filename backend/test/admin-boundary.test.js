@@ -46,11 +46,8 @@ const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root'
 // .level). Socket.IO tests need `level` IN the token itself, since
 // socket.decoded_token is the raw JWT payload, not a fresh DB lookup —
 // mirrors the real payload shape login.js signs.
-const tokenWithLevel = (user) => jwt.sign(
-  { id: user._id.toString(), email: user.email, level: user.level },
-  config.secret,
-  { expiresIn: '1h' },
-);
+const tokenWithLevel = (user) =>
+  jwt.sign({ id: user._id.toString(), email: user.email, level: user.level }, config.secret, { expiresIn: '1h' });
 
 describe('isPrivileged() unit behavior', () => {
   it('treats the default "standard" level as not privileged', () => {
@@ -79,20 +76,32 @@ describe('authorizeAction() admin_boundary check', () => {
 
   it('denies a standard actor targeting a privileged target, before relationship state matters', async () => {
     const result = await authorizeAction({
-      actor: fakeActor(), target: fakeTarget(), action: Actions.SEND_MESSAGE, actorLevel: 'standard', targetLevel: 'root',
+      actor: fakeActor(),
+      target: fakeTarget(),
+      action: Actions.SEND_MESSAGE,
+      actorLevel: 'standard',
+      targetLevel: 'root',
     });
     expect(result.decision).toBe('DENY');
     expect(result.reason).toBe('admin_boundary');
   });
   it('allows a privileged actor targeting a privileged target', async () => {
     const result = await authorizeAction({
-      actor: fakeActor(), target: fakeTarget(), action: Actions.SEND_MESSAGE, actorLevel: 'root', targetLevel: 'root',
+      actor: fakeActor(),
+      target: fakeTarget(),
+      action: Actions.SEND_MESSAGE,
+      actorLevel: 'root',
+      targetLevel: 'root',
     });
     expect(result.decision).toBe('ALLOW');
   });
   it('allows a privileged actor targeting a standard target (admin -> normal unaffected)', async () => {
     const result = await authorizeAction({
-      actor: fakeActor(), target: fakeTarget(), action: Actions.SEND_MESSAGE, actorLevel: 'root', targetLevel: 'standard',
+      actor: fakeActor(),
+      target: fakeTarget(),
+      action: Actions.SEND_MESSAGE,
+      actorLevel: 'root',
+      targetLevel: 'standard',
     });
     expect(result.decision).toBe('ALLOW');
   });
@@ -287,7 +296,10 @@ describe('Existing admin DM denied post-hoc (join-room / get-room / more-message
     const message = await Message.create({ room: room._id, author: admin._id, content: 'hi', type: 'text' });
     await Room.updateOne({ _id: room._id }, { $set: { lastMessage: message._id } });
     return {
-      me, admin, room, message,
+      me,
+      admin,
+      room,
+      message,
     };
   };
 
@@ -328,7 +340,7 @@ describe('Existing admin DM denied post-hoc (join-room / get-room / more-message
     expect(res.status).toBe(404);
   });
 
-  it('list-rooms excludes the admin DM from the standard user\'s inbox', async () => {
+  it("list-rooms excludes the admin DM from the standard user's inbox", async () => {
     const { me, room } = await seedAdminRoom();
     const res = await request(app)
       .post('/api/rooms/list')
@@ -337,7 +349,7 @@ describe('Existing admin DM denied post-hoc (join-room / get-room / more-message
     expect(res.body.rooms.find((r) => r._id === room._id.toString())).toBeUndefined();
   });
 
-  it('the admin\'s own access to the same room is completely unaffected', async () => {
+  it("the admin's own access to the same room is completely unaffected", async () => {
     const { admin, room } = await seedAdminRoom();
     const joinRes = await request(app)
       .post('/api/room/join')
@@ -358,11 +370,26 @@ describe('Existing admin DM denied post-hoc (join-room / get-room / more-message
     const message = await Message.create({ room: room._id, author: b._id, content: 'hi', type: 'text' });
     await Room.updateOne({ _id: room._id }, { $set: { lastMessage: message._id } });
 
-    const join = await request(app).post('/api/room/join').set('Authorization', `Bearer ${tokenFor(a)}`).field('id', room._id.toString());
-    const get = await request(app).post('/api/room/get').set('Authorization', `Bearer ${tokenFor(a)}`).field('id', room._id.toString());
-    const more = await request(app).post('/api/messages/more').set('Authorization', `Bearer ${tokenFor(a)}`).field('roomID', room._id.toString()).field('firstMessageID', message._id.toString());
-    const sync = await request(app).post('/api/messages/sync').set('Authorization', `Bearer ${tokenFor(a)}`).field('roomID', room._id.toString());
-    const list = await request(app).post('/api/rooms/list').set('Authorization', `Bearer ${tokenFor(a)}`);
+    const join = await request(app)
+      .post('/api/room/join')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('id', room._id.toString());
+    const get = await request(app)
+      .post('/api/room/get')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('id', room._id.toString());
+    const more = await request(app)
+      .post('/api/messages/more')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('roomID', room._id.toString())
+      .field('firstMessageID', message._id.toString());
+    const sync = await request(app)
+      .post('/api/messages/sync')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('roomID', room._id.toString());
+    const list = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(a)}`);
 
     expect(join.status).toBe(200);
     expect(get.status).toBe(200);
@@ -398,8 +425,14 @@ describe('Direct-ID/username enumeration denied (manipulated/guessed IDs, not di
     const room = await Room.create({ people: [me._id, admin._id], isGroup: false });
     const fakeRoomID = '507f1f77bcf86cd799439011';
 
-    const realRes = await request(app).post('/api/room/join').set('Authorization', `Bearer ${tokenFor(me)}`).field('id', room._id.toString());
-    const fakeRes = await request(app).post('/api/room/join').set('Authorization', `Bearer ${tokenFor(me)}`).field('id', fakeRoomID);
+    const realRes = await request(app)
+      .post('/api/room/join')
+      .set('Authorization', `Bearer ${tokenFor(me)}`)
+      .field('id', room._id.toString());
+    const fakeRes = await request(app)
+      .post('/api/room/join')
+      .set('Authorization', `Bearer ${tokenFor(me)}`)
+      .field('id', fakeRoomID);
 
     expect(realRes.status).toBe(404);
     expect(fakeRes.status).toBe(404);
@@ -648,26 +681,28 @@ describe('Presence denied — Socket.IO onlineUsers broadcast', () => {
   // connection's own broadcast — socket.io does not replay/buffer past
   // events for a listener attached late. Collecting every event from
   // connection time onward sidesteps the ordering entirely.
-  const connectAndAuth = (token) => new Promise((resolve, reject) => {
-    const client = ioc(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
-    const presenceEvents = [];
-    client.on('onlineUsers', (view) => presenceEvents.push(view));
-    client.on('connect', () => client.emit('authenticate', { token }));
-    client.on('authenticated', () => resolve({ client, presenceEvents }));
-    client.on('unauthorized', (err) => reject(new Error(JSON.stringify(err))));
-  });
+  const connectAndAuth = (token) =>
+    new Promise((resolve, reject) => {
+      const client = ioc(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
+      const presenceEvents = [];
+      client.on('onlineUsers', (view) => presenceEvents.push(view));
+      client.on('connect', () => client.emit('authenticate', { token }));
+      client.on('authenticated', () => resolve({ client, presenceEvents }));
+      client.on('unauthorized', (err) => reject(new Error(JSON.stringify(err))));
+    });
 
   // Waits until presenceEvents has at least `count` entries (a new
   // connection elsewhere triggers one more broadcast to every socket).
-  const waitForPresenceCount = (presenceEvents, count) => new Promise((resolve, reject) => {
-    const start = Date.now();
-    const check = () => {
-      if (presenceEvents.length >= count) return resolve(presenceEvents[presenceEvents.length - 1]);
-      if (Date.now() - start > 5000) return reject(new Error('Timed out waiting for onlineUsers broadcast'));
-      setTimeout(check, 50);
-    };
-    check();
-  });
+  const waitForPresenceCount = (presenceEvents, count) =>
+    new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = () => {
+        if (presenceEvents.length >= count) return resolve(presenceEvents[presenceEvents.length - 1]);
+        if (Date.now() - start > 5000) return reject(new Error('Timed out waiting for onlineUsers broadcast'));
+        setTimeout(check, 50);
+      };
+      check();
+    });
 
   it("a standard user's onlineUsers view never contains a privileged user's id", async () => {
     const standard = await createUser();

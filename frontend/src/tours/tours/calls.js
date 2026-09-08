@@ -11,7 +11,8 @@ export default function buildCallsTour() {
       {
         popover: {
           title: 'In-call controls',
-          description: 'Mute your mic, turn your camera on/off, share your screen, or leave the call — all from the control bar.',
+          description:
+            'Mute your mic, turn your camera on/off, share your screen, or leave the call — all from the control bar.',
         },
       },
       {

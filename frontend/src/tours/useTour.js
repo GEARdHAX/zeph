@@ -1,6 +1,4 @@
-import {
-  useEffect, useMemo, useRef, useState,
-} from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGlobal } from 'reactn';
 import { createTourController } from './tourController';
 import { TourStatus } from './tourStorage';
@@ -48,18 +46,21 @@ const useTour = (tourId) => {
     };
   }, [tourId, userId]);
 
-  return useMemo(() => ({
-    status: snapshot.status,
-    currentStep: snapshot.currentStep,
-    isActive: snapshot.isActive,
-    isCompleted: snapshot.status === TourStatus.COMPLETED,
-    isDismissed: snapshot.status === TourStatus.DISMISSED,
-    start: (ctx) => controllerRef.current.start(ctx),
-    startAt: (stepIndex, ctx) => controllerRef.current.startAt(ctx, stepIndex),
-    resume: (ctx) => controllerRef.current.resume(ctx),
-    skip: () => controllerRef.current.skip(),
-    reset: () => controllerRef.current.reset(),
-  }), [snapshot]);
+  return useMemo(
+    () => ({
+      status: snapshot.status,
+      currentStep: snapshot.currentStep,
+      isActive: snapshot.isActive,
+      isCompleted: snapshot.status === TourStatus.COMPLETED,
+      isDismissed: snapshot.status === TourStatus.DISMISSED,
+      start: (ctx) => controllerRef.current.start(ctx),
+      startAt: (stepIndex, ctx) => controllerRef.current.startAt(ctx, stepIndex),
+      resume: (ctx) => controllerRef.current.resume(ctx),
+      skip: () => controllerRef.current.skip(),
+      reset: () => controllerRef.current.reset(),
+    }),
+    [snapshot],
+  );
 };
 
 export default useTour;

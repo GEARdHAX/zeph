@@ -36,11 +36,11 @@ const uploadViaProxy = (file, onProgress, poster) => {
 const uploadViaPresignedUrl = async (file, onProgress, poster) => {
   const presignUrl = `${Config.url || ''}/api/upload/media/presign`;
   const presignRes = await axios.post(presignUrl, {
-    filename: file.name, size: file.size, poster: poster ? 'true' : undefined,
+    filename: file.name,
+    size: file.size,
+    poster: poster ? 'true' : undefined,
   });
-  const {
-    mediaId, uploadUrl, posterUploadUrl, posterStorageKey,
-  } = presignRes.data;
+  const { mediaId, uploadUrl, posterUploadUrl, posterStorageKey } = presignRes.data;
 
   // Plain XHR (not axios) for the actual R2 PUT — onUploadProgress needs to
   // track this request specifically, and axios.put's own progress hook

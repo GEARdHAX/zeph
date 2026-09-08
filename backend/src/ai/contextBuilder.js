@@ -27,9 +27,8 @@ const MAX_MESSAGE_CHARS = 20000;
 const buildBoundedContext = (messages, config = {}) => {
   const maxInputTokens = config.aiMaxInputTokens || 4000;
   const lines = messages.map((m) => {
-    const content = (m.content || '').length > MAX_MESSAGE_CHARS
-      ? `${m.content.slice(0, MAX_MESSAGE_CHARS)}...`
-      : m.content;
+    const content =
+      (m.content || '').length > MAX_MESSAGE_CHARS ? `${m.content.slice(0, MAX_MESSAGE_CHARS)}...` : m.content;
     return `${m.author}: ${content}`;
   });
 
@@ -55,12 +54,15 @@ const buildBoundedContext = (messages, config = {}) => {
 // truncates the raw string to the token budget, nothing else.
 const boundText = (text, config = {}) => {
   const maxInputTokens = config.aiMaxInputTokens || 4000;
-  let out = (text || '').length > MAX_MESSAGE_CHARS ? `${text.slice(0, MAX_MESSAGE_CHARS)}...` : (text || '');
+  let out = (text || '').length > MAX_MESSAGE_CHARS ? `${text.slice(0, MAX_MESSAGE_CHARS)}...` : text || '';
   const hardCapChars = maxInputTokens * 4;
   if (out.length > hardCapChars) out = out.slice(0, hardCapChars);
   return { text: out, inputTokenEstimate: estimateTokens(out) };
 };
 
 module.exports = {
-  buildBoundedContext, boundText, estimateTokens, MAX_MESSAGE_CHARS,
+  buildBoundedContext,
+  boundText,
+  estimateTokens,
+  MAX_MESSAGE_CHARS,
 };

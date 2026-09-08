@@ -32,19 +32,17 @@ module.exports = async (req, res, next) => {
 
   if (Object.keys(errors).length > 0) return res.status(400).json(errors);
 
-  argon2
-    .hash(password)
-    .then((hash) =>
-      new User({
-        username: xss(username),
-        email: xss(email),
-        firstName: xss(firstName),
-        password: hash,
-        phone: xss(phone),
-        lastName: xss(lastName),
-        lastOnline: Date.now(),
-      })
-        .save()
-        .then((user) => res.status(200).json(user)),
-    );
+  argon2.hash(password).then((hash) =>
+    new User({
+      username: xss(username),
+      email: xss(email),
+      firstName: xss(firstName),
+      password: hash,
+      phone: xss(phone),
+      lastName: xss(lastName),
+      lastOnline: Date.now(),
+    })
+      .save()
+      .then((user) => res.status(200).json(user)),
+  );
 };

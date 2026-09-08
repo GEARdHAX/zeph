@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
 import { getGlobal, useGlobal, setGlobal } from 'reactn';
-import {
-  BrowserRouter as Router, Routes, Route, Navigate, useNavigate,
-} from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ToastContainer, toast } from 'react-toastify';
 import jwtDecode from 'jwt-decode';

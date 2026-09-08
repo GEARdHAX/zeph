@@ -36,7 +36,10 @@ const createUser = async () => {
 };
 
 const tmpFile = (bytes, ext) => {
-  const filePath = path.join(os.tmpdir(), `upload-media-test-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  const filePath = path.join(
+    os.tmpdir(),
+    `upload-media-test-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`,
+  );
   fs.writeFileSync(filePath, Buffer.from(bytes));
   return filePath;
 };

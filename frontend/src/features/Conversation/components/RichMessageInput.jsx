@@ -65,7 +65,13 @@ const styledElementFor = (token) => {
     case 'strike':
       return wrapWithDelimiter('s', '~~', '~~', token.children);
     case 'highlight':
-      return wrapWithDelimiter('mark', '==', '==', token.children, 'rounded bg-yellow-200 px-0.5 text-inherit dark:bg-yellow-500/30');
+      return wrapWithDelimiter(
+        'mark',
+        '==',
+        '==',
+        token.children,
+        'rounded bg-yellow-200 px-0.5 text-inherit dark:bg-yellow-500/30',
+      );
     case 'code': {
       const el = document.createElement('span');
       const openSpan = document.createElement('span');
@@ -188,9 +194,7 @@ const setCaretOffset = (root, targetOffset) => {
   selection.addRange(range);
 };
 
-function RichMessageInput({
-  value, onChange, onKeyDown, onFocus, placeholder, className,
-}) {
+function RichMessageInput({ value, onChange, onKeyDown, onFocus, placeholder, className }) {
   const rootRef = useRef(null);
   const caretOffsetRef = useRef(null);
 

@@ -73,10 +73,7 @@ describe('NoSQL injection — structural defenses (Phase 9)', () => {
     // A crafted field NAME (not the standard 'email') containing operator
     // syntax — formidable has no bracket/nested-object parsing, so this can
     // only ever produce a flat string field, never {email: {$ne: null}}.
-    const res = await request(app)
-      .post('/api/login')
-      .field('email[$ne]', 'anything')
-      .field('password', 'irrelevant');
+    const res = await request(app).post('/api/login').field('email[$ne]', 'anything').field('password', 'irrelevant');
 
     // Login must fail (no valid email field was actually supplied) — proves
     // the operator-shaped field name did not get interpreted as a nested

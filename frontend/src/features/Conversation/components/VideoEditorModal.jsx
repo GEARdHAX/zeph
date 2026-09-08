@@ -1,10 +1,6 @@
-import {
-  useCallback, useEffect, useRef, useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 
@@ -16,9 +12,7 @@ import { Slider } from '@/components/ui/slider';
 // regardless of the source container) rather than doing a byte-exact cut of
 // the original file — the tradeoff that keeps this dependency-free instead
 // of pulling in ffmpeg.wasm for frame-accurate trimming.
-function VideoEditorModal({
-  file, onCancel, onDone,
-}) {
+function VideoEditorModal({ file, onCancel, onDone }) {
   const videoRef = useRef(null);
   const [objectUrl, setObjectUrl] = useState(null);
   const [duration, setDuration] = useState(0);
@@ -70,14 +64,15 @@ function VideoEditorModal({
   // video message's poster/thumbnail, the same <canvas>-to-blob approach
   // getCroppedImageBlob.js already uses for images (reused technique, not
   // a new one).
-  const capturePoster = () => new Promise((resolve) => {
-    const video = videoRef.current;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
-  });
+  const capturePoster = () =>
+    new Promise((resolve) => {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+    });
 
   const handleDone = useCallback(async () => {
     const video = videoRef.current;
@@ -93,7 +88,9 @@ function VideoEditorModal({
       const recordStream = new MediaStream(tracks);
       const recorder = new MediaRecorder(recordStream, { mimeType: 'video/webm' });
       const chunks = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
 
       const recordingDone = new Promise((resolve, reject) => {
         recorder.onstop = () => resolve();
@@ -143,7 +140,9 @@ function VideoEditorModal({
   const formatTime = (seconds) => {
     if (!Number.isFinite(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+    const secs = Math.floor(seconds % 60)
+      .toString()
+      .padStart(2, '0');
     return `${mins}:${secs}`;
   };
 

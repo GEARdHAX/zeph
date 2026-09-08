@@ -9,9 +9,7 @@ import downloadFile from '../../../lib/downloadFile';
 // as the graceful fallback for anything detection can't categorize
 // (unsupported/unknown), so there's exactly one "we can't preview this,
 // here's what we know" code path rather than two.
-function FileViewer({
-  src, filename, size, unsupported,
-}) {
+function FileViewer({ src, filename, size, unsupported }) {
   const Icon = unsupported ? FileQuestion : getFileIcon(filename);
   const extension = (filename || '').split('.').pop()?.toUpperCase();
 
@@ -22,11 +20,9 @@ function FileViewer({
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="max-w-[240px] truncate text-sm font-semibold text-white">
-          {filename || 'Unknown file'}
-        </span>
+        <span className="max-w-[240px] truncate text-sm font-semibold text-white">{filename || 'Unknown file'}</span>
         <span className="text-xs text-white/50">
-          {unsupported ? 'Preview unavailable' : (extension || 'File')}
+          {unsupported ? 'Preview unavailable' : extension || 'File'}
           {' · '}
           {formatFileSize(size)}
         </span>

@@ -1,9 +1,20 @@
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  useEffect, useState, useRef, useCallback,
-} from 'react';
-import {
-  Phone, Video, ArrowLeft, MoreHorizontal, Star, Info, Sparkles,
-  Search, BellOff, Lock, Trash2, Ban, Flag, UserCheck, Hash,
+  Phone,
+  Video,
+  ArrowLeft,
+  MoreHorizontal,
+  Star,
+  Info,
+  Sparkles,
+  Search,
+  BellOff,
+  Lock,
+  Trash2,
+  Ban,
+  Flag,
+  UserCheck,
+  Hash,
 } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
@@ -18,7 +29,12 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,10 +86,13 @@ function TopBar({ back, loading, aiEnabled }) {
   // mid-summarize never tries to setState on an unmounted component.
   const summarizeAbortRef = useRef(null);
   const topicsAbortRef = useRef(null);
-  useEffect(() => () => {
-    summarizeAbortRef.current?.abort();
-    topicsAbortRef.current?.abort();
-  }, []);
+  useEffect(
+    () => () => {
+      summarizeAbortRef.current?.abort();
+      topicsAbortRef.current?.abort();
+    },
+    [],
+  );
   const [favorites, setFavorites] = useGlobal('favorites');
   const [showDetails, setShowDetails] = useGlobal('showDetails');
   const setNav = useGlobal('nav')[1];
@@ -309,9 +328,9 @@ function TopBar({ back, loading, aiEnabled }) {
         type: Actions.SET_ROOM,
         room: {
           ...room,
-          people: room.people.map((person) => (person._id === other._id
-            ? { ...person, blockedByMe: false, blockedMe: false }
-            : person)),
+          people: room.people.map((person) =>
+            person._id === other._id ? { ...person, blockedByMe: false, blockedMe: false } : person,
+          ),
         },
       });
     } catch (e) {
@@ -333,11 +352,7 @@ function TopBar({ back, loading, aiEnabled }) {
     }, [statusUsers, peer]);
 
     if (typing) {
-      return (
-        <span className="inline-flex items-center gap-1 font-medium text-primary animate-pulse">
-          typing...
-        </span>
-      );
+      return <span className="inline-flex items-center gap-1 font-medium text-primary animate-pulse">typing...</span>;
     }
 
     // A blocked relationship (either direction) means presence.js already
@@ -361,15 +376,22 @@ function TopBar({ back, loading, aiEnabled }) {
     return null;
   };
 
-  const initials = (room.isGroup
-    ? (room.title || 'G').charAt(0)
-    : `${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`
+  const initials = (
+    room.isGroup
+      ? (room.title || 'G').charAt(0)
+      : `${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`
   ).toUpperCase();
 
   return (
     <div className="relative z-50 flex min-h-[60px] max-h-[60px] w-full items-center justify-between border-b border-border/60 bg-card px-2.5 sm:px-4 text-card-foreground">
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 mr-2">
-        <Button variant="ghost" size="icon" className="sm:hidden h-8 w-8 shrink-0 text-muted-foreground" onClick={back} aria-label="Go back">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="sm:hidden h-8 w-8 shrink-0 text-muted-foreground"
+          onClick={back}
+          aria-label="Go back"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         {!loading && (
@@ -388,9 +410,7 @@ function TopBar({ back, loading, aiEnabled }) {
                     className="aspect-square size-full object-cover"
                   />
                 )}
-                <AvatarFallback className="bg-transparent text-xs font-bold text-white">
-                  {initials}
-                </AvatarFallback>
+                <AvatarFallback className="bg-transparent text-xs font-bold text-white">{initials}</AvatarFallback>
               </Avatar>
               {getStatus() && (
                 <span
@@ -415,17 +435,32 @@ function TopBar({ back, loading, aiEnabled }) {
 
       <div className="flex items-center gap-0.5 sm:gap-1 text-muted-foreground shrink-0">
         <div data-tour="call-buttons" className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-foreground" onClick={() => call(true)} title="Video Call">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 hover:text-foreground"
+            onClick={() => call(true)}
+            title="Video Call"
+          >
             <Video className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-foreground" onClick={() => call(false)} title="Audio Call">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 hover:text-foreground"
+            onClick={() => call(false)}
+            title="Audio Call"
+          >
             <Phone className="h-4 w-4" />
           </Button>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className={cn('hidden sm:inline-flex h-8 w-8 hover:text-foreground', isFavorite() && 'text-primary fill-primary hover:text-primary')}
+          className={cn(
+            'hidden sm:inline-flex h-8 w-8 hover:text-foreground',
+            isFavorite() && 'text-primary fill-primary hover:text-primary',
+          )}
           onClick={favorite}
           title="Toggle Favorite"
         >
@@ -666,14 +701,9 @@ function TopBar({ back, loading, aiEnabled }) {
           <DialogHeader>
             <DialogTitle>Delete this conversation?</DialogTitle>
             <DialogDescription>
-              This removes the conversation from your own view —
-              {' '}
-              {other.firstName || 'the other participant'}
-              {' '}
-              will still see their full history. If either of you sends a new
-              message later, this conversation reappears in your inbox — but
-              only with new messages from that point forward, not what came
-              before.
+              This removes the conversation from your own view — {other.firstName || 'the other participant'} will still
+              see their full history. If either of you sends a new message later, this conversation reappears in your
+              inbox — but only with new messages from that point forward, not what came before.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

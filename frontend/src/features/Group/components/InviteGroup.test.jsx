@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import InviteGroup from './InviteGroup';
@@ -16,10 +14,11 @@ import getFriends from '../../../actions/getFriends';
 // (not Object.assign) is required to stub it. userEvent.setup() installs its
 // own clipboard stub, so this must run AFTER setup() in each test, not in
 // beforeEach, or userEvent's stub silently wins.
-const stubClipboard = () => Object.defineProperty(navigator, 'clipboard', {
-  value: { writeText: vi.fn().mockResolvedValue() },
-  configurable: true,
-});
+const stubClipboard = () =>
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: vi.fn().mockResolvedValue() },
+    configurable: true,
+  });
 
 beforeEach(() => {
   createGroupInvite.mockReset();
@@ -53,7 +52,10 @@ describe('InviteGroup', () => {
 
 describe('InviteGroup — add from friends', () => {
   const FRIEND = {
-    _id: 'friend-1', firstName: 'Riya', lastName: 'Sharma', username: 'riyasharma',
+    _id: 'friend-1',
+    firstName: 'Riya',
+    lastName: 'Sharma',
+    username: 'riyasharma',
   };
 
   it('lists friends who are not already in the group', async () => {
@@ -68,12 +70,7 @@ describe('InviteGroup — add from friends', () => {
     createGroupInvite.mockResolvedValue({ data: { url: '/invite/g/xyz789' } });
     getFriends.mockResolvedValue({ data: { users: [FRIEND] } });
     render(
-      <InviteGroup
-        groupId="group-1"
-        groupName="Study Group"
-        existingMemberIds={['friend-1']}
-        onClose={() => {}}
-      />,
+      <InviteGroup groupId="group-1" groupName="Study Group" existingMemberIds={['friend-1']} onClose={() => {}} />,
     );
 
     await waitFor(() => expect(getFriends).toHaveBeenCalled());

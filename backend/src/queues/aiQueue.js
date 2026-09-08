@@ -24,22 +24,27 @@ const getQueue = () => {
 // NOTE: BullMQ custom job ids MUST NOT contain ':' (it throws
 // "Custom Id cannot contain :"), so this uses '-' as the separator even
 // though Redis keys elsewhere (ai/dedup.js locks) idiomatically use ':'.
-const enqueueSummaryJob = async ({
-  roomId, conversationType, userId, messageCountAtSummary, requestId,
-}) => {
+const enqueueSummaryJob = async ({ roomId, conversationType, userId, messageCountAtSummary, requestId }) => {
   const q = getQueue();
   if (!q) return { enqueued: false };
   try {
-    await q.add('generate-summary', {
-      roomId, conversationType, userId, requestId,
-    }, {
-      jobId: `summary-${roomId}-${messageCountAtSummary}`,
-      attempts: 2,
-      backoff: { type: 'exponential', delay: 3000 },
-      timeout: 20000,
-      removeOnComplete: { age: 24 * 60 * 60 },
-      removeOnFail: { age: 24 * 60 * 60 },
-    });
+    await q.add(
+      'generate-summary',
+      {
+        roomId,
+        conversationType,
+        userId,
+        requestId,
+      },
+      {
+        jobId: `summary-${roomId}-${messageCountAtSummary}`,
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 3000 },
+        timeout: 20000,
+        removeOnComplete: { age: 24 * 60 * 60 },
+        removeOnFail: { age: 24 * 60 * 60 },
+      },
+    );
     return { enqueued: true };
   } catch (err) {
     logger.warn({ err, roomId }, 'ai_summary_enqueue_failed');

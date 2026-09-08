@@ -31,10 +31,11 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
 // The test harness's default store.io.to() stub (helpers/app.js) can't
 // answer "was this delivered to a real recipient" — it accepts any target
@@ -85,7 +86,9 @@ describe('Group moderation events reach real per-user targets, not a dead group 
       .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({
-        id: group.body._id, userId: member._id, role: 'ADMIN',
+        id: group.body._id,
+        userId: member._id,
+        role: 'ADMIN',
       });
 
     expect(toSpyTargets.some((t) => t.startsWith('group:'))).toBe(false);

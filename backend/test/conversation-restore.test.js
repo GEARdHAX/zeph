@@ -32,30 +32,35 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
-const deleteConversation = (user, conversationId) => request(app)
-  .post('/api/conversation/delete')
-  .set('Authorization', `Bearer ${tokenFor(user)}`)
-  .send({ conversationId });
+const deleteConversation = (user, conversationId) =>
+  request(app)
+    .post('/api/conversation/delete')
+    .set('Authorization', `Bearer ${tokenFor(user)}`)
+    .send({ conversationId });
 
-const restoreConversation = (user, conversationId) => request(app)
-  .post('/api/conversation/restore')
-  .set('Authorization', `Bearer ${tokenFor(user)}`)
-  .send({ conversationId });
+const restoreConversation = (user, conversationId) =>
+  request(app)
+    .post('/api/conversation/restore')
+    .set('Authorization', `Bearer ${tokenFor(user)}`)
+    .send({ conversationId });
 
-const listRemoved = (user) => request(app)
-  .post('/api/conversations/removed')
-  .set('Authorization', `Bearer ${tokenFor(user)}`)
-  .send({});
+const listRemoved = (user) =>
+  request(app)
+    .post('/api/conversations/removed')
+    .set('Authorization', `Bearer ${tokenFor(user)}`)
+    .send({});
 
-const listRooms = (user) => request(app)
-  .post('/api/rooms/list')
-  .set('Authorization', `Bearer ${tokenFor(user)}`)
-  .send({});
+const listRooms = (user) =>
+  request(app)
+    .post('/api/rooms/list')
+    .set('Authorization', `Bearer ${tokenFor(user)}`)
+    .send({});
 
 describe('Removed-conversations list (GET the ones I deleted from my own inbox)', () => {
   it('a deleted group appears in the removed list, not the normal inbox', async () => {

@@ -2,12 +2,13 @@ import axios from 'axios';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import Config from '../config';
 
-const post = (path, data, vaultToken) => axios({
-  method: 'post',
-  url: `${Config.url || ''}${path}`,
-  data,
-  headers: vaultToken ? { 'X-Vault-Token': vaultToken } : undefined,
-});
+const post = (path, data, vaultToken) =>
+  axios({
+    method: 'post',
+    url: `${Config.url || ''}${path}`,
+    data,
+    headers: vaultToken ? { 'X-Vault-Token': vaultToken } : undefined,
+  });
 
 // Registers a new passkey for the Private Vault. vaultToken is required
 // whenever a vault secret already exists (server enforces this); omit it on

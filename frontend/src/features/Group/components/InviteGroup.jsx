@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import {
-  Copy, Share2, QrCode, UserPlus, Check,
-} from 'lucide-react';
+import { Copy, Share2, QrCode, UserPlus, Check } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { createGroupInvite, addGroupMember } from '../../../actions/invites';
 import getFriends from '../../../actions/getFriends';
@@ -48,9 +44,7 @@ function FriendRow({ friend, added, adding, onAdd }) {
   );
 }
 
-function InviteGroup({
-  groupId, groupName, existingMemberIds = [], onClose,
-}) {
+function InviteGroup({ groupId, groupName, existingMemberIds = [], onClose }) {
   const [url, setUrl] = useState(null);
   const [showQr, setShowQr] = useState(false);
   const [friends, setFriends] = useState([]);
@@ -130,7 +124,12 @@ function InviteGroup({
             <Share2 className="h-4 w-4" />
             Share
           </Button>
-          <Button onClick={() => setShowQr((v) => !v)} disabled={!url} variant="secondary" className="justify-start gap-2">
+          <Button
+            onClick={() => setShowQr((v) => !v)}
+            disabled={!url}
+            variant="secondary"
+            className="justify-start gap-2"
+          >
             <QrCode className="h-4 w-4" />
             {showQr ? 'Hide QR' : 'Show QR'}
           </Button>

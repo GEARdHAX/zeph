@@ -36,13 +36,19 @@ const main = async () => {
     users.push(user);
   }
 
-  const tokens = users.map((user) => jwt.sign(
-    {
-      id: user._id, email: user.email, level: user.level, firstName: user.firstName, lastName: user.lastName,
-    },
-    config.secret,
-    { expiresIn: 60 * 60 * 24 * 60 },
-  ));
+  const tokens = users.map((user) =>
+    jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+        level: user.level,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      config.secret,
+      { expiresIn: 60 * 60 * 24 * 60 },
+    ),
+  );
 
   console.log(JSON.stringify({ tokens, userIds: users.map((u) => u._id.toString()) }));
   await mongoose.disconnect();

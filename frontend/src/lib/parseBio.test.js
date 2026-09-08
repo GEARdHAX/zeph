@@ -18,9 +18,7 @@ describe('parseBio — plain text', () => {
 
 describe('parseBio — bold', () => {
   it('parses **bold** into a bold token with a text child', () => {
-    expect(parseBio('**bold**')).toEqual([
-      { type: 'bold', children: [{ type: 'text', text: 'bold' }] },
-    ]);
+    expect(parseBio('**bold**')).toEqual([{ type: 'bold', children: [{ type: 'text', text: 'bold' }] }]);
   });
 
   it('bold is never misread as italic — the outer ** is never split into two single *', () => {
@@ -36,9 +34,7 @@ describe('parseBio — bold', () => {
 
 describe('parseBio — italic', () => {
   it('parses *italic* into an italic token', () => {
-    expect(parseBio('*italic*')).toEqual([
-      { type: 'italic', children: [{ type: 'text', text: 'italic' }] },
-    ]);
+    expect(parseBio('*italic*')).toEqual([{ type: 'italic', children: [{ type: 'text', text: 'italic' }] }]);
   });
 
   it('treats unclosed * as plain text', () => {
@@ -202,23 +198,15 @@ describe('parseBio — precedence edge cases', () => {
     expect(rendered).toContain('x');
   });
 
-  it.each([
-    '*a**b*',
-    '**a*b**',
-    '__a~~b__',
-    '***nested***',
-    '[a](b)[c](d)',
-    '@a@b#c#d',
-    '****',
-    '**',
-    '*',
-    '[]()',
-  ])('never throws and never produces an empty result for non-empty input (%s)', (raw) => {
-    expect(() => parseBio(raw)).not.toThrow();
-    if (raw.length > 0) {
-      expect(parseBio(raw).length).toBeGreaterThan(0);
-    }
-  });
+  it.each(['*a**b*', '**a*b**', '__a~~b__', '***nested***', '[a](b)[c](d)', '@a@b#c#d', '****', '**', '*', '[]()'])(
+    'never throws and never produces an empty result for non-empty input (%s)',
+    (raw) => {
+      expect(() => parseBio(raw)).not.toThrow();
+      if (raw.length > 0) {
+        expect(parseBio(raw).length).toBeGreaterThan(0);
+      }
+    },
+  );
 });
 
 describe('tokenizeInline', () => {
@@ -229,18 +217,19 @@ describe('tokenizeInline', () => {
 
 describe('tokensToHtml — clipboard text/html serialization', () => {
   it('serializes bold/italic/link tokens to real HTML tags', () => {
-    expect(tokensToHtml(parseBio('**bold** and [site](https://example.com)')))
-      .toBe('<strong>bold</strong> and <a href="https://example.com">site</a>');
+    expect(tokensToHtml(parseBio('**bold** and [site](https://example.com)'))).toBe(
+      '<strong>bold</strong> and <a href="https://example.com">site</a>',
+    );
   });
 
   it('HTML-escapes a literal tag in plain text so it copies as inert text, not live markup', () => {
-    expect(tokensToHtml(parseBio('<script>alert(1)</script>')))
-      .toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(tokensToHtml(parseBio('<script>alert(1)</script>'))).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
   });
 
   it('escapes HTML-significant characters inside a link href and text too', () => {
-    expect(tokensToHtml(parseBio('[a<b>](https://example.com?x=1&y=2)')))
-      .toBe('<a href="https://example.com?x=1&amp;y=2">a&lt;b&gt;</a>');
+    expect(tokensToHtml(parseBio('[a<b>](https://example.com?x=1&y=2)'))).toBe(
+      '<a href="https://example.com?x=1&amp;y=2">a&lt;b&gt;</a>',
+    );
   });
 
   it('renders a break token as <br>', () => {

@@ -34,7 +34,10 @@ const createUser = async (overrides = {}) => {
 
 const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root' });
 
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 100); });
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 100);
+  });
 
 describe('GET /api/security/network/summary — admin-only', () => {
   it('a standard user gets 404', async () => {
@@ -95,9 +98,12 @@ describe('GET /api/security/network/summary — admin-only', () => {
       .get('/api/security/network/summary')
       .set('Authorization', `Bearer ${tokenFor(admin)}`);
     expect(res.status).toBe(200);
-    expect(res.body.topSuspiciousDestinations[0]).toEqual(expect.objectContaining({
-      destinationIp: '198.51.100.66', count: 3,
-    }));
+    expect(res.body.topSuspiciousDestinations[0]).toEqual(
+      expect.objectContaining({
+        destinationIp: '198.51.100.66',
+        count: 3,
+      }),
+    );
   });
 
   it('does not include ordinary NETWORK_FLOW observations as alerts', async () => {

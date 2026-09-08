@@ -18,28 +18,30 @@ setInterval(() => {
 // windowMs/max scoped per route via closure — e.g. inviteRateLimit({ max: 10, windowMs: 60_000 }).
 // Keyed on req.user.id when authenticated (create/accept/join routes), else
 // falls back to IP (preview routes, which are intentionally unauthenticated).
-const inviteRateLimit = ({ max, windowMs, keyPrefix }) => (req, res, next) => {
-  const key = `${keyPrefix}:${req.user ? req.user.id : req.ip}`;
-  const now = Date.now();
-  let bucket = buckets.get(key);
-  if (!bucket || bucket.resetAt <= now) {
-    bucket = { count: 0, resetAt: now + windowMs };
-    buckets.set(key, bucket);
-  }
-  bucket.count += 1;
-  if (bucket.count > max) {
-    SecurityEventService.record({
-      type: 'RATE_LIMIT_TRIGGERED',
-      severity: 'medium',
-      actor: req.user ? { userId: req.user.id } : {},
-      source: securityEventContext(req),
-      target: { resource: req.originalUrl, action: keyPrefix },
-      result: 'blocked',
-      metadata: { limiter: keyPrefix },
-    });
-    return res.status(429).json({ error: true, reason: 'RATE_LIMITED' });
-  }
-  return next();
-};
+const inviteRateLimit =
+  ({ max, windowMs, keyPrefix }) =>
+  (req, res, next) => {
+    const key = `${keyPrefix}:${req.user ? req.user.id : req.ip}`;
+    const now = Date.now();
+    let bucket = buckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      buckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (bucket.count > max) {
+      SecurityEventService.record({
+        type: 'RATE_LIMIT_TRIGGERED',
+        severity: 'medium',
+        actor: req.user ? { userId: req.user.id } : {},
+        source: securityEventContext(req),
+        target: { resource: req.originalUrl, action: keyPrefix },
+        result: 'blocked',
+        metadata: { limiter: keyPrefix },
+      });
+      return res.status(429).json({ error: true, reason: 'RATE_LIMITED' });
+    }
+    return next();
+  };
 
 module.exports = inviteRateLimit;

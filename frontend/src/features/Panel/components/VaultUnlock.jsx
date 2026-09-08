@@ -26,14 +26,19 @@ function VaultUnlock() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getVaultStatus().then((res) => setStatus(res.data)).catch(() => setStatus({ configured: false }));
+    getVaultStatus()
+      .then((res) => setStatus(res.data))
+      .catch(() => setStatus({ configured: false }));
   }, []);
 
-  const loadVaultList = useCallback((token) => {
-    getVaultList(token)
-      .then((res) => setVaultRooms(res.data.rooms))
-      .catch(() => toast.error('Could not load your Private Vault.'));
-  }, [setVaultRooms]);
+  const loadVaultList = useCallback(
+    (token) => {
+      getVaultList(token)
+        .then((res) => setVaultRooms(res.data.rooms))
+        .catch(() => toast.error('Could not load your Private Vault.'));
+    },
+    [setVaultRooms],
+  );
 
   useEffect(() => {
     if (vaultToken) loadVaultList(vaultToken);
@@ -107,7 +112,14 @@ function VaultUnlock() {
           <ShieldCheck className="h-3.5 w-3.5" />
           Private Vault unlocked
           {!status.hasPasskey && (
-            <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 px-2 text-[11px]" onClick={addPasskey} disabled={busy}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-7 px-2 text-[11px]"
+              onClick={addPasskey}
+              disabled={busy}
+            >
               Add passkey
             </Button>
           )}

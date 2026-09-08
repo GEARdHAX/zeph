@@ -22,9 +22,22 @@ const COMPLEXITY_THRESHOLD = 2; // >=3 distinct non-zero signal categories route
 
 const countSignalCategories = (context) => {
   let categories = 0;
-  if ((context.failedLoginCount || 0) > 0 || (context.rateLimitCount || 0) > 0 || (context.permissionDeniedCount || 0) > 0 || context.newDevice) categories += 1;
+  if (
+    (context.failedLoginCount || 0) > 0 ||
+    (context.rateLimitCount || 0) > 0 ||
+    (context.permissionDeniedCount || 0) > 0 ||
+    context.newDevice
+  )
+    categories += 1;
   if ((context.processAnomalyCount || 0) > 0) categories += 1;
-  if ((context.networkAnomalyCount || 0) > 0 || (context.portScanCount || 0) > 0 || (context.hostScanCount || 0) > 0 || (context.beaconingCount || 0) > 0 || (context.exfiltrationCount || 0) > 0) categories += 1;
+  if (
+    (context.networkAnomalyCount || 0) > 0 ||
+    (context.portScanCount || 0) > 0 ||
+    (context.hostScanCount || 0) > 0 ||
+    (context.beaconingCount || 0) > 0 ||
+    (context.exfiltrationCount || 0) > 0
+  )
+    categories += 1;
   if ((context.maliciousIpCount || 0) > 0 || (context.threatSignals || []).length > 0) categories += 1;
   if ((context.dnsAnomalyCount || 0) > 0) categories += 1;
   return categories;

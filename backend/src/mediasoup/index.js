@@ -114,7 +114,9 @@ async function createConsumer(producer, rtpCapabilities, consumerTransport) {
 // started is correctly denied on their next join attempt).
 const authorizeMeetingJoin = async (meetingId, userId) => {
   if (!meetingId) return { ok: false, reason: 'no_meeting_id' };
-  const meeting = await Meeting.findById(meetingId).select('caller callee group users').catch(() => null);
+  const meeting = await Meeting.findById(meetingId)
+    .select('caller callee group users')
+    .catch(() => null);
   if (!meeting) return { ok: false, reason: 'meeting_not_found' };
 
   const userIdStr = userId.toString();
@@ -188,7 +190,10 @@ const initSocket = (socket) => {
       // meeting's room merely by naming its id in a direct 'produce' call.
       const authz = await authorizeMeetingJoin(data.roomID, socket.decoded_token.id);
       if (!authz.ok) {
-        logger.warn({ meetingId: data.roomID, userId: socket.decoded_token.id, reason: authz.reason }, 'Unauthorized mediasoup produce attempt rejected');
+        logger.warn(
+          { meetingId: data.roomID, userId: socket.decoded_token.id, reason: authz.reason },
+          'Unauthorized mediasoup produce attempt rejected',
+        );
         callback({ error: 'unauthorized' });
         return;
       }
@@ -219,15 +224,13 @@ const initSocket = (socket) => {
       !producers[socket.id] && (producers[socket.id] = {});
       producers[socket.id][producer.id] = producer;
 
-      socket
-        .to(data.roomID)
-        .emit('newProducer', {
-          userID: socket.decoded_token.id,
-          roomID: data.roomID || 'general',
-          socketID: socket.id,
-          producerID: producer.id,
-          isScreen,
-        });
+      socket.to(data.roomID).emit('newProducer', {
+        userID: socket.decoded_token.id,
+        roomID: data.roomID || 'general',
+        socketID: socket.id,
+        producerID: producer.id,
+        isScreen,
+      });
 
       callback({ id: producer.id });
     } catch (err) {
@@ -242,7 +245,8 @@ const initSocket = (socket) => {
       if (!producer) throw new Error('Producer not found — it may have already left');
 
       const consumerTransport = consumerTransports[socket.id];
-      if (!consumerTransport) throw new Error('No consumer transport for this socket — call createConsumerTransport first');
+      if (!consumerTransport)
+        throw new Error('No consumer transport for this socket — call createConsumerTransport first');
 
       const obj = await createConsumer(producer, data.rtpCapabilities, consumerTransport);
       if (!obj) throw new Error('Cannot consume this producer (incompatible rtpCapabilities)');
@@ -287,11 +291,17 @@ const initSocket = (socket) => {
 
   socket.on('join', async (data, callback) => {
     const authz = await authorizeMeetingJoin(data.roomID, socket.decoded_token.id).catch((err) => {
-      logger.error({ err, meetingId: data.roomID, userId: socket.decoded_token.id }, 'Meeting join authorization check failed');
+      logger.error(
+        { err, meetingId: data.roomID, userId: socket.decoded_token.id },
+        'Meeting join authorization check failed',
+      );
       return { ok: false, reason: 'authorization_check_failed' };
     });
     if (!authz.ok) {
-      logger.warn({ meetingId: data.roomID, userId: socket.decoded_token.id, reason: authz.reason }, 'Unauthorized mediasoup join attempt rejected');
+      logger.warn(
+        { meetingId: data.roomID, userId: socket.decoded_token.id, reason: authz.reason },
+        'Unauthorized mediasoup join attempt rejected',
+      );
       if (typeof callback === 'function') callback({ error: 'unauthorized' });
       return;
     }
@@ -369,7 +379,9 @@ const initSocket = (socket) => {
   socket.on('disconnect', async () => {
     const roomID = store.roomIDs[socket.id];
     if (roomID) {
-      await leaveRoom(socket, roomID).catch((err) => logger.error({ err, socketId: socket.id }, 'Failed to clean up mediasoup state on disconnect'));
+      await leaveRoom(socket, roomID).catch((err) =>
+        logger.error({ err, socketId: socket.id }, 'Failed to clean up mediasoup state on disconnect'),
+      );
     } else {
       // Never joined a room (e.g. dropped mid-handshake) — still clear any
       // transports/producers/consumers this socket may have created.
@@ -387,7 +399,10 @@ const initSocket = (socket) => {
     // producer), so ownership is exactly "is this producerID one of mine."
     const ownsProducer = !!(producers[socket.id] && producers[socket.id][data.producerID]);
     if (!ownsProducer) {
-      logger.warn({ producerId: data.producerID, socketId: socket.id }, 'Unauthorized mediasoup remove attempt rejected — not the producer owner');
+      logger.warn(
+        { producerId: data.producerID, socketId: socket.id },
+        'Unauthorized mediasoup remove attempt rejected — not the producer owner',
+      );
       if (typeof callback === 'function') callback({ error: 'unauthorized' });
       return;
     }
@@ -517,7 +532,13 @@ module.exports = {
   // caller/test, not created here). __testHelpers is not used by any
   // production code path.
   __testHelpers: {
-    cleanupSocketResources, closeProducer, closeConsumer, producerTransports, consumerTransports, producers, consumers,
+    cleanupSocketResources,
+    closeProducer,
+    closeConsumer,
+    producerTransports,
+    consumerTransports,
+    producers,
+    consumers,
     authorizeMeetingJoin,
   },
 };

@@ -139,12 +139,12 @@ describe('zeroTrust middleware — evaluation error fails CLOSED (spec section 3
         .post('/api/users/change-password')
         .set('Authorization', `Bearer ${token}`)
         .field('password', 'newpassword123')
-      // Phase 9: change-password now requires current-password
-      // re-verification (see users/change-password.js's audit comment) —
-      // every call here supplies createUser()'s real password so these
-      // ZERO TRUST-focused assertions aren't accidentally testing the
-      // (unrelated) current-password check instead.
-      .field('currentPassword', 'password123');
+        // Phase 9: change-password now requires current-password
+        // re-verification (see users/change-password.js's audit comment) —
+        // every call here supplies createUser()'s real password so these
+        // ZERO TRUST-focused assertions aren't accidentally testing the
+        // (unrelated) current-password check instead.
+        .field('currentPassword', 'password123');
       // resolveSession's own .catch(() => null) already handles this
       // gracefully (degrades to null session, still evaluates, doesn't
       // throw) — confirming the fail-safe explicitly rather than assuming.

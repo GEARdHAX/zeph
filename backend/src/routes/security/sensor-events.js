@@ -119,21 +119,39 @@ module.exports = async (req, res) => {
     // pass — see the final report's scope note on process<->network
     // correlation being deferred.
     if (event.type === 'NETWORK_FLOW' && event.flow) {
-      networkRules.evaluateFlow({
-        sensorId: req.sensor.sensorId, hostId: req.sensor.hostId, flow: event.flow,
-      }).catch((err) => logger.warn({ err, sensorId: req.sensor.sensorId }, 'network_rules_flow_evaluation_failed'));
+      networkRules
+        .evaluateFlow({
+          sensorId: req.sensor.sensorId,
+          hostId: req.sensor.hostId,
+          flow: event.flow,
+        })
+        .catch((err) => logger.warn({ err, sensorId: req.sensor.sensorId }, 'network_rules_flow_evaluation_failed'));
     } else if (event.type === 'DNS_QUERY' && event.dns) {
-      networkRules.evaluateDnsQuery({
-        sensorId: req.sensor.sensorId, hostId: req.sensor.hostId, dns: event.dns,
-      }).catch((err) => logger.warn({ err, sensorId: req.sensor.sensorId }, 'network_rules_dns_evaluation_failed'));
+      networkRules
+        .evaluateDnsQuery({
+          sensorId: req.sensor.sensorId,
+          hostId: req.sensor.hostId,
+          dns: event.dns,
+        })
+        .catch((err) => logger.warn({ err, sensorId: req.sensor.sensorId }, 'network_rules_dns_evaluation_failed'));
     }
   }
 
-  logger.info({
-    sensorId: req.sensor.sensorId, batchSize: batch.length, accepted, duplicates, rejected,
-  }, 'ebpf_sensor_batch_ingested');
+  logger.info(
+    {
+      sensorId: req.sensor.sensorId,
+      batchSize: batch.length,
+      accepted,
+      duplicates,
+      rejected,
+    },
+    'ebpf_sensor_batch_ingested',
+  );
 
   res.status(200).json({
-    status: 'success', accepted, duplicates, rejected,
+    status: 'success',
+    accepted,
+    duplicates,
+    rejected,
   });
 };

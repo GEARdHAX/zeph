@@ -42,15 +42,17 @@ describe('sendMail', () => {
   it('rejects when the SMTP connection cannot be verified (bad credentials/host)', async () => {
     mockTransport({ verifyError: new Error('535 Authentication failed') });
 
-    await expect(sendMail({ to: 'user@example.com', subject: 'hi', html: '<p>hi</p>' }))
-      .rejects.toThrow('535 Authentication failed');
+    await expect(sendMail({ to: 'user@example.com', subject: 'hi', html: '<p>hi</p>' })).rejects.toThrow(
+      '535 Authentication failed',
+    );
   });
 
   it('rejects when sendMail itself fails, without ever including the SMTP password in the error', async () => {
     mockTransport({ sendError: new Error('450 rate limited') });
 
-    await expect(sendMail({ to: 'user@example.com', subject: 'hi', html: '<p>hi</p>' }))
-      .rejects.toThrow('450 rate limited');
+    await expect(sendMail({ to: 'user@example.com', subject: 'hi', html: '<p>hi</p>' })).rejects.toThrow(
+      '450 rate limited',
+    );
   });
 
   it('never leaks the auth password through anything sendMail itself throws or returns', async () => {

@@ -27,9 +27,7 @@ function User({ user, selected, onSelect }) {
                 className="aspect-square size-full object-cover"
               />
             )}
-            <AvatarFallback className="bg-transparent text-xs font-bold text-white">
-              {initials}
-            </AvatarFallback>
+            <AvatarFallback className="bg-transparent text-xs font-bold text-white">{initials}</AvatarFallback>
           </Avatar>
         </div>
 

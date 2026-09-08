@@ -6,7 +6,10 @@ const { computeRiskFactors } = require('../src/services/zeroTrust/riskEngine');
 const { setCachedAnalysis, closeSecurityAiCacheConnection } = require('../src/services/securityAi/cache');
 const SecurityEventService = require('../src/services/securityEventService');
 
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 200); });
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 200);
+  });
 
 beforeAll(async () => {
   await db.connect();
@@ -23,7 +26,7 @@ afterEach(async () => {
 
 const knownSession = { createdAt: new Date(Date.now() - 999999), revokedAt: null };
 
-describe('riskEngine + securityAi integration — no Redis (this suite\'s default)', () => {
+describe("riskEngine + securityAi integration — no Redis (this suite's default)", () => {
   beforeEach(() => {
     store.config = { ...config, redisUrl: null };
   });
@@ -51,16 +54,34 @@ describeIfRedis('riskEngine + securityAi integration — real Redis', () => {
   it('a cached AI anomaly result ABOVE the confidence threshold contributes the bounded AI_AUTH_ANOMALY factor', async () => {
     const userId = `user-ai-risk-${Date.now()}`;
     SecurityEventService.record({
-      type: 'LOGIN_FAILED', severity: 'medium', actor: { userId }, result: 'failure',
+      type: 'LOGIN_FAILED',
+      severity: 'medium',
+      actor: { userId },
+      result: 'failure',
     });
     await flush();
 
     const context = {
-      timeWindow: '5m', scope: 'user', failedLoginCount: 1, rateLimitCount: 0,
+      timeWindow: '5m',
+      scope: 'user',
+      failedLoginCount: 1,
+      rateLimitCount: 0,
     };
-    await setCachedAnalysis('ANOMALY', context, {
-      schemaVersion: 1, anomalous: true, confidence: 85, category: 'authentication_behavior', signals: ['repeated_failed_login'], explanation: 'test', analysisId: 'test-analysis-1',
-    }, 60, userId);
+    await setCachedAnalysis(
+      'ANOMALY',
+      context,
+      {
+        schemaVersion: 1,
+        anomalous: true,
+        confidence: 85,
+        category: 'authentication_behavior',
+        signals: ['repeated_failed_login'],
+        explanation: 'test',
+        analysisId: 'test-analysis-1',
+      },
+      60,
+      userId,
+    );
 
     const result = await computeRiskFactors({ userId, session: knownSession, ip: null });
     const factor = result.factors.find((f) => f.type === 'AI_AUTH_ANOMALY');
@@ -72,11 +93,26 @@ describeIfRedis('riskEngine + securityAi integration — real Redis', () => {
   it('a cached AI result BELOW the confidence threshold contributes nothing', async () => {
     const userId = `user-ai-risk-lowconf-${Date.now()}`;
     const context = {
-      timeWindow: '5m', scope: 'user', failedLoginCount: 0, rateLimitCount: 0,
+      timeWindow: '5m',
+      scope: 'user',
+      failedLoginCount: 0,
+      rateLimitCount: 0,
     };
-    await setCachedAnalysis('ANOMALY', context, {
-      schemaVersion: 1, anomalous: true, confidence: 50, category: 'authentication_behavior', signals: [], explanation: 'test', analysisId: 'test-analysis-2',
-    }, 60, userId);
+    await setCachedAnalysis(
+      'ANOMALY',
+      context,
+      {
+        schemaVersion: 1,
+        anomalous: true,
+        confidence: 50,
+        category: 'authentication_behavior',
+        signals: [],
+        explanation: 'test',
+        analysisId: 'test-analysis-2',
+      },
+      60,
+      userId,
+    );
 
     const result = await computeRiskFactors({ userId, session: knownSession, ip: null });
     expect(result.factors.some((f) => f.type === 'AI_AUTH_ANOMALY')).toBe(false);
@@ -85,11 +121,26 @@ describeIfRedis('riskEngine + securityAi integration — real Redis', () => {
   it('a cached AI result with anomalous:false contributes nothing even at high confidence', async () => {
     const userId = `user-ai-risk-clean-${Date.now()}`;
     const context = {
-      timeWindow: '5m', scope: 'user', failedLoginCount: 0, rateLimitCount: 0,
+      timeWindow: '5m',
+      scope: 'user',
+      failedLoginCount: 0,
+      rateLimitCount: 0,
     };
-    await setCachedAnalysis('ANOMALY', context, {
-      schemaVersion: 1, anomalous: false, confidence: 95, category: 'other', signals: [], explanation: 'test', analysisId: 'test-analysis-3',
-    }, 60, userId);
+    await setCachedAnalysis(
+      'ANOMALY',
+      context,
+      {
+        schemaVersion: 1,
+        anomalous: false,
+        confidence: 95,
+        category: 'other',
+        signals: [],
+        explanation: 'test',
+        analysisId: 'test-analysis-3',
+      },
+      60,
+      userId,
+    );
 
     const result = await computeRiskFactors({ userId, session: knownSession, ip: null });
     expect(result.factors.some((f) => f.type === 'AI_AUTH_ANOMALY')).toBe(false);
@@ -115,13 +166,28 @@ describeIfRedis('riskEngine + securityAi integration — real Redis', () => {
     const userA = `user-ai-risk-collide-a-${Date.now()}`;
     const userB = `user-ai-risk-collide-b-${Date.now()}`;
     const identicalContext = {
-      timeWindow: '5m', scope: 'user', failedLoginCount: 0, rateLimitCount: 0,
+      timeWindow: '5m',
+      scope: 'user',
+      failedLoginCount: 0,
+      rateLimitCount: 0,
     };
 
     // Only userA gets a cached anomalous verdict.
-    await setCachedAnalysis('ANOMALY', identicalContext, {
-      schemaVersion: 1, anomalous: true, confidence: 95, category: 'authentication_behavior', signals: [], explanation: 'test', analysisId: 'test-analysis-collision',
-    }, 60, userA);
+    await setCachedAnalysis(
+      'ANOMALY',
+      identicalContext,
+      {
+        schemaVersion: 1,
+        anomalous: true,
+        confidence: 95,
+        category: 'authentication_behavior',
+        signals: [],
+        explanation: 'test',
+        analysisId: 'test-analysis-collision',
+      },
+      60,
+      userA,
+    );
 
     const resultA = await computeRiskFactors({ userId: userA, session: knownSession, ip: null });
     const resultB = await computeRiskFactors({ userId: userB, session: knownSession, ip: null });
@@ -135,11 +201,26 @@ describeIfRedis('riskEngine + securityAi integration — real Redis', () => {
   it('the AI factor alone is never enough to push risk into DENY territory (bounded contribution, spec section 24)', async () => {
     const userId = `user-ai-risk-bounded-${Date.now()}`;
     const context = {
-      timeWindow: '5m', scope: 'user', failedLoginCount: 0, rateLimitCount: 0,
+      timeWindow: '5m',
+      scope: 'user',
+      failedLoginCount: 0,
+      rateLimitCount: 0,
     };
-    await setCachedAnalysis('ANOMALY', context, {
-      schemaVersion: 1, anomalous: true, confidence: 99, category: 'authentication_behavior', signals: [], explanation: 'test', analysisId: 'test-analysis-4',
-    }, 60, userId);
+    await setCachedAnalysis(
+      'ANOMALY',
+      context,
+      {
+        schemaVersion: 1,
+        anomalous: true,
+        confidence: 99,
+        category: 'authentication_behavior',
+        signals: [],
+        explanation: 'test',
+        analysisId: 'test-analysis-4',
+      },
+      60,
+      userId,
+    );
 
     const result = await computeRiskFactors({ userId, session: knownSession, ip: null });
     // KNOWN_DEVICE(-10) + AI_AUTH_ANOMALY(15) at most — nowhere near the

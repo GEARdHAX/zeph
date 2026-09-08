@@ -25,18 +25,25 @@ module.exports = async (req, res) => {
 
   const requested = types.includes('all') ? ['all'] : types.filter((t) => QUOTA_TYPES.includes(t));
   if (requested.length === 0) {
-    return res.status(400).json({ error: true, message: `types must be one or more of ${QUOTA_TYPES.join(', ')} or "all".` });
+    return res
+      .status(400)
+      .json({ error: true, message: `types must be one or more of ${QUOTA_TYPES.join(', ')} or "all".` });
   }
 
-  const target = await User.findById(userId).select('_id username level').catch(() => null);
+  const target = await User.findById(userId)
+    .select('_id username level')
+    .catch(() => null);
   if (!target) return res.status(404).json({ error: true });
 
   const result = await resetUserQuota(userId, requested);
   if (!result.ok) {
-    const message = result.reason === 'REDIS_UNAVAILABLE'
-      ? 'Quota tracking is not active on this server (no Redis configured).'
-      : 'Could not reset the quota. Please try again.';
-    return res.status(result.reason === 'REDIS_UNAVAILABLE' ? 409 : 500).json({ error: true, reason: result.reason, message });
+    const message =
+      result.reason === 'REDIS_UNAVAILABLE'
+        ? 'Quota tracking is not active on this server (no Redis configured).'
+        : 'Could not reset the quota. Please try again.';
+    return res
+      .status(result.reason === 'REDIS_UNAVAILABLE' ? 409 : 500)
+      .json({ error: true, reason: result.reason, message });
   }
 
   SecurityEventService.record({

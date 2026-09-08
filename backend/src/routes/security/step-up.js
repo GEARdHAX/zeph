@@ -17,7 +17,11 @@ module.exports = async (req, res) => {
 
   const session = await resolveSession(req);
   const result = await issueStepUpToken({
-    userId: req.user.id, sessionId: session?._id, resource, action, password,
+    userId: req.user.id,
+    sessionId: session?._id,
+    resource,
+    action,
+    password,
   });
 
   if (!result.ok) {

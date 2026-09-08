@@ -36,7 +36,10 @@ const checkAndReserveBudget = async (dailyBudget) => {
     }
     return { allowed: true, remaining: dailyBudget - count };
   } catch (err) {
-    logger.warn({ err }, 'Failed to check threat intel quota — allowing (fail open on the QUOTA check only, not on the security decision itself)');
+    logger.warn(
+      { err },
+      'Failed to check threat intel quota — allowing (fail open on the QUOTA check only, not on the security decision itself)',
+    );
     // A quota-tracking failure is NOT a security failure — the actual
     // provider call still has its own timeout/circuit-breaker; losing the
     // ability to COUNT calls must not itself become a reason to stop

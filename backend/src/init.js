@@ -249,7 +249,10 @@ module.exports = (mediasoupEnabled) => {
     limit: 8,
     standardHeaders: true,
     legacyHeaders: false,
-    handler: rateLimitHandler('vault_unlock', { status: 'error', message: 'Too many vault unlock attempts, please try again later.' }),
+    handler: rateLimitHandler('vault_unlock', {
+      status: 'error',
+      message: 'Too many vault unlock attempts, please try again later.',
+    }),
   });
   store.app.use(
     ['/api/login', '/api/register', '/api/auth/change', '/api/auth/code', '/api/auth/verify', '/api/check-user'],
@@ -258,15 +261,29 @@ module.exports = (mediasoupEnabled) => {
   store.app.use('/api/ai', aiLimiter);
   store.app.use(
     [
-      '/api/search', '/api/users', '/api/friend-requests', '/api/friends', '/api/room/create', '/api/block',
-      '/api/unblock', '/api/group/create', '/api/group/members/search', '/api/group/members/add',
+      '/api/search',
+      '/api/users',
+      '/api/friend-requests',
+      '/api/friends',
+      '/api/room/create',
+      '/api/block',
+      '/api/unblock',
+      '/api/group/create',
+      '/api/group/members/search',
+      '/api/group/members/add',
     ],
     discoveryLimiter,
   );
   store.app.use(
     [
-      '/api/message/delete', '/api/conversation/hide', '/api/conversation/unhide', '/api/conversation/delete',
-      '/api/group/members/remove', '/api/group/leave', '/api/group/delete', '/api/meeting/delete',
+      '/api/message/delete',
+      '/api/conversation/hide',
+      '/api/conversation/unhide',
+      '/api/conversation/delete',
+      '/api/group/members/remove',
+      '/api/group/leave',
+      '/api/group/delete',
+      '/api/meeting/delete',
       '/api/users/delete-account',
     ],
     deleteLimiter,
@@ -294,7 +311,8 @@ module.exports = (mediasoupEnabled) => {
             const session = await Session.findById(payload.deviceId);
             if (!session || session.revokedAt) return done(null, false);
             Session.updateOne({ _id: session._id }, { $set: { lastSeenAt: new Date() } }).catch((err) =>
-              logger.warn({ err, sessionId: session._id }, 'Failed to update session lastSeenAt'));
+              logger.warn({ err, sessionId: session._id }, 'Failed to update session lastSeenAt'),
+            );
             // Stashed directly on the User document passport hands back —
             // NOT a schema field, never persisted, just carries the
             // already-verified deviceId through to req.user for the rest of
@@ -370,15 +388,19 @@ module.exports = (mediasoupEnabled) => {
         User.findOne({ $or: [{ username }, { email }] })
           .then((user) => {
             if (!user) {
-              return argon2
-                .hash(password)
-                .then((hash) => new User({
-                  username, email, password: hash, firstName, lastName, level: 'root',
-                }).save());
+              return argon2.hash(password).then((hash) =>
+                new User({
+                  username,
+                  email,
+                  password: hash,
+                  firstName,
+                  lastName,
+                  level: 'root',
+                }).save(),
+              );
             }
-            return argon2
-              .hash(password)
-              .then((hash) => User.findOneAndUpdate(
+            return argon2.hash(password).then((hash) =>
+              User.findOneAndUpdate(
                 { _id: user._id },
                 {
                   $set: {
@@ -391,11 +413,14 @@ module.exports = (mediasoupEnabled) => {
                     level: 'root',
                   },
                 },
-              ));
+              ),
+            );
           })
           .catch((err) => logger.error({ err }, 'Failed to provision root user on boot'));
 
-        Meeting.updateMany({}, { $set: { peers: [] } }).catch((err) => logger.error({ err }, 'Failed to reset meeting peers on boot'));
+        Meeting.updateMany({}, { $set: { peers: [] } }).catch((err) =>
+          logger.error({ err }, 'Failed to reset meeting peers on boot'),
+        );
 
         // Backfill usernameNormalized for users created before it existed (findOneAndUpdate/
         // legacy documents bypass the pre-save hook that keeps it in sync). Idempotent —
@@ -403,10 +428,14 @@ module.exports = (mediasoupEnabled) => {
         User.find({ username: { $exists: true, $ne: null }, usernameNormalized: { $exists: false } })
           .then((users) =>
             Promise.all(
-              users.map((u) => User.updateOne({ _id: u._id }, { $set: { usernameNormalized: u.username.toLowerCase() } })),
-            ))
+              users.map((u) =>
+                User.updateOne({ _id: u._id }, { $set: { usernameNormalized: u.username.toLowerCase() } }),
+              ),
+            ),
+          )
           .then((results) => {
-            if (results.length) logger.info({ count: results.length }, 'Backfilled usernameNormalized for legacy users');
+            if (results.length)
+              logger.info({ count: results.length }, 'Backfilled usernameNormalized for legacy users');
           })
           .catch((err) => logger.error({ err }, 'Failed to backfill usernameNormalized'));
 

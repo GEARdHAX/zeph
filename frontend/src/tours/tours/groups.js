@@ -48,21 +48,20 @@ export default function buildGroupsTour({ myRole = 'MEMBER' } = {}) {
   // (spec §14 covers the missing-element case regardless, but this avoids
   // even attempting it).
   if (canManage) {
-    steps.push(
-      {
-        element: '[data-tour="group-manage-button"]',
-        popover: {
-          title: 'Manage Group',
-          description: `As ${roleLabel(myRole)}, you can moderate members, review join requests, and adjust group settings here.`,
-          side: 'bottom',
-        },
+    steps.push({
+      element: '[data-tour="group-manage-button"]',
+      popover: {
+        title: 'Manage Group',
+        description: `As ${roleLabel(myRole)}, you can moderate members, review join requests, and adjust group settings here.`,
+        side: 'bottom',
       },
-    );
+    });
   } else {
     steps.push({
       popover: {
         title: 'Group settings',
-        description: 'Only the owner and admins can manage members or change group settings — you\'ll see a "Manage Group" button here if you\'re promoted.',
+        description:
+          'Only the owner and admins can manage members or change group settings — you\'ll see a "Manage Group" button here if you\'re promoted.',
       },
     });
   }

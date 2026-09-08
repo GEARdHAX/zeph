@@ -38,7 +38,9 @@ const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root'
 const registerSensor = async (sensorId = 'sensor-1', hostId = 'host-1') => {
   const rawCredential = 'a-raw-test-credential-value';
   await SensorCredential.create({
-    sensorId, hostId, credentialHash: SensorCredential.hashCredential(rawCredential),
+    sensorId,
+    hostId,
+    credentialHash: SensorCredential.hashCredential(rawCredential),
   });
   return { sensorId, hostId, rawCredential };
 };
@@ -50,15 +52,18 @@ const validProcessEvent = (eventId = 'evt-1') => ({
   process: { name: 'sshd', pid: 100, parentPid: 1, parentName: 'systemd' },
 });
 
-const sendBatch = (sensorId, rawCredential, events) => request(app)
-  .post('/api/security/sensor/events')
-  .set('x-zeph-sensor-id', sensorId)
-  .set('x-zeph-sensor-credential', rawCredential)
-  .send({ events });
+const sendBatch = (sensorId, rawCredential, events) =>
+  request(app)
+    .post('/api/security/sensor/events')
+    .set('x-zeph-sensor-id', sensorId)
+    .set('x-zeph-sensor-credential', rawCredential)
+    .send({ events });
 
 describe('POST /api/security/sensor/events — sensor auth', () => {
   it('rejects a request with no sensor credentials', async () => {
-    const res = await request(app).post('/api/security/sensor/events').send({ events: [validProcessEvent()] });
+    const res = await request(app)
+      .post('/api/security/sensor/events')
+      .send({ events: [validProcessEvent()] });
     expect(res.status).toBe(401);
   });
 
@@ -115,7 +120,9 @@ describe('POST /api/security/sensor/events — validation', () => {
     expect(res.body.accepted + res.body.duplicates).toBe(1);
     expect(res.body.rejected).toBe(0);
 
-    await new Promise((resolve) => { setTimeout(resolve, 50); }); // fire-and-forget Mongo write
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    }); // fire-and-forget Mongo write
     const stored = await SecurityEvent.findOne({ 'metadata.sensorEventId': 'evt-accept-1' });
     if (res.body.accepted === 1) {
       expect(stored).toBeTruthy();
@@ -143,7 +150,9 @@ describe('POST /api/security/sensor/events — validation', () => {
     expect(res.body.accepted + res.body.duplicates).toBe(1);
     expect(res.body.rejected).toBe(0);
 
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     const stored = await SecurityEvent.findOne({ 'metadata.sensorEventId': 'evt-spoof-1' });
     if (res.body.accepted === 1) {
       expect(stored.severity).not.toBe('critical'); // computed server-side from type, not from the sensor
@@ -260,7 +269,11 @@ const validFlowEvent = (eventId = 'flow-1') => ({
   type: 'NETWORK_FLOW',
   timestamp: new Date().toISOString(),
   flow: {
-    destinationIp: '203.0.113.5', destinationPort: 443, protocol: 'TCP', pid: 100, processName: 'node',
+    destinationIp: '203.0.113.5',
+    destinationPort: 443,
+    protocol: 'TCP',
+    pid: 100,
+    processName: 'node',
   },
 });
 
@@ -279,7 +292,9 @@ describe('POST /api/security/sensor/events — Phase 5 network events', () => {
     expect(res.body.accepted + res.body.duplicates).toBe(1);
     expect(res.body.rejected).toBe(0);
 
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     const stored = await SecurityEvent.findOne({ 'metadata.sensorEventId': 'flow-accept-1' });
     if (res.body.accepted === 1) {
       expect(stored).toBeTruthy();
@@ -298,7 +313,9 @@ describe('POST /api/security/sensor/events — Phase 5 network events', () => {
     expect(res.status).toBe(200);
     expect(res.body.accepted + res.body.duplicates).toBe(1);
 
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     const stored = await SecurityEvent.findOne({ 'metadata.sensorEventId': 'dns-accept-1' });
     if (res.body.accepted === 1) {
       expect(stored).toBeTruthy();
@@ -314,14 +331,21 @@ describe('POST /api/security/sensor/events — Phase 5 network events', () => {
     const event = {
       ...validFlowEvent('flow-spoof-1'),
       flow: {
-        ...validFlowEvent().flow, riskScore: 100, malicious: true, decision: 'DENY', trusted: false, policy: 'ADMIN_OVERRIDE',
+        ...validFlowEvent().flow,
+        riskScore: 100,
+        malicious: true,
+        decision: 'DENY',
+        trusted: false,
+        policy: 'ADMIN_OVERRIDE',
       },
     };
     const res = await sendBatch(sensorId, rawCredential, [event]);
     expect(res.status).toBe(200);
     expect(res.body.rejected).toBe(0);
 
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     const stored = await SecurityEvent.findOne({ 'metadata.sensorEventId': 'flow-spoof-1' });
     if (stored) {
       const raw = JSON.stringify(stored.toObject());
@@ -352,7 +376,10 @@ describe('POST /api/security/sensor/events — Phase 5 network events', () => {
   it('a sensor cannot submit a backend-computed verdict type directly (PORT_SCAN_ANOMALY is not in the sensor allowlist)', async () => {
     const { sensorId, rawCredential } = await registerSensor('sensor-net-5', 'host-net-5');
     const event = {
-      eventId: 'fake-verdict-1', type: 'PORT_SCAN_ANOMALY', timestamp: new Date().toISOString(), flow: validFlowEvent().flow,
+      eventId: 'fake-verdict-1',
+      type: 'PORT_SCAN_ANOMALY',
+      timestamp: new Date().toISOString(),
+      flow: validFlowEvent().flow,
     };
     const res = await sendBatch(sensorId, rawCredential, [event]);
     expect(res.status).toBe(200);

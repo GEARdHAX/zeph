@@ -30,22 +30,25 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
-const setSlowMode = (actor, groupId, slowModeSeconds) => request(app)
-  .post('/api/group/update')
-  .set('Authorization', `Bearer ${tokenFor(actor)}`)
-  .send({ id: groupId, slowModeSeconds });
+const setSlowMode = (actor, groupId, slowModeSeconds) =>
+  request(app)
+    .post('/api/group/update')
+    .set('Authorization', `Bearer ${tokenFor(actor)}`)
+    .send({ id: groupId, slowModeSeconds });
 
-const send = (user, roomID, content) => request(app)
-  .post('/api/message')
-  .set('Authorization', `Bearer ${tokenFor(user)}`)
-  .field('roomID', roomID)
-  .field('content', content)
-  .field('type', 'text');
+const send = (user, roomID, content) =>
+  request(app)
+    .post('/api/message')
+    .set('Authorization', `Bearer ${tokenFor(user)}`)
+    .field('roomID', roomID)
+    .field('content', content)
+    .field('type', 'text');
 
 describe('Slow mode', () => {
   it('rejects a rapid second send from a MEMBER within the window', async () => {

@@ -45,7 +45,10 @@ module.exports = async (req, res) => {
   // ollama-only deployments correctly get the 503.
   if (!aiTextEnabled(config) || config.aiProvider === 'ollama') {
     return res.status(503).json({
-      error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'Meeting AI requires the Gemini or Groq provider to be configured on this server.', requestId,
+      error: true,
+      reason: REJECTION_REASONS.AI_DISABLED,
+      message: 'Meeting AI requires the Gemini or Groq provider to be configured on this server.',
+      requestId,
     });
   }
 
@@ -61,16 +64,28 @@ module.exports = async (req, res) => {
   } else {
     const existing = await MeetingTranscript.findOne({ meeting: meetingId });
     if (!existing || !existing.transcript) {
-      return res.status(400).json({ error: true, reason: 'NO_TRANSCRIPT_YET', message: 'No recording has been uploaded for this meeting yet.', requestId });
+      return res.status(400).json({
+        error: true,
+        reason: 'NO_TRANSCRIPT_YET',
+        message: 'No recording has been uploaded for this meeting yet.',
+        requestId,
+      });
     }
   }
 
   if (getQueue()) {
     await enqueueMeetingSummaryJob({
-      meetingId, mediaId, userId: req.user.id, requestId,
+      meetingId,
+      mediaId,
+      userId: req.user.id,
+      requestId,
     });
     return res.status(202).json({
-      status: 'PROCESSING', message: mediaId ? 'Transcribing and summarizing your meeting recording.' : 'Generating a summary from the existing transcript.', requestId,
+      status: 'PROCESSING',
+      message: mediaId
+        ? 'Transcribing and summarizing your meeting recording.'
+        : 'Generating a summary from the existing transcript.',
+      requestId,
     });
   }
 
@@ -82,17 +97,28 @@ module.exports = async (req, res) => {
     const transcribeResult = await transcribeMeetingAudio({ meetingId, mediaId, userId: req.user.id });
     if (!transcribeResult.ok) {
       return res.status(502).json({
-        error: true, reason: transcribeResult.reason, message: 'Could not transcribe the meeting recording.', requestId,
+        error: true,
+        reason: transcribeResult.reason,
+        message: 'Could not transcribe the meeting recording.',
+        requestId,
       });
     }
   }
 
   const result = await generateMeetingSummary({ meetingId, userId: req.user.id, requestId });
   if (!result.ok) {
-    const ELIGIBILITY_REASONS = new Set(['MEETING_TOO_SHORT', 'INSUFFICIENT_PARTICIPANTS', 'INSUFFICIENT_TRANSCRIPT', 'MEETING_NOT_ENDED']);
+    const ELIGIBILITY_REASONS = new Set([
+      'MEETING_TOO_SHORT',
+      'INSUFFICIENT_PARTICIPANTS',
+      'INSUFFICIENT_TRANSCRIPT',
+      'MEETING_NOT_ENDED',
+    ]);
     if (ELIGIBILITY_REASONS.has(result.reason)) {
       return res.status(422).json({
-        error: true, reason: result.reason, message: meetingEligibilityMessage(result), requestId,
+        error: true,
+        reason: result.reason,
+        message: meetingEligibilityMessage(result),
+        requestId,
       });
     }
     // RATE_LIMITED / QUOTA_EXCEEDED (with reset info) / provider failures —
@@ -100,7 +126,9 @@ module.exports = async (req, res) => {
     return aiFailureResponse(res, result, requestId);
   }
   res.status(200).json({
-    summary: result.text || result.summary, cached: !!result.cached, requestId: result.requestId || requestId,
+    summary: result.text || result.summary,
+    cached: !!result.cached,
+    requestId: result.requestId || requestId,
   });
 };
 

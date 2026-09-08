@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Bell, MessageSquare, Check, X,
-} from 'lucide-react';
+import { Bell, MessageSquare, Check, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -34,9 +32,11 @@ function NotificationsPlaceholder() {
   useEffect(() => {
     if (!socket) return undefined;
     const onReceived = (data) => {
-      setIncoming((prev) => (prev.some((r) => r._id === data.relationship._id)
-        ? prev
-        : [{ ...data.relationship, requester: data.requester }, ...prev]));
+      setIncoming((prev) =>
+        prev.some((r) => r._id === data.relationship._id)
+          ? prev
+          : [{ ...data.relationship, requester: data.requester }, ...prev],
+      );
     };
     socket.on('friend-request:received', onReceived);
     return () => socket.off('friend-request:received', onReceived);
@@ -57,7 +57,10 @@ function NotificationsPlaceholder() {
   return (
     <div className="flex h-full w-full flex-col bg-background text-foreground overflow-y-auto">
       {/* Header */}
-      <div data-tour="notifications-header" className="flex h-16 w-full shrink-0 items-center justify-between border-b border-border/60 bg-card px-6">
+      <div
+        data-tour="notifications-header"
+        className="flex h-16 w-full shrink-0 items-center justify-between border-b border-border/60 bg-card px-6"
+      >
         <div>
           <h1 className="text-base font-bold text-foreground">Notifications</h1>
           <p className="text-xs text-muted-foreground">Recent alerts, unread messages, and mentions</p>
@@ -69,14 +72,13 @@ function NotificationsPlaceholder() {
         {incoming.length > 0 && (
           <div className="flex flex-col gap-3 mb-6">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              Friend Requests (
-              {incoming.length}
-              )
+              Friend Requests ({incoming.length})
             </h2>
             {incoming.map((request) => {
               const person = request.requester || {};
               const fullName = `${person.firstName || ''} ${person.lastName || ''}`.trim() || person.username;
-              const initials = `${(person.firstName || 'U').charAt(0)}${(person.lastName || '').charAt(0)}`.toUpperCase();
+              const initials =
+                `${(person.firstName || 'U').charAt(0)}${(person.lastName || '').charAt(0)}`.toUpperCase();
               return (
                 <div
                   key={request._id}
@@ -122,9 +124,7 @@ function NotificationsPlaceholder() {
         {unreadRooms.length > 0 ? (
           <div className="flex flex-col gap-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              Unread Messages (
-              {unreadRooms.length}
-              )
+              Unread Messages ({unreadRooms.length})
             </h2>
             {unreadRooms.map((room) => (
               <div
@@ -137,7 +137,9 @@ function NotificationsPlaceholder() {
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-foreground">{room.title || 'Conversation'}</div>
-                    <div className="text-xs text-muted-foreground">{room.lastMessage?.content || 'New unread message'}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {room.lastMessage?.content || 'New unread message'}
+                    </div>
                   </div>
                 </div>
                 <Button

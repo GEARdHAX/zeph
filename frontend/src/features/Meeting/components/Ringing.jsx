@@ -131,9 +131,7 @@ function Ringing({ incoming, meetingID }) {
       {/* Header Info */}
       <div className="relative flex flex-col items-center text-center">
         <h2 className="text-xl font-bold tracking-tight text-foreground">{fullName}</h2>
-        <span className="mt-1 text-xs font-medium text-muted-foreground animate-pulse">
-          {getSubtitle()}
-        </span>
+        <span className="mt-1 text-xs font-medium text-muted-foreground animate-pulse">{getSubtitle()}</span>
       </div>
 
       {/* Avatar with ripple animation */}
@@ -149,9 +147,7 @@ function Ringing({ incoming, meetingID }) {
               className="aspect-square size-full object-cover"
             />
           )}
-          <AvatarFallback className="bg-transparent text-2xl font-bold text-white">
-            {initials}
-          </AvatarFallback>
+          <AvatarFallback className="bg-transparent text-2xl font-bold text-white">{initials}</AvatarFallback>
         </Avatar>
       </div>
 

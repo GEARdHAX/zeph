@@ -32,10 +32,7 @@ module.exports = async (req, res) => {
       { $set: { username, usernameNormalized } },
       { new: true },
     ).select('-email -password -friends -__v -vaultPinHash');
-    await Promise.all([
-      invalidateProfileCache(previousUsernameNormalized),
-      invalidateProfileCache(usernameNormalized),
-    ]);
+    await Promise.all([invalidateProfileCache(previousUsernameNormalized), invalidateProfileCache(usernameNormalized)]);
     res.status(200).json({ status: 'success', user: updated });
   } catch (err) {
     // Unique index on usernameNormalized — a concurrent request claiming

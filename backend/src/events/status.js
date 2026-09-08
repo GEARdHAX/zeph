@@ -7,7 +7,9 @@ module.exports = (socket, data) => {
   if (store.onlineUsers.get(socket).status === 'busy') return;
   store.onlineUsers.delete(socket);
   store.onlineUsers.set(socket, {
-    id: socket.decoded_token.id, status: status || 'online', level: socket.decoded_token.level,
+    id: socket.decoded_token.id,
+    status: status || 'online',
+    level: socket.decoded_token.level,
   });
   broadcastPresence().catch((err) => logger.error({ err }, 'Failed to broadcast presence'));
 };

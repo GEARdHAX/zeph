@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, beforeEach, vi,
-} from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
@@ -31,13 +29,18 @@ const makeMessage = (overrides = {}) => ({
 
 function renderMessages(msgs, roomOverrides = {}) {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   store.dispatch({
     type: Actions.SET_ROOM,
     room: {
-      _id: 'room-1', people: [{ _id: 'user-1' }, { _id: 'user-2' }], ...roomOverrides,
+      _id: 'room-1',
+      people: [{ _id: 'user-1' }, { _id: 'user-2' }],
+      ...roomOverrides,
     },
   });
   store.dispatch({ type: Actions.SET_MESSAGES, messages: msgs });
@@ -103,7 +106,9 @@ describe('type:system messages (moderation events)', () => {
   it('renders the system message content as a centered pill, not a chat bubble', () => {
     renderMessages([
       makeMessage({
-        type: 'system', content: 'Tom Target was removed by Alice Owner', author: null,
+        type: 'system',
+        content: 'Tom Target was removed by Alice Owner',
+        author: null,
       }),
     ]);
 
@@ -113,7 +118,9 @@ describe('type:system messages (moderation events)', () => {
   it('does not show an author name header or avatar for a system message', () => {
     renderMessages([
       makeMessage({
-        type: 'system', content: 'Jane Bad was banned by Bob Owner', author: null,
+        type: 'system',
+        content: 'Jane Bad was banned by Bob Owner',
+        author: null,
       }),
     ]);
 
@@ -125,7 +132,10 @@ describe('type:system messages (moderation events)', () => {
     renderMessages([
       makeMessage({ content: 'hey', date: moment().hour(9).toISOString() }),
       makeMessage({
-        type: 'system', content: 'Tom Target was removed by Alice Owner', author: null, date: moment().hour(9).minute(5).toISOString(),
+        type: 'system',
+        content: 'Tom Target was removed by Alice Owner',
+        author: null,
+        date: moment().hour(9).minute(5).toISOString(),
       }),
     ]);
 
@@ -188,7 +198,11 @@ describe('older-history loading preserves scroll position (does not jump to bott
 
   it('shows a spinner while older messages are being fetched, and clears it once they land', async () => {
     let resolveFetch;
-    getMoreMessages.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    getMoreMessages.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
     renderMessages([makeMessage({ _id: 'm-1' })]);
     const scrollEl = screen.getByText('hello').closest('[class*="overflow-y-auto"]');
 
@@ -198,7 +212,9 @@ describe('older-history loading preserves scroll position (does not jump to bott
     expect(await screen.findByRole('status', { name: /loading older messages/i })).toBeInTheDocument();
 
     resolveFetch({ data: { messages: [], hasMore: false } });
-    await waitFor(() => expect(screen.queryByRole('status', { name: /loading older messages/i })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('status', { name: /loading older messages/i })).not.toBeInTheDocument(),
+    );
   });
 
   it('does not show the pagination spinner during the room-load loading state (only messages.length===0 uses that)', () => {

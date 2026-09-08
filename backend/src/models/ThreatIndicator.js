@@ -43,10 +43,12 @@ const ThreatIndicatorSchema = new Schema({
   // Provider-reported categories, normalized to this closed set (spec
   // section 22) — "only use categories the provider actually establishes,"
   // so this stays empty rather than guessing when a provider gives none.
-  categories: [{
-    type: String,
-    enum: ['MALWARE', 'PHISHING', 'BOTNET', 'C2', 'SCANNING', 'SPAM', 'ABUSE', 'UNKNOWN'],
-  }],
+  categories: [
+    {
+      type: String,
+      enum: ['MALWARE', 'PHISHING', 'BOTNET', 'C2', 'SCANNING', 'SPAM', 'ABUSE', 'UNKNOWN'],
+    },
+  ],
 
   source: { type: String, required: true }, // e.g. 'abuseipdb' — see threatIntel/providers/
 

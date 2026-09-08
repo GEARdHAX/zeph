@@ -1,9 +1,5 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
-import {
-  render, screen, fireEvent, waitFor,
-} from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import VideoEditorModal from './VideoEditorModal';
 
@@ -21,7 +17,9 @@ function FakeMediaRecorder(stream, options) {
   this.options = options;
   this.state = 'inactive';
 }
-FakeMediaRecorder.prototype.start = function start() { this.state = 'recording'; };
+FakeMediaRecorder.prototype.start = function start() {
+  this.state = 'recording';
+};
 FakeMediaRecorder.prototype.stop = function stop() {
   this.state = 'inactive';
   if (this.ondataavailable) this.ondataavailable({ data: new Blob(['fake-webm-bytes']) });
@@ -31,8 +29,12 @@ FakeMediaRecorder.prototype.stop = function stop() {
 function FakeMediaStream(tracks = []) {
   this.tracks = tracks;
 }
-FakeMediaStream.prototype.getTracks = function getTracks() { return this.tracks; };
-FakeMediaStream.prototype.getVideoTracks = function getVideoTracks() { return this.tracks; };
+FakeMediaStream.prototype.getTracks = function getTracks() {
+  return this.tracks;
+};
+FakeMediaStream.prototype.getVideoTracks = function getVideoTracks() {
+  return this.tracks;
+};
 
 beforeEach(() => {
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-video-url');

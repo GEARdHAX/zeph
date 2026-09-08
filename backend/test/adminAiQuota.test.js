@@ -5,9 +5,7 @@ const { buildApp, tokenFor } = require('./helpers/app');
 const store = require('../src/store');
 const config = require('../config');
 const User = require('../src/models/User');
-const {
-  resetUserQuota, getUserQuota, QUOTA_TYPES,
-} = require('../src/ai/quota');
+const { resetUserQuota, getUserQuota, QUOTA_TYPES } = require('../src/ai/quota');
 
 let app;
 
@@ -20,8 +18,12 @@ afterAll(async () => {
   await db.closeDatabase();
 });
 
-beforeEach(() => { store.config = { ...config, redisUrl: null }; });
-afterEach(async () => { await db.clearDatabase(); });
+beforeEach(() => {
+  store.config = { ...config, redisUrl: null };
+});
+afterEach(async () => {
+  await db.clearDatabase();
+});
 
 const createUser = async (overrides = {}) => {
   const password = await argon2.hash('password123');

@@ -31,9 +31,11 @@ function AiQuotaPanel({ user, onClose }) {
       toast.success(`Reset ${label} for @${user.username}.`);
     } catch (err) {
       const reason = err?.response?.data?.reason;
-      toast.error(reason === 'REDIS_UNAVAILABLE'
-        ? 'Quota tracking is not active on this server.'
-        : 'Could not reset. Please try again.');
+      toast.error(
+        reason === 'REDIS_UNAVAILABLE'
+          ? 'Quota tracking is not active on this server.'
+          : 'Could not reset. Please try again.',
+      );
     } finally {
       setResetting(null);
     }
@@ -51,7 +53,9 @@ function AiQuotaPanel({ user, onClose }) {
         <div className="rounded-lg border border-border/60 bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
           AI usage tracking is not active on this server (no Redis configured), so there is nothing to reset.
         </div>
-        <Button type="button" variant="secondary" onClick={() => onClose()}>Close</Button>
+        <Button type="button" variant="secondary" onClick={() => onClose()}>
+          Close
+        </Button>
       </div>
     );
   }
@@ -88,19 +92,8 @@ function AiQuotaPanel({ user, onClose }) {
         sub={usage.minute.ttlSeconds ? `resets in ${usage.minute.ttlSeconds}s` : null}
         types={['minute']}
       />
-      <Row
-        label="Today"
-        used={usage.day.used}
-        max={limits.perDay}
-        sub="resets at midnight UTC"
-        types={['day']}
-      />
-      <Row
-        label="In-flight requests"
-        used={usage.concurrent.used}
-        max={limits.concurrent}
-        types={['concurrent']}
-      />
+      <Row label="Today" used={usage.day.used} max={limits.perDay} sub="resets at midnight UTC" types={['day']} />
+      <Row label="In-flight requests" used={usage.concurrent.used} max={limits.concurrent} types={['concurrent']} />
 
       <Button
         type="button"
@@ -111,7 +104,9 @@ function AiQuotaPanel({ user, onClose }) {
       >
         {resetting === 'all AI usage' ? 'Resetting…' : 'Reset all AI usage'}
       </Button>
-      <Button type="button" variant="secondary" onClick={() => onClose()}>Close</Button>
+      <Button type="button" variant="secondary" onClick={() => onClose()}>
+        Close
+      </Button>
     </div>
   );
 }

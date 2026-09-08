@@ -35,7 +35,9 @@ module.exports = async (req, res, next) => {
 
   // Admin privacy boundary — see DECISIONS.md.
   const boundaryViolation = await roomHasBoundaryViolation({
-    room, callerID: req.user.id, callerLevel: req.user.level,
+    room,
+    callerID: req.user.id,
+    callerLevel: req.user.level,
   });
   if (boundaryViolation) {
     return res.status(404).json({ error: true });
@@ -45,7 +47,9 @@ module.exports = async (req, res, next) => {
   // conversation only shows messages from this point forward for THIS
   // user; the other participant's view/the DB record are unaffected. See
   // ConversationUserState's model comment and DECISIONS.md.
-  const state = await ConversationUserState.findOne({ conversation: roomID, user: req.user.id }).select('deletedBefore');
+  const state = await ConversationUserState.findOne({ conversation: roomID, user: req.user.id }).select(
+    'deletedBefore',
+  );
   const deletedBefore = state && state.deletedBefore;
 
   const PAGE_SIZE = 20;

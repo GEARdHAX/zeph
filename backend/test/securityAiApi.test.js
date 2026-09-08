@@ -47,19 +47,20 @@ const createUser = async (overrides = {}) => {
 
 const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root' });
 
-const seedIncident = (overrides = {}) => SecurityIncident.create({
-  incidentId: overrides.incidentId || `incident-${Math.random().toString(36).slice(2)}`,
-  startedAt: overrides.startedAt || new Date(),
-  lastSeenAt: overrides.lastSeenAt || new Date(),
-  severity: overrides.severity || 'high',
-  correlationKey: overrides.correlationKey || 'test-key',
-  signals: overrides.signals || ['process_anomaly', 'malicious_ip'],
-  hosts: overrides.hosts || ['host-1'],
-  sensorIds: overrides.sensorIds || ['sensor-1'],
-  sources: overrides.sources || ['ebpf'],
-  eventCount: overrides.eventCount || 2,
-  aiAnalysis: overrides.aiAnalysis || {},
-});
+const seedIncident = (overrides = {}) =>
+  SecurityIncident.create({
+    incidentId: overrides.incidentId || `incident-${Math.random().toString(36).slice(2)}`,
+    startedAt: overrides.startedAt || new Date(),
+    lastSeenAt: overrides.lastSeenAt || new Date(),
+    severity: overrides.severity || 'high',
+    correlationKey: overrides.correlationKey || 'test-key',
+    signals: overrides.signals || ['process_anomaly', 'malicious_ip'],
+    hosts: overrides.hosts || ['host-1'],
+    sensorIds: overrides.sensorIds || ['sensor-1'],
+    sources: overrides.sources || ['ebpf'],
+    eventCount: overrides.eventCount || 2,
+    aiAnalysis: overrides.aiAnalysis || {},
+  });
 
 describe('GET /api/security/ai/incidents — RBAC', () => {
   it('a standard user gets 404', async () => {
@@ -131,7 +132,13 @@ describe('GET /api/security/ai/incidents/:id — RBAC', () => {
 
 describe('POST /api/security/ai/analyze — RBAC, bounded input', () => {
   beforeEach(() => {
-    store.config = { ...store.config, aiProvider: 'ollama', ollamaModel: 'llama3.2:1b', securityAiTimeoutMs: 8000, securityAiCacheTtlSeconds: 60 };
+    store.config = {
+      ...store.config,
+      aiProvider: 'ollama',
+      ollamaModel: 'llama3.2:1b',
+      securityAiTimeoutMs: 8000,
+      securityAiCacheTtlSeconds: 60,
+    };
     securityAiService.resetBreakerForTests();
   });
 
@@ -148,11 +155,18 @@ describe('POST /api/security/ai/analyze — RBAC, bounded input', () => {
   });
 
   it('an admin can request a manual analysis', async () => {
-    getProvider.mockReturnValue(buildMockAiProvider({
-      response: {
-        anomalous: true, confidence: 82, category: 'authentication_behavior', signals: ['repeated_failed_login'], explanation: 'Elevated failed login count.', recommendedAction: 'STEP_UP',
-      },
-    }));
+    getProvider.mockReturnValue(
+      buildMockAiProvider({
+        response: {
+          anomalous: true,
+          confidence: 82,
+          category: 'authentication_behavior',
+          signals: ['repeated_failed_login'],
+          explanation: 'Elevated failed login count.',
+          recommendedAction: 'STEP_UP',
+        },
+      }),
+    );
     const admin = await createAdmin();
     const res = await request(app)
       .post('/api/security/ai/analyze')

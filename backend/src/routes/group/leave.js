@@ -25,7 +25,10 @@ module.exports = async (req, res) => {
 
   const remainingMemberIds = room.people.filter((p) => p.toString() !== userId.toString());
 
-  await GroupMember.updateOne({ _id: membership._id }, { $set: { active: false, status: 'LEFT', updatedAt: new Date() } });
+  await GroupMember.updateOne(
+    { _id: membership._id },
+    { $set: { active: false, status: 'LEFT', updatedAt: new Date() } },
+  );
   await Room.updateOne({ _id: room._id }, { $pull: { people: userId } });
 
   forceLeaveGroupRoom(userId.toString(), room._id.toString(), { reason: 'left', groupName: room.title });
@@ -34,9 +37,12 @@ module.exports = async (req, res) => {
   broadcastToGroup(remainingMemberIds, 'group:member:removed', { groupId: room._id, userId, self: false });
 
   const leaver = await User.findById(userId).select('firstName lastName username');
-  const leaverName = leaver ? `${leaver.firstName || ''} ${leaver.lastName || ''}`.trim() || leaver.username : 'A member';
-  await postSystemMessage(room._id, `${leaverName} left the group`, remainingMemberIds)
-    .catch((err) => logger.warn({ err, groupId: room._id }, 'Failed to post leave system message'));
+  const leaverName = leaver
+    ? `${leaver.firstName || ''} ${leaver.lastName || ''}`.trim() || leaver.username
+    : 'A member';
+  await postSystemMessage(room._id, `${leaverName} left the group`, remainingMemberIds).catch((err) =>
+    logger.warn({ err, groupId: room._id }, 'Failed to post leave system message'),
+  );
 
   res.status(200).json({ status: 'success' });
 };

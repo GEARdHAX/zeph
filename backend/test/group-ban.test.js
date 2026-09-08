@@ -32,20 +32,23 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
-const banMember = (actor, groupId, userId) => request(app)
-  .post('/api/group/members/ban')
-  .set('Authorization', `Bearer ${tokenFor(actor)}`)
-  .send({ groupId, userId });
+const banMember = (actor, groupId, userId) =>
+  request(app)
+    .post('/api/group/members/ban')
+    .set('Authorization', `Bearer ${tokenFor(actor)}`)
+    .send({ groupId, userId });
 
-const createInvite = (actor, groupId) => request(app)
-  .post('/api/group/invites/create')
-  .set('Authorization', `Bearer ${tokenFor(actor)}`)
-  .send({ groupId });
+const createInvite = (actor, groupId) =>
+  request(app)
+    .post('/api/group/invites/create')
+    .set('Authorization', `Bearer ${tokenFor(actor)}`)
+    .send({ groupId });
 
 describe('Member ban', () => {
   it('sets status BANNED and removes from Room.people', async () => {

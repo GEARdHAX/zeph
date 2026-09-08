@@ -3,7 +3,19 @@ import { useGlobal } from 'reactn';
 import { useNavigate } from 'react-router-dom';
 import DataTable from 'react-data-table-component';
 import {
-  Search, Plus, UserCheck, Shield, Edit2, Trash2, ArrowLeft, ShieldAlert, Radar, Cpu, Network, Sparkles, Gauge,
+  Search,
+  Plus,
+  UserCheck,
+  Shield,
+  Edit2,
+  Trash2,
+  ArrowLeft,
+  ShieldAlert,
+  Radar,
+  Cpu,
+  Network,
+  Sparkles,
+  Gauge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useTheme from '../../lib/useTheme';
@@ -63,9 +75,7 @@ function Admin() {
           </div>
           <div className="min-w-0">
             <div className="font-semibold text-foreground text-sm truncate">
-              {row.firstName}
-              {' '}
-              {row.lastName}
+              {row.firstName} {row.lastName}
             </div>
             <div className="text-xs text-muted-foreground truncate">{`@${row.username}`}</div>
           </div>
@@ -294,9 +304,7 @@ function Admin() {
           <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 self-end sm:self-center">
             <UserCheck className="h-4 w-4 text-primary" />
             <span>
-              Total Users:
-              {' '}
-              <strong className="text-foreground">{users.length}</strong>
+              Total Users: <strong className="text-foreground">{users.length}</strong>
             </span>
           </div>
         </div>

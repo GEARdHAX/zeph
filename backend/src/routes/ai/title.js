@@ -20,7 +20,10 @@ module.exports = async (req, res) => {
   const config = store.config;
   if (!aiTextEnabled(config)) {
     return res.status(503).json({
-      error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'AI features are not enabled on this server.', requestId,
+      error: true,
+      reason: REJECTION_REASONS.AI_DISABLED,
+      message: 'AI features are not enabled on this server.',
+      requestId,
     });
   }
 
@@ -40,7 +43,12 @@ module.exports = async (req, res) => {
   const eligibility = await checkTitleEligibility(policy, roomID);
   if (!eligibility.eligible) {
     logEligibilityRejected({
-      requestId, feature: 'conversation_title', scope, reason: eligibility.reason, minMessages: eligibility.minMessages, count: eligibility.count,
+      requestId,
+      feature: 'conversation_title',
+      scope,
+      reason: eligibility.reason,
+      minMessages: eligibility.minMessages,
+      count: eligibility.count,
     });
     return res.status(422).json({
       error: true,
@@ -50,11 +58,13 @@ module.exports = async (req, res) => {
     });
   }
 
-  const messages = (await Message.find({ room: roomID, type: 'text' })
-    .sort({ _id: -1 })
-    .limit(50)
-    .populate({ path: 'author', select: 'firstName' })
-    .lean())
+  const messages = (
+    await Message.find({ room: roomID, type: 'text' })
+      .sort({ _id: -1 })
+      .limit(50)
+      .populate({ path: 'author', select: 'firstName' })
+      .lean()
+  )
     .reverse()
     .map((m) => ({ author: m.author ? m.author.firstName : 'Deleted User', content: m.content }));
 

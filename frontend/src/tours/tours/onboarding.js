@@ -42,7 +42,7 @@ export default function buildOnboardingTour() {
         element: '[data-tour="conversation-list"]',
         popover: {
           title: 'Your conversations',
-          description: 'Every chat and group you\'re part of shows up here, newest activity first.',
+          description: "Every chat and group you're part of shows up here, newest activity first.",
           side: 'right',
         },
       },
@@ -57,7 +57,8 @@ export default function buildOnboardingTour() {
       {
         popover: {
           title: "That's it!",
-          description: 'Open any conversation for a closer look at messaging, or revisit this tour anytime from Settings → Help.',
+          description:
+            'Open any conversation for a closer look at messaging, or revisit this tour anytime from Settings → Help.',
         },
       },
     ],

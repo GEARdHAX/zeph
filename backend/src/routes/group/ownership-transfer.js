@@ -44,11 +44,19 @@ module.exports = async (req, res) => {
   );
   await Room.updateOne({ _id: room._id }, { $set: { ownerId: userId } });
   await GroupAuditLog.create({
-    group: room._id, actor: actorId, action: 'ownership_transferred', target: userId,
+    group: room._id,
+    actor: actorId,
+    action: 'ownership_transferred',
+    target: userId,
   });
 
   logger.info({ groupId: room._id, previousOwnerId: actorId, newOwnerId: userId }, 'group_ownership_transferred');
-  broadcastToGroup(room.people, 'group:ownership:transferred', { groupId: room._id, newOwnerId: userId }, { excludeUserId: actorId });
+  broadcastToGroup(
+    room.people,
+    'group:ownership:transferred',
+    { groupId: room._id, newOwnerId: userId },
+    { excludeUserId: actorId },
+  );
 
   res.status(200).json({ status: 'success' });
 };

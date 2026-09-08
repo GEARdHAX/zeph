@@ -37,12 +37,16 @@ module.exports = (req, res, next) => {
           room.people.forEach((personId) => {
             if (personId.toString() === req.user.id.toString()) return;
             store.io.to(personId.toString()).emit('user-profile-updated', {
-              userId: req.user.id, picture: user.picture || null,
+              userId: req.user.id,
+              picture: user.picture || null,
             });
           });
         });
       } catch (notifyErr) {
-        logger.warn({ err: notifyErr, userId: req.user.id }, 'Failed to notify conversation partners of picture change');
+        logger.warn(
+          { err: notifyErr, userId: req.user.id },
+          'Failed to notify conversation partners of picture change',
+        );
       }
 
       res.status(200).json(user.picture);

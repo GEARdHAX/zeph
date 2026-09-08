@@ -9,7 +9,10 @@ const MOCK_MALICIOUS_IP = '198.51.100.66'; // TEST-NET-2, RFC5737 — never a re
 const MOCK_CLEAN_IP = '8.8.8.8';
 
 const buildMockProvider = ({
-  malicious = [MOCK_MALICIOUS_IP], failOn = [], failReason = 'server_error', latencyMs = 0,
+  malicious = [MOCK_MALICIOUS_IP],
+  failOn = [],
+  failReason = 'server_error',
+  latencyMs = 0,
 } = {}) => {
   let callCount = 0;
   return {
@@ -18,7 +21,10 @@ const buildMockProvider = ({
     callCount: () => callCount,
     async lookupIndicator(indicator) {
       callCount += 1;
-      if (latencyMs) await new Promise((resolve) => { setTimeout(resolve, latencyMs); });
+      if (latencyMs)
+        await new Promise((resolve) => {
+          setTimeout(resolve, latencyMs);
+        });
 
       if (failOn.includes(indicator)) {
         // failReason defaults to 'server_error' — one of
@@ -27,7 +33,10 @@ const buildMockProvider = ({
         // reason (e.g. 'rejected') explicitly to test the "this kind of
         // failure does NOT trip the breaker" path instead.
         return {
-          ok: false, reason: failReason, status: 500, rateLimit: null,
+          ok: false,
+          reason: failReason,
+          status: 500,
+          rateLimit: null,
         };
       }
 

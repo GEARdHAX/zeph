@@ -15,16 +15,18 @@ setInterval(() => {
 }, sweepIntervalMs).unref();
 
 // authCodeRateLimit({ max: 5, windowMs: 60 * 60 * 1000 })(email) -> boolean allowed
-const authCodeRateLimit = ({ max, windowMs }) => (email) => {
-  const key = email.toLowerCase();
-  const now = Date.now();
-  let bucket = buckets.get(key);
-  if (!bucket || bucket.resetAt <= now) {
-    bucket = { count: 0, resetAt: now + windowMs };
-    buckets.set(key, bucket);
-  }
-  bucket.count += 1;
-  return bucket.count <= max;
-};
+const authCodeRateLimit =
+  ({ max, windowMs }) =>
+  (email) => {
+    const key = email.toLowerCase();
+    const now = Date.now();
+    let bucket = buckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      buckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    return bucket.count <= max;
+  };
 
 module.exports = authCodeRateLimit;

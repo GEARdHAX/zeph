@@ -73,7 +73,9 @@ function Meeting() {
   const [meetingAiEnabled, setMeetingAiEnabled] = useState(false);
 
   useEffect(() => {
-    getInfo().then((res) => setMeetingAiEnabled(!!res.data.meetingAiEnabled)).catch(() => {});
+    getInfo()
+      .then((res) => setMeetingAiEnabled(!!res.data.meetingAiEnabled))
+      .catch(() => {});
   }, []);
 
   const answerIncrement = useSelector((state) => state.rtc.answerIncrement);
@@ -86,7 +88,8 @@ function Meeting() {
 
   const init = () => {
     setConnecting(true);
-    callManager.join(roomID)
+    callManager
+      .join(roomID)
       .catch(() => {
         toast.error('Could not connect to the call. Check your connection and try again.');
       })
@@ -288,9 +291,7 @@ function Meeting() {
   // button controls is currently ON (video/audio/screen-share), which gets
   // a filled/tinted look instead of the flat neutral default, and danger is
   // the one-off hang-up button.
-  function ControlButton({
-    icon: Icon, onClick, title, active, danger,
-  }) {
+  function ControlButton({ icon: Icon, onClick, title, active, danger }) {
     return (
       <Button
         type="button"
@@ -340,29 +341,30 @@ function Meeting() {
               icon={video ? Video : VideoOff}
               active={video}
               title={video ? 'Turn off camera' : 'Turn on camera'}
-              onClick={() => (video ? callManager.stopVideo() : getVideo().then((stream) => callManager.produceVideo(stream)))}
+              onClick={() =>
+                video ? callManager.stopVideo() : getVideo().then((stream) => callManager.produceVideo(stream))
+              }
             />
             <ControlButton
               icon={audio ? Mic : MicOff}
               active={audio}
               title={audio ? 'Mute microphone' : 'Unmute microphone'}
-              onClick={() => (audio ? callManager.stopAudio() : getAudio().then((stream) => callManager.produceAudio(stream)))}
+              onClick={() =>
+                audio ? callManager.stopAudio() : getAudio().then((stream) => callManager.produceAudio(stream))
+              }
             />
             <ControlButton
               icon={isScreen ? XOctagon : Monitor}
               active={isScreen}
               title={isScreen ? 'Stop sharing screen' : 'Share screen'}
-              onClick={() => (isScreen ? callManager.stopScreen() : getScreen().then((stream) => callManager.produceScreen(stream)))}
+              onClick={() =>
+                isScreen ? callManager.stopScreen() : getScreen().then((stream) => callManager.produceScreen(stream))
+              }
             />
 
             <div className="mx-0.5 h-8 w-px bg-white/15" />
 
-            <ControlButton
-              icon={PhoneOff}
-              danger
-              title="Leave call"
-              onClick={close}
-            />
+            <ControlButton icon={PhoneOff} danger title="Leave call" onClick={close} />
 
             {meetingAiEnabled && (
               <>
@@ -373,11 +375,7 @@ function Meeting() {
 
             <div className="mx-0.5 h-8 w-px bg-white/15" />
 
-            <ControlButton
-              icon={UserPlus}
-              title="Add people"
-              onClick={() => setAddPeers(true)}
-            />
+            <ControlButton icon={UserPlus} title="Add people" onClick={() => setAddPeers(true)} />
             <ControlButton
               icon={isMaximized ? Minimize : Maximize}
               title={isMaximized ? 'Fit to screen' : 'Fill screen'}

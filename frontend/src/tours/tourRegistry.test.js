@@ -1,13 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import {
-  KNOWN_TOUR_IDS, isKnownTour, loadTourDefinition,
-} from './tourRegistry';
+import { KNOWN_TOUR_IDS, isKnownTour, loadTourDefinition } from './tourRegistry';
 
 describe('tourRegistry', () => {
   it('knows about every documented tour id', () => {
-    expect(KNOWN_TOUR_IDS).toEqual(expect.arrayContaining([
-      'onboarding', 'home', 'chat', 'groups', 'meetings', 'calls', 'media', 'notifications', 'settings', 'admin',
-    ]));
+    expect(KNOWN_TOUR_IDS).toEqual(
+      expect.arrayContaining([
+        'onboarding',
+        'home',
+        'chat',
+        'groups',
+        'meetings',
+        'calls',
+        'media',
+        'notifications',
+        'settings',
+        'admin',
+      ]),
+    );
   });
 
   it('isKnownTour is true for a registered id, false for a made-up one', () => {

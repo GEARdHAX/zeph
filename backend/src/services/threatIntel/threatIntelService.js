@@ -1,9 +1,7 @@
 const ThreatIndicator = require('../../models/ThreatIndicator');
 const logger = require('../../logger');
 const store = require('../../store');
-const {
-  IndicatorTypes, normalizeIndicator, isPrivateOrReservedIp, indicatorKey,
-} = require('./indicators');
+const { IndicatorTypes, normalizeIndicator, isPrivateOrReservedIp, indicatorKey } = require('./indicators');
 const { getCachedThreatResult, setCachedThreatResult } = require('./cache');
 const { tryAcquireLock, releaseLock, waitForResult } = require('./singleFlight');
 const { checkAndReserveBudget, recordProviderRateLimit } = require('./quota');
@@ -24,13 +22,21 @@ let breaker = buildCircuitBreaker();
 // state (see above), so tests that trip it need a way back to CLOSED
 // without reloading the whole module tree (which would also lose the
 // jest.mock'd provider reference — see threatIntelService.test.js).
-const resetBreakerForTests = () => { breaker = buildCircuitBreaker(); };
+const resetBreakerForTests = () => {
+  breaker = buildCircuitBreaker();
+};
 
 // UNKNOWN is the safe, honest default for every path that does NOT reach a
 // real provider verdict — spec section 15's central rule ("provider
 // unavailable != CLEAN") is enforced by never returning anything else here.
 const unknownResult = (reason) => ({
-  found: false, malicious: false, confidence: 0, severity: 'low', categories: [], source: 'unknown', metadata: { reason },
+  found: false,
+  malicious: false,
+  confidence: 0,
+  severity: 'low',
+  categories: [],
+  source: 'unknown',
+  metadata: { reason },
 });
 
 const toCacheableResult = (providerResult) => ({
@@ -46,9 +52,7 @@ const toCacheableResult = (providerResult) => ({
 // Persists/updates the ThreatIndicator document — upsert on the
 // (normalizedIndicator, type) unique index (spec section 12: MongoDB as
 // persistent intelligence, one row per indicator, not a new row per check).
-const persistIndicator = async ({
-  rawIndicator, normalized, type, cacheableResult, ttlSeconds,
-}) => {
+const persistIndicator = async ({ rawIndicator, normalized, type, cacheableResult, ttlSeconds }) => {
   const now = new Date();
   const status = cacheableResult.malicious ? 'MALICIOUS' : 'CLEAN';
   try {
@@ -103,7 +107,10 @@ const lookup = async (rawIndicator, { type: hintedType, priority = 'MEDIUM', req
   // answer is always the same for a given private address).
   if (type === IndicatorTypes.IP && isPrivateOrReservedIp(normalized)) {
     return {
-      ...unknownResult('private_or_reserved_ip'), indicator: rawIndicator, normalizedIndicator: normalized, type,
+      ...unknownResult('private_or_reserved_ip'),
+      indicator: rawIndicator,
+      normalizedIndicator: normalized,
+      type,
     };
   }
 
@@ -112,7 +119,11 @@ const lookup = async (rawIndicator, { type: hintedType, priority = 'MEDIUM', req
   const cached = await getCachedThreatResult(key);
   if (cached) {
     return {
-      ...cached, indicator: rawIndicator, normalizedIndicator: normalized, type, cacheHit: true,
+      ...cached,
+      indicator: rawIndicator,
+      normalizedIndicator: normalized,
+      type,
+      cacheHit: true,
     };
   }
 
@@ -124,13 +135,19 @@ const lookup = async (rawIndicator, { type: hintedType, priority = 'MEDIUM', req
   // spending a lock/quota cycle on a request the provider can never answer.
   if (type !== IndicatorTypes.IP) {
     return {
-      ...unknownResult('no_provider_for_type'), indicator: rawIndicator, normalizedIndicator: normalized, type,
+      ...unknownResult('no_provider_for_type'),
+      indicator: rawIndicator,
+      normalizedIndicator: normalized,
+      type,
     };
   }
 
   if (priority === 'LOW') {
     return {
-      ...unknownResult('low_priority_skip'), indicator: rawIndicator, normalizedIndicator: normalized, type,
+      ...unknownResult('low_priority_skip'),
+      indicator: rawIndicator,
+      normalizedIndicator: normalized,
+      type,
     };
   }
 
@@ -148,7 +165,12 @@ const lookup = async (rawIndicator, { type: hintedType, priority = 'MEDIUM', req
     const waited = await waitForResult(key, getCachedThreatResult);
     if (waited) {
       return {
-        ...waited, indicator: rawIndicator, normalizedIndicator: normalized, type, cacheHit: true, coalesced: true,
+        ...waited,
+        indicator: rawIndicator,
+        normalizedIndicator: normalized,
+        type,
+        cacheHit: true,
+        coalesced: true,
       };
     }
     // Timed out waiting — proceed WITHOUT the lock rather than block this
@@ -158,13 +180,23 @@ const lookup = async (rawIndicator, { type: hintedType, priority = 'MEDIUM', req
     // during a true stampede's tail end — an accepted, bounded cost
     // against ever blocking a user-facing request past WAIT_TIMEOUT_MS.
     return performProviderLookup({
-      rawIndicator, normalized, type, key, priority, requestId,
+      rawIndicator,
+      normalized,
+      type,
+      key,
+      priority,
+      requestId,
     });
   }
 
   try {
     return await performProviderLookup({
-      rawIndicator, normalized, type, key, priority, requestId,
+      rawIndicator,
+      normalized,
+      type,
+      key,
+      priority,
+      requestId,
     });
   } finally {
     await releaseLock(key, lockToken);
@@ -172,22 +204,26 @@ const lookup = async (rawIndicator, { type: hintedType, priority = 'MEDIUM', req
 };
 
 // eslint-disable-next-line no-use-before-define
-async function performProviderLookup({
-  rawIndicator, normalized, type, key, requestId,
-}) {
+async function performProviderLookup({ rawIndicator, normalized, type, key, requestId }) {
   const config = store.config || {};
   const provider = getProvider(config);
 
   if (!provider.enabled) {
     return {
-      ...unknownResult('provider_disabled'), indicator: rawIndicator, normalizedIndicator: normalized, type,
+      ...unknownResult('provider_disabled'),
+      indicator: rawIndicator,
+      normalizedIndicator: normalized,
+      type,
     };
   }
 
   if (!breaker.canAttempt()) {
     logger.info({ normalized }, 'threatintel_circuit_open_skip');
     return {
-      ...unknownResult('circuit_open'), indicator: rawIndicator, normalizedIndicator: normalized, type,
+      ...unknownResult('circuit_open'),
+      indicator: rawIndicator,
+      normalizedIndicator: normalized,
+      type,
     };
   }
 
@@ -203,7 +239,10 @@ async function performProviderLookup({
       requestId,
     });
     return {
-      ...unknownResult('quota_exhausted'), indicator: rawIndicator, normalizedIndicator: normalized, type,
+      ...unknownResult('quota_exhausted'),
+      indicator: rawIndicator,
+      normalizedIndicator: normalized,
+      type,
     };
   }
 
@@ -231,7 +270,10 @@ async function performProviderLookup({
     const failureResult = { ...unknownResult(providerResult.reason), source: 'unknown' };
     await setCachedThreatResult(key, failureResult, 60);
     return {
-      ...failureResult, indicator: rawIndicator, normalizedIndicator: normalized, type,
+      ...failureResult,
+      indicator: rawIndicator,
+      normalizedIndicator: normalized,
+      type,
     };
   }
 
@@ -240,7 +282,11 @@ async function performProviderLookup({
   const ttlSeconds = config.threatIntelCacheTtlSeconds || 6 * 60 * 60;
   await setCachedThreatResult(key, cacheableResult, ttlSeconds);
   await persistIndicator({
-    rawIndicator, normalized, type, cacheableResult, ttlSeconds,
+    rawIndicator,
+    normalized,
+    type,
+    cacheableResult,
+    ttlSeconds,
   });
 
   if (providerResult.malicious) {
@@ -251,14 +297,20 @@ async function performProviderLookup({
       target: { resource: 'threat_intelligence', resourceId: normalized, action: 'lookup' },
       result: 'success',
       metadata: {
-        indicatorType: type, confidence: providerResult.confidence, source: providerResult.source,
+        indicatorType: type,
+        confidence: providerResult.confidence,
+        source: providerResult.source,
       },
       requestId,
     });
   }
 
   return {
-    ...cacheableResult, indicator: rawIndicator, normalizedIndicator: normalized, type, cacheHit: false,
+    ...cacheableResult,
+    indicator: rawIndicator,
+    normalizedIndicator: normalized,
+    type,
+    cacheHit: false,
   };
 }
 
@@ -266,5 +318,9 @@ async function performProviderLookup({
 // resetBreakerForTests above for why a plain `{ breaker }` export would go
 // stale the instant a test resets it.
 module.exports = {
-  lookup, resetBreakerForTests, get breaker() { return breaker; },
+  lookup,
+  resetBreakerForTests,
+  get breaker() {
+    return breaker;
+  },
 };

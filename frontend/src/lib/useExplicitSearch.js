@@ -78,7 +78,13 @@ const useExplicitSearch = (fetcher, { minLength = 3, staleTime = DEFAULT_STALE_T
   };
 
   return {
-    query, setQuery, results, loading, hasSearched, search, reset,
+    query,
+    setQuery,
+    results,
+    loading,
+    hasSearched,
+    search,
+    reset,
   };
 };
 

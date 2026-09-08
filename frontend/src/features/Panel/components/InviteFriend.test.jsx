@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import InviteFriend from './InviteFriend';
@@ -13,10 +11,11 @@ import { createFriendInvite } from '../../../actions/invites';
 // (not Object.assign) is required to stub it. userEvent.setup() installs its
 // own clipboard stub, so this must run AFTER setup() in each test, not in
 // beforeEach, or userEvent's stub silently wins.
-const stubClipboard = () => Object.defineProperty(navigator, 'clipboard', {
-  value: { writeText: vi.fn().mockResolvedValue() },
-  configurable: true,
-});
+const stubClipboard = () =>
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: vi.fn().mockResolvedValue() },
+    configurable: true,
+  });
 
 beforeEach(() => {
   createFriendInvite.mockReset();

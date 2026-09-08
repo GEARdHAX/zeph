@@ -1,8 +1,6 @@
 const store = require('../src/store');
 const config = require('../config');
-const {
-  parseTrustedList, isTrustedDestination, isKnownCandidate,
-} = require('../src/services/networkIntel/baseline');
+const { parseTrustedList, isTrustedDestination, isKnownCandidate } = require('../src/services/networkIntel/baseline');
 const { closeNetworkIntelConnection } = require('../src/services/networkIntel/cache');
 
 describe('parseTrustedList / isTrustedDestination', () => {

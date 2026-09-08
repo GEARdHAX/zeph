@@ -1,7 +1,11 @@
 const crypto = require('crypto');
 const SecurityEvent = require('../models/SecurityEvent');
 const logger = require('../logger');
-const { SecurityEventTypes, SecurityEventSeverities, SecurityEventResults } = require('../constants/securityEventTypes');
+const {
+  SecurityEventTypes,
+  SecurityEventSeverities,
+  SecurityEventResults,
+} = require('../constants/securityEventTypes');
 
 const VALID_TYPES = new Set(Object.values(SecurityEventTypes));
 
@@ -11,10 +15,23 @@ const VALID_TYPES = new Set(Object.values(SecurityEventTypes));
 // discipline. Matches on key name, case-insensitively, anywhere in the
 // metadata object graph (arbitrary nesting depth).
 const FORBIDDEN_METADATA_KEYS = [
-  'password', 'passwordhash', 'newpassword', 'oldpassword',
-  'token', 'accesstoken', 'refreshtoken', 'jwt',
-  'otp', 'code', 'authcode', 'secret', 'apikey', 'privatekey',
-  'content', 'messagecontent', 'body',
+  'password',
+  'passwordhash',
+  'newpassword',
+  'oldpassword',
+  'token',
+  'accesstoken',
+  'refreshtoken',
+  'jwt',
+  'otp',
+  'code',
+  'authcode',
+  'secret',
+  'apikey',
+  'privatekey',
+  'content',
+  'messagecontent',
+  'body',
 ];
 
 const isForbiddenKey = (key) => {
@@ -55,7 +72,14 @@ const sanitizeMetadata = (value, depth = 0) => {
 // that triggered the event.
 const record = (event) => {
   const {
-    type, severity = 'low', actor = {}, source = {}, target = {}, result = 'unknown', metadata = {}, requestId = null,
+    type,
+    severity = 'low',
+    actor = {},
+    source = {},
+    target = {},
+    result = 'unknown',
+    metadata = {},
+    requestId = null,
     sourceSystem = 'app',
   } = event || {};
 
@@ -81,17 +105,20 @@ const record = (event) => {
   // Mongo write below is the queryable audit trail (same "pino is the
   // operational log, Mongo is the in-app audit trail" split GroupAuditLog's
   // own comment documents).
-  logger.info({
-    event: type,
-    severity,
-    userId: actor.userId || null,
-    sessionId: actor.sessionId || null,
-    sourceIp: source.ip || null,
-    requestId,
-    result,
-    resource: target.resource || null,
-    action: target.action || null,
-  }, 'security_event');
+  logger.info(
+    {
+      event: type,
+      severity,
+      userId: actor.userId || null,
+      sessionId: actor.sessionId || null,
+      sourceIp: source.ip || null,
+      requestId,
+      result,
+      resource: target.resource || null,
+      action: target.action || null,
+    },
+    'security_event',
+  );
 
   // Never awaited by the caller — a Mongo outage must not turn a login/
   // upload/permission-check into a 500. Failure is itself logged (spec
@@ -108,37 +135,39 @@ const record = (event) => {
     metadata: safeMetadata,
     requestId,
     sourceSystem,
-  }).then((saved) => {
-    // Phase 3 — Threat Intelligence enrichment (spec section 15). Deferred
-    // require (not a top-of-file import) breaks what would otherwise be a
-    // circular require: this module -> securityEventEnrichment.js ->
-    // threatIntelService.js -> back to this module (THREAT_INTEL_MATCH
-    // etc. are themselves recorded through record()). By the time record()
-    // actually runs, both modules have already finished loading, so the
-    // cycle never actually bites — this is purely to keep the require
-    // GRAPH acyclic at load time, not a runtime concern.
-    // eslint-disable-next-line global-require
-    const { enrichSecurityEvent } = require('./threatIntel/securityEventEnrichment');
-    enrichSecurityEvent(saved).catch((err) => {
-      logger.warn({ err, type, eventId }, 'security_event_enrichment_dispatch_failed');
-    });
+  })
+    .then((saved) => {
+      // Phase 3 — Threat Intelligence enrichment (spec section 15). Deferred
+      // require (not a top-of-file import) breaks what would otherwise be a
+      // circular require: this module -> securityEventEnrichment.js ->
+      // threatIntelService.js -> back to this module (THREAT_INTEL_MATCH
+      // etc. are themselves recorded through record()). By the time record()
+      // actually runs, both modules have already finished loading, so the
+      // cycle never actually bites — this is purely to keep the require
+      // GRAPH acyclic at load time, not a runtime concern.
+      // eslint-disable-next-line global-require
+      const { enrichSecurityEvent } = require('./threatIntel/securityEventEnrichment');
+      enrichSecurityEvent(saved).catch((err) => {
+        logger.warn({ err, type, eventId }, 'security_event_enrichment_dispatch_failed');
+      });
 
-    // Phase 6 — AI incident correlation (spec sections 22/31/33). Same
-    // deferred-require reasoning as the enrichment hook above (this module
-    // -> securityAiQueue.js -> back to this module for AI_* events). The
-    // correlation write itself is cheap synchronous-ish Mongo work (an
-    // upsert), done here; the actual AI analysis is queued through BullMQ
-    // (securityAiQueue.js), never called directly from this hot path — a
-    // security-event write must never wait on, or be coupled to, an LLM
-    // call's latency/availability.
-    // eslint-disable-next-line global-require
-    const { onSecurityEventForCorrelation } = require('./securityAi/correlationHook');
-    onSecurityEventForCorrelation(saved).catch((err) => {
-      logger.warn({ err, type, eventId }, 'security_event_correlation_dispatch_failed');
+      // Phase 6 — AI incident correlation (spec sections 22/31/33). Same
+      // deferred-require reasoning as the enrichment hook above (this module
+      // -> securityAiQueue.js -> back to this module for AI_* events). The
+      // correlation write itself is cheap synchronous-ish Mongo work (an
+      // upsert), done here; the actual AI analysis is queued through BullMQ
+      // (securityAiQueue.js), never called directly from this hot path — a
+      // security-event write must never wait on, or be coupled to, an LLM
+      // call's latency/availability.
+      // eslint-disable-next-line global-require
+      const { onSecurityEventForCorrelation } = require('./securityAi/correlationHook');
+      onSecurityEventForCorrelation(saved).catch((err) => {
+        logger.warn({ err, type, eventId }, 'security_event_correlation_dispatch_failed');
+      });
+    })
+    .catch((err) => {
+      logger.error({ err, type, eventId }, 'security_event_persist_failed');
     });
-  }).catch((err) => {
-    logger.error({ err, type, eventId }, 'security_event_persist_failed');
-  });
 
   return eventId;
 };

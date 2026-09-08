@@ -10,9 +10,15 @@ function TestHarness() {
     <div>
       <span data-testid="loading">{isLoading ? 'loading' : 'idle'}</span>
       <span data-testid="label">{label || ''}</span>
-      <button type="button" onClick={() => show()}>Show</button>
-      <button type="button" onClick={() => show('Sending message')}>Show with label</button>
-      <button type="button" onClick={hide}>Hide</button>
+      <button type="button" onClick={() => show()}>
+        Show
+      </button>
+      <button type="button" onClick={() => show('Sending message')}>
+        Show with label
+      </button>
+      <button type="button" onClick={hide}>
+        Hide
+      </button>
     </div>
   );
 }

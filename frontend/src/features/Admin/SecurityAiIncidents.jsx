@@ -58,7 +58,9 @@ function SecurityAiIncidents() {
             <Sparkles className="h-4 w-4 text-primary" />
             AI Security Incidents
           </h1>
-          <p className="text-xs text-muted-foreground">Correlated anomalies with AI-assisted analysis — advisory only, not a security decision</p>
+          <p className="text-xs text-muted-foreground">
+            Correlated anomalies with AI-assisted analysis — advisory only, not a security decision
+          </p>
         </div>
       </div>
 
@@ -90,46 +92,64 @@ function SecurityAiIncidents() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">Loading…</td></tr>
-              )}
-              {!loading && incidents.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">No incidents found.</td></tr>
-              )}
-              {!loading && incidents.map((incident) => (
-                <tr
-                  key={incident.incidentId}
-                  className="cursor-pointer border-b border-border/40 hover:bg-muted/40"
-                  onClick={() => onSelectIncident(incident.incidentId)}
-                >
-                  <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{new Date(incident.lastSeenAt).toLocaleString()}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${SEVERITY_CLASSES[incident.severity] || SEVERITY_CLASSES.low}`}>
-                      {incident.severity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{(incident.signals || []).join(', ') || '—'}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{incident.eventCount}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">
-                    {incident.aiAnalysis?.anomalous === true && `Anomalous (${incident.aiAnalysis.confidence}%)`}
-                    {incident.aiAnalysis?.anomalous === false && 'Not anomalous'}
-                    {incident.aiAnalysis?.anomalous == null && 'Not yet analyzed'}
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                    Loading…
                   </td>
                 </tr>
-              ))}
+              )}
+              {!loading && incidents.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                    No incidents found.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                incidents.map((incident) => (
+                  <tr
+                    key={incident.incidentId}
+                    className="cursor-pointer border-b border-border/40 hover:bg-muted/40"
+                    onClick={() => onSelectIncident(incident.incidentId)}
+                  >
+                    <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
+                      {new Date(incident.lastSeenAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${SEVERITY_CLASSES[incident.severity] || SEVERITY_CLASSES.low}`}
+                      >
+                        {incident.severity}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{(incident.signals || []).join(', ') || '—'}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{incident.eventCount}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">
+                      {incident.aiAnalysis?.anomalous === true && `Anomalous (${incident.aiAnalysis.confidence}%)`}
+                      {incident.aiAnalysis?.anomalous === false && 'Not anomalous'}
+                      {incident.aiAnalysis?.anomalous == null && 'Not yet analyzed'}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setSelected(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setSelected(null)}
+        >
           <div
             className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-bold text-foreground">Incident Detail</h2>
-              <Button variant="ghost" size="sm" className="h-7 rounded-lg text-xs" onClick={() => setSelected(null)}>Close</Button>
+              <Button variant="ghost" size="sm" className="h-7 rounded-lg text-xs" onClick={() => setSelected(null)}>
+                Close
+              </Button>
             </div>
             {selectedLoading ? (
               <div className="py-8 text-center text-xs text-muted-foreground">Loading…</div>
@@ -147,7 +167,9 @@ function SecurityAiIncidents() {
                   <div className="text-muted-foreground">Events</div>
                   <div className="font-medium text-foreground">{selected.eventCount}</div>
                   <div className="text-muted-foreground">Started</div>
-                  <div className="font-medium text-foreground">{selected.startedAt ? new Date(selected.startedAt).toLocaleString() : '—'}</div>
+                  <div className="font-medium text-foreground">
+                    {selected.startedAt ? new Date(selected.startedAt).toLocaleString() : '—'}
+                  </div>
                 </div>
 
                 {/* AI assessment — clearly labeled advisory, never a decision (spec section 45-46). */}
@@ -173,15 +195,14 @@ function SecurityAiIncidents() {
                         <span className="text-foreground">{selected.aiAnalysis.summary}</span>
                       </div>
                       <div className="pt-1 text-[10px] text-muted-foreground">
-                        Model:
-                        {' '}
-                        {selected.aiAnalysis.model || 'unknown'}
-                        {' '}
-                        — this is an AI recommendation, not a security decision. The actual access decision is made by Zero Trust.
+                        Model: {selected.aiAnalysis.model || 'unknown'} — this is an AI recommendation, not a security
+                        decision. The actual access decision is made by Zero Trust.
                       </div>
                     </div>
                   ) : (
-                    <div className="text-[11px] text-muted-foreground">No AI analysis available for this incident yet.</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      No AI analysis available for this incident yet.
+                    </div>
                   )}
                 </div>
               </div>

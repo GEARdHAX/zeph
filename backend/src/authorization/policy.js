@@ -21,12 +21,13 @@ const Decisions = {
 
 // Looks up the single row (if any) between two users, in either direction —
 // matches the {requester, recipient} unique-per-direction index.
-const findRelationship = (userA, userB) => Relationship.findOne({
-  $or: [
-    { requester: userA, recipient: userB },
-    { requester: userB, recipient: userA },
-  ],
-});
+const findRelationship = (userA, userB) =>
+  Relationship.findOne({
+    $or: [
+      { requester: userA, recipient: userB },
+      { requester: userB, recipient: userA },
+    ],
+  });
 
 // Block always wins regardless of action — checked first, unconditionally,
 // before any action-specific logic runs.
@@ -47,9 +48,7 @@ const isPrivileged = (user) => !!(user && user.level && user.level !== 'standard
 // cost; omitting both skips the admin-boundary check entirely, so existing
 // call sites that don't pass them are unaffected until explicitly wired in.
 // Returns { decision: 'ALLOW'|'DENY', reason?: string }.
-const authorizeAction = async ({
-  actor, target, action, actorLevel, targetLevel,
-}) => {
+const authorizeAction = async ({ actor, target, action, actorLevel, targetLevel }) => {
   if (!actor) return { decision: Decisions.DENY, reason: 'unauthenticated' };
 
   // Actions with no target (e.g. none currently) would skip straight to ALLOW here.
@@ -105,5 +104,10 @@ const authorizeAction = async ({
 };
 
 module.exports = {
-  Actions, Decisions, authorizeAction, findRelationship, isBlocked, isPrivileged,
+  Actions,
+  Decisions,
+  authorizeAction,
+  findRelationship,
+  isBlocked,
+  isPrivileged,
 };

@@ -7,9 +7,7 @@
 // the raw JSON.
 const SCHEMA_VERSION = 1;
 
-const CATEGORIES = new Set([
-  'authentication_behavior', 'network_behavior', 'process_behavior', 'correlation', 'other',
-]);
+const CATEGORIES = new Set(['authentication_behavior', 'network_behavior', 'process_behavior', 'correlation', 'other']);
 
 // Advisory only (spec section 11: "recommendedAction is advisory only...
 // the backend MUST NOT automatically execute it") — restricted to the
@@ -51,7 +49,8 @@ const validateAnalysisOutput = (raw) => {
   // otherwise-valid analysis — same "truncate, don't reject" posture
   // signals/explanation already take elsewhere for bounded-but-recoverable
   // oversized fields.
-  if (typeof raw.explanation !== 'string' || raw.explanation.length === 0) return { ok: false, reason: 'missing_explanation' };
+  if (typeof raw.explanation !== 'string' || raw.explanation.length === 0)
+    return { ok: false, reason: 'missing_explanation' };
 
   const signals = Array.isArray(raw.signals)
     ? raw.signals.filter((s) => typeof s === 'string' && s.length <= 64).slice(0, 20)
@@ -78,5 +77,9 @@ const validateAnalysisOutput = (raw) => {
 };
 
 module.exports = {
-  validateAnalysisOutput, normalizeConfidence, SCHEMA_VERSION, CATEGORIES, RECOMMENDED_ACTIONS,
+  validateAnalysisOutput,
+  normalizeConfidence,
+  SCHEMA_VERSION,
+  CATEGORIES,
+  RECOMMENDED_ACTIONS,
 };

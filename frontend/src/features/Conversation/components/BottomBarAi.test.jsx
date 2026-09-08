@@ -1,9 +1,5 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
-import {
-  render, screen, waitFor,
-} from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
@@ -44,7 +40,10 @@ const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
 
 function makeStore() {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   store.dispatch({ type: Actions.SET_ROOM, room: ROOM });
@@ -65,7 +64,9 @@ function renderBottomBar(props = {}) {
 
 beforeEach(async () => {
   await setGlobal({
-    ref: 'ref', user: ME, isPicker: false,
+    ref: 'ref',
+    user: ME,
+    isPicker: false,
   });
   draftReply.mockReset();
   rewriteMessage.mockReset();
@@ -90,13 +91,20 @@ describe('BottomBar — Draft reply (AI)', () => {
     await userEv.click(screen.getByRole('button', { name: 'Draft reply with AI' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: 'Type something to send...' }).textContent).toBe('Sounds good, see you then!');
+      expect(screen.getByRole('textbox', { name: 'Type something to send...' }).textContent).toBe(
+        'Sounds good, see you then!',
+      );
     });
   });
 
   it('shows a spinning icon while generating, and disables the button', async () => {
     let resolveRequest;
-    draftReply.mockImplementationOnce(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    draftReply.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
     const userEv = userEvent.setup();
     renderBottomBar();
 
@@ -112,7 +120,12 @@ describe('BottomBar — Draft reply (AI)', () => {
 
   it('prevents a duplicate submission while one is already in flight', async () => {
     let resolveRequest;
-    draftReply.mockImplementationOnce(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    draftReply.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
     const userEv = userEvent.setup();
     renderBottomBar();
 
@@ -165,7 +178,12 @@ describe('BottomBar — Draft reply (AI)', () => {
 
   it('does not show an error toast for a cancelled (unmounted) request', async () => {
     let resolveRequest;
-    draftReply.mockImplementationOnce(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    draftReply.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
     const userEv = userEvent.setup();
     const { unmount } = render(
       <Provider store={makeStore()}>

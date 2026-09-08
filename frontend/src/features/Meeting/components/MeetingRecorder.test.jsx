@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setGlobal } from 'reactn';
@@ -30,7 +28,9 @@ class FakeMediaRecorder {
     FakeMediaRecorder.instances.push(this);
   }
 
-  start() { this.state = 'recording'; }
+  start() {
+    this.state = 'recording';
+  }
 
   stop() {
     this.state = 'inactive';
@@ -93,7 +93,13 @@ describe('MeetingRecorder — record, upload, synchronous summary', () => {
     await setGlobal({ audioStream: FAKE_STREAM });
     uploadMedia.mockResolvedValueOnce({ data: { media: { _id: 'media-1' } } });
     summarizeMeeting.mockRejectedValueOnce({
-      response: { status: 422, data: { reason: 'MEETING_TOO_SHORT', message: 'This meeting was too short to summarize. Minimum duration: 5 minutes.' } },
+      response: {
+        status: 422,
+        data: {
+          reason: 'MEETING_TOO_SHORT',
+          message: 'This meeting was too short to summarize. Minimum duration: 5 minutes.',
+        },
+      },
     });
 
     const user = userEvent.setup();
@@ -103,7 +109,9 @@ describe('MeetingRecorder — record, upload, synchronous summary', () => {
     await user.click(screen.getByRole('button', { name: 'Stop recording & summarize' }));
 
     await waitFor(() => {
-      expect(screen.getByText('This meeting was too short to summarize. Minimum duration: 5 minutes.')).toBeInTheDocument();
+      expect(
+        screen.getByText('This meeting was too short to summarize. Minimum duration: 5 minutes.'),
+      ).toBeInTheDocument();
     });
   });
 });

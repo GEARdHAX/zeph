@@ -29,7 +29,11 @@ module.exports = async (req, res) => {
     { group: room._id, user: userId, status: 'PENDING' },
     {
       $set: {
-        status: 'ACTIVE', active: true, updatedAt: new Date(), joinedVia: 'JOIN_REQUEST', invitedBy: actorId,
+        status: 'ACTIVE',
+        active: true,
+        updatedAt: new Date(),
+        joinedVia: 'JOIN_REQUEST',
+        invitedBy: actorId,
       },
     },
     { new: true },
@@ -39,7 +43,10 @@ module.exports = async (req, res) => {
   await Room.updateOne({ _id: room._id }, { $addToSet: { people: userId } });
   await unhideConversationForUser(room._id, userId);
   await GroupAuditLog.create({
-    group: room._id, actor: actorId, action: 'request_approved', target: userId,
+    group: room._id,
+    actor: actorId,
+    action: 'request_approved',
+    target: userId,
   });
 
   logger.info({ groupId: room._id, actorId, targetId: userId }, 'group_join_request_approved');
@@ -53,8 +60,12 @@ module.exports = async (req, res) => {
     User.findById(actorId).select('firstName lastName username'),
     User.findById(userId).select('firstName lastName username'),
   ]);
-  const approverName = approver ? `${approver.firstName || ''} ${approver.lastName || ''}`.trim() || approver.username : null;
-  const joinerName = joiner ? `${joiner.firstName || ''} ${joiner.lastName || ''}`.trim() || joiner.username : 'A member';
+  const approverName = approver
+    ? `${approver.firstName || ''} ${approver.lastName || ''}`.trim() || approver.username
+    : null;
+  const joinerName = joiner
+    ? `${joiner.firstName || ''} ${joiner.lastName || ''}`.trim() || joiner.username
+    : 'A member';
   await postSystemMessage(
     room._id,
     approverName ? `${joinerName} joined via request, approved by ${approverName}` : `${joinerName} joined via request`,

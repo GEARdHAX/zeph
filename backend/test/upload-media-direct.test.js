@@ -159,7 +159,7 @@ describe('Direct-to-R2 flow (mocked storage) — presign then complete', () => {
     expect(stored.status).toBe('READY');
   });
 
-  it('deletes the R2 object and marks FAILED when the uploaded bytes don\'t match the claimed category (renamed executable)', async () => {
+  it("deletes the R2 object and marks FAILED when the uploaded bytes don't match the claimed category (renamed executable)", async () => {
     const user = await createUser();
 
     const presignRes = await request(app)
@@ -184,7 +184,7 @@ describe('Direct-to-R2 flow (mocked storage) — presign then complete', () => {
     expect(fakeR2Objects.has(presignRes.body.storageKey)).toBe(false);
   });
 
-  it('rejects completing a media doc that isn\'t in UPLOADING status (already completed or belongs to someone else)', async () => {
+  it("rejects completing a media doc that isn't in UPLOADING status (already completed or belongs to someone else)", async () => {
     const user = await createUser();
     const other = await createUser();
 

@@ -12,9 +12,7 @@ const crypto = require('crypto');
 const store = require('../store');
 const logger = require('../logger');
 const providerRouter = require('./providerRouter');
-const {
-  checkQuota, recordUsage, acquireConcurrency, releaseConcurrency,
-} = require('./quota');
+const { checkQuota, recordUsage, acquireConcurrency, releaseConcurrency } = require('./quota');
 const { acquireLock, releaseLock } = require('./dedup');
 const { validateTextOutput } = require('./outputValidation');
 const { REJECTION_REASONS } = require('./policy');
@@ -43,15 +41,16 @@ const logOutcome = (event, fields) => {
 // upstream correlation id (e.g. from pino-http's req.id) so every log line
 // for one HTTP request, across every stage, shares one id; a fresh uuid is
 // generated here if the caller doesn't have one (e.g. the BullMQ worker).
-const runGoverned = async ({
-  userId, ip, prompt, dedupeKey, maxTokens, metricsFeature, requestId, scope,
-}) => {
+const runGoverned = async ({ userId, ip, prompt, dedupeKey, maxTokens, metricsFeature, requestId, scope }) => {
   const config = store.config || {};
   const rid = requestId || crypto.randomUUID();
   const inputTokenEstimate = estimateTokens(prompt);
   const startedAt = Date.now();
   const base = {
-    requestId: rid, feature: metricsFeature, scope, inputTokenEstimate,
+    requestId: rid,
+    feature: metricsFeature,
+    scope,
+    inputTokenEstimate,
   };
 
   if (config.aiProvider === 'none' || !config.aiProvider) {
@@ -67,7 +66,10 @@ const runGoverned = async ({
   const quota = await checkQuota({ userId, ip, config });
   if (!quota.allowed) {
     logOutcome('ai_quota_rejected', {
-      ...base, reason: quota.reason, detail: quota.detail, retryAfter: quota.retryAfter,
+      ...base,
+      reason: quota.reason,
+      detail: quota.detail,
+      retryAfter: quota.retryAfter,
     });
     return {
       ok: false,
@@ -108,7 +110,8 @@ const runGoverned = async ({
       }));
     } catch (err) {
       const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
-      const reason = err.code === 'RATE_LIMITED' ? REJECTION_REASONS.RATE_LIMITED : REJECTION_REASONS.PROVIDER_UNAVAILABLE;
+      const reason =
+        err.code === 'RATE_LIMITED' ? REJECTION_REASONS.RATE_LIMITED : REJECTION_REASONS.PROVIDER_UNAVAILABLE;
       const providerLatencyMs = Date.now() - providerStartedAt;
       logOutcome('ai_provider_call_failed', {
         ...base,
@@ -121,7 +124,10 @@ const runGoverned = async ({
       // Not recording usage — a failed provider call must never consume the
       // user's minute/day quota (Phase 13).
       return {
-        ok: false, reason, requestId: rid, providerLatencyMs,
+        ok: false,
+        reason,
+        requestId: rid,
+        providerLatencyMs,
       };
     }
     const providerLatencyMs = Date.now() - providerStartedAt;
@@ -129,12 +135,18 @@ const runGoverned = async ({
     const validation = validateTextOutput(rawOutput);
     if (!validation.ok) {
       logOutcome('ai_output_validation_failed', {
-        ...base, level: 'warn', reason: validation.reason, providerLatencyMs,
+        ...base,
+        level: 'warn',
+        reason: validation.reason,
+        providerLatencyMs,
       });
       // A malformed response is still a failed attempt from the user's
       // perspective — no usage recorded (Phase 13).
       return {
-        ok: false, reason: 'INVALID_OUTPUT', requestId: rid, providerLatencyMs,
+        ok: false,
+        reason: 'INVALID_OUTPUT',
+        requestId: rid,
+        providerLatencyMs,
       };
     }
 

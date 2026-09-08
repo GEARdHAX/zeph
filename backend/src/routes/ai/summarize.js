@@ -7,7 +7,11 @@ const { checkSummaryEligibility, isSummaryStale } = require('../../ai/eligibilit
 const { generateAndPersistSummary } = require('../../ai/summaryService');
 const { enqueueSummaryJob, getQueue } = require('../../queues/aiQueue');
 const {
-  logEligibilityRejected, logCacheHit, logQueued, resolveRequestId, aiFailureResponse,
+  logEligibilityRejected,
+  logCacheHit,
+  logQueued,
+  resolveRequestId,
+  aiFailureResponse,
 } = require('../../ai/telemetry');
 
 // Zeph AI — POST /api/ai/summarize (Phases 3-9). Gateway entry point:
@@ -23,7 +27,10 @@ module.exports = async (req, res) => {
   const config = store.config;
   if (!aiTextEnabled(config)) {
     return res.status(503).json({
-      error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'AI features are not enabled on this server.', requestId,
+      error: true,
+      reason: REJECTION_REASONS.AI_DISABLED,
+      message: 'AI features are not enabled on this server.',
+      requestId,
     });
   }
 
@@ -43,7 +50,12 @@ module.exports = async (req, res) => {
   const eligibility = await checkSummaryEligibility(policy, roomID, conversationType);
   if (!eligibility.eligible) {
     logEligibilityRejected({
-      requestId, feature: 'conversation_summary', scope: conversationType, reason: eligibility.reason, minMessages: eligibility.minMessages, count: eligibility.count,
+      requestId,
+      feature: 'conversation_summary',
+      scope: conversationType,
+      reason: eligibility.reason,
+      minMessages: eligibility.minMessages,
+      count: eligibility.count,
     });
     return res.status(422).json({
       error: true,
@@ -58,7 +70,11 @@ module.exports = async (req, res) => {
   const existing = await ConversationSummary.findOne({ room: roomID }).lean();
   if (existing && !isSummaryStale(policy, existing.messageCountAtSummary, eligibility.count)) {
     logCacheHit({
-      requestId, feature: 'conversation_summary', scope: conversationType, messageCountAtSummary: existing.messageCountAtSummary, currentCount: eligibility.count,
+      requestId,
+      feature: 'conversation_summary',
+      scope: conversationType,
+      messageCountAtSummary: existing.messageCountAtSummary,
+      currentCount: eligibility.count,
     });
     return res.status(200).json({ summary: existing.summary, cached: true, requestId });
   }
@@ -69,7 +85,11 @@ module.exports = async (req, res) => {
   // Redis-optional Zeph feature).
   if (getQueue()) {
     await enqueueSummaryJob({
-      roomId: roomID, conversationType, userId: req.user.id, messageCountAtSummary: eligibility.count, requestId,
+      roomId: roomID,
+      conversationType,
+      userId: req.user.id,
+      messageCountAtSummary: eligibility.count,
+      requestId,
     });
     logQueued({ requestId, feature: 'conversation_summary', scope: conversationType });
     return res.status(202).json({
@@ -81,10 +101,17 @@ module.exports = async (req, res) => {
   }
 
   const result = await generateAndPersistSummary({
-    roomId: roomID, userId: req.user.id, ip: req.ip, currentMessageCount: eligibility.count, requestId, scope: conversationType,
+    roomId: roomID,
+    userId: req.user.id,
+    ip: req.ip,
+    currentMessageCount: eligibility.count,
+    requestId,
+    scope: conversationType,
   });
   if (!result.ok) return aiFailureResponse(res, result, requestId);
   res.status(200).json({
-    summary: result.text, cached: false, requestId: result.requestId || requestId,
+    summary: result.text,
+    cached: false,
+    requestId: result.requestId || requestId,
   });
 };

@@ -13,13 +13,15 @@ export default function buildMeetingsTour() {
       {
         popover: {
           title: 'Meetings',
-          description: 'Start an instant meeting, or join one you\'ve been invited to — video and audio calls, right from your browser.',
+          description:
+            "Start an instant meeting, or join one you've been invited to — video and audio calls, right from your browser.",
         },
       },
       {
         popover: {
           title: 'Camera & microphone',
-          description: 'You\'ll be asked to allow camera/mic access only when you actually join or start a call — never automatically.',
+          description:
+            "You'll be asked to allow camera/mic access only when you actually join or start a call — never automatically.",
         },
       },
     ],

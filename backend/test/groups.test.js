@@ -40,10 +40,11 @@ const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root'
 // body via axios, not multipart form fields — .send() matches that, and
 // unlike .field() correctly preserves `people` as a real array (see
 // admin-boundary.test.js's own group-creation tests for the same pattern).
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
 describe('Group creation', () => {
   it('creates a Room+GroupMember(OWNER) for the creator', async () => {
@@ -95,15 +96,20 @@ describe('Membership authorization', () => {
     const created = await createGroup(owner);
     const groupId = created.body._id;
 
-    const getRes = await request(app).post('/api/group/get')
-      .set('Authorization', `Bearer ${tokenFor(outsider)}`).send({ id: groupId });
+    const getRes = await request(app)
+      .post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(outsider)}`)
+      .send({ id: groupId });
     expect(getRes.status).toBe(404);
 
-    const membersRes = await request(app).post('/api/group/members')
-      .set('Authorization', `Bearer ${tokenFor(outsider)}`).send({ id: groupId });
+    const membersRes = await request(app)
+      .post('/api/group/members')
+      .set('Authorization', `Bearer ${tokenFor(outsider)}`)
+      .send({ id: groupId });
     expect(membersRes.status).toBe(404);
 
-    const msgRes = await request(app).post('/api/message')
+    const msgRes = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(outsider)}`)
       .send({ roomID: groupId, content: 'hi', type: 'text' });
     expect(msgRes.status).toBe(403);
@@ -114,12 +120,15 @@ describe('Membership authorization', () => {
     const member = await createUser();
     const created = await createGroup(owner, [member._id]);
 
-    const getRes = await request(app).post('/api/group/get')
-      .set('Authorization', `Bearer ${tokenFor(member)}`).send({ id: created.body._id });
+    const getRes = await request(app)
+      .post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({ id: created.body._id });
     expect(getRes.status).toBe(200);
     expect(getRes.body.group.myRole).toBe('MEMBER');
 
-    const msgRes = await request(app).post('/api/message')
+    const msgRes = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(member)}`)
       .send({ roomID: created.body._id, content: 'hi', type: 'text' });
     expect(msgRes.status).toBe(200);
@@ -132,8 +141,10 @@ describe('IDOR', () => {
     const outsider = await createUser();
     const created = await createGroup(owner);
 
-    const res = await request(app).post('/api/group/get')
-      .set('Authorization', `Bearer ${tokenFor(outsider)}`).send({ id: created.body._id });
+    const res = await request(app)
+      .post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(outsider)}`)
+      .send({ id: created.body._id });
     expect(res.status).toBe(404);
   });
 
@@ -143,14 +154,19 @@ describe('IDOR', () => {
     const created = await createGroup(owner, [member._id]);
     const groupId = created.body._id;
 
-    await request(app).post('/api/group/members/remove')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, userId: member._id.toString() });
+    await request(app)
+      .post('/api/group/members/remove')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, userId: member._id.toString() });
 
-    const res = await request(app).post('/api/group/get')
-      .set('Authorization', `Bearer ${tokenFor(member)}`).send({ id: groupId });
+    const res = await request(app)
+      .post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({ id: groupId });
     expect(res.status).toBe(404);
 
-    const msgRes = await request(app).post('/api/message')
+    const msgRes = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(member)}`)
       .send({ roomID: groupId, content: 'hi', type: 'text' });
     expect(msgRes.status).toBe(403);
@@ -164,17 +180,22 @@ describe('Role hierarchy / privilege escalation prevention', () => {
     const member = await createUser();
     const created = await createGroup(owner, [admin._id, member._id]);
     const groupId = created.body._id;
-    await request(app).post('/api/group/members/role')
+    await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: admin._id.toString(), role: 'ADMIN' });
     return {
-      owner, admin, member, groupId,
+      owner,
+      admin,
+      member,
+      groupId,
     };
   };
 
   it('MEMBER cannot promote themselves to ADMIN', async () => {
     const { member, groupId } = await setupGroup();
-    const res = await request(app).post('/api/group/members/role')
+    const res = await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(member)}`)
       .send({ id: groupId, userId: member._id.toString(), role: 'ADMIN' });
     expect(res.status).toBe(403);
@@ -182,41 +203,43 @@ describe('Role hierarchy / privilege escalation prevention', () => {
 
   it('ADMIN cannot promote anyone to OWNER', async () => {
     const { admin, member, groupId } = await setupGroup();
-    const res = await request(app).post('/api/group/members/role')
+    const res = await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(admin)}`)
       .send({ id: groupId, userId: member._id.toString(), role: 'OWNER' });
     expect(res.status).toBe(400);
   });
 
   it('ADMIN cannot demote/promote another ADMIN (MANAGE_ADMINS is OWNER-only)', async () => {
-    const {
-      owner, admin, member, groupId,
-    } = await setupGroup();
+    const { owner, admin, member, groupId } = await setupGroup();
     // second admin
-    await request(app).post('/api/group/members/role')
+    await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: member._id.toString(), role: 'ADMIN' });
 
-    const res = await request(app).post('/api/group/members/role')
+    const res = await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(admin)}`)
       .send({ id: groupId, userId: member._id.toString(), role: 'MEMBER' });
     expect(res.status).toBe(403);
   });
 
   it('ADMIN cannot remove another ADMIN or the OWNER', async () => {
-    const {
-      owner, admin, member, groupId,
-    } = await setupGroup();
-    await request(app).post('/api/group/members/role')
+    const { owner, admin, member, groupId } = await setupGroup();
+    await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: member._id.toString(), role: 'ADMIN' });
 
-    const removeOtherAdmin = await request(app).post('/api/group/members/remove')
+    const removeOtherAdmin = await request(app)
+      .post('/api/group/members/remove')
       .set('Authorization', `Bearer ${tokenFor(admin)}`)
       .send({ id: groupId, userId: member._id.toString() });
     expect(removeOtherAdmin.status).toBe(403);
 
-    const removeOwner = await request(app).post('/api/group/members/remove')
+    const removeOwner = await request(app)
+      .post('/api/group/members/remove')
       .set('Authorization', `Bearer ${tokenFor(admin)}`)
       .send({ id: groupId, userId: owner._id.toString() });
     expect(removeOwner.status).toBe(403);
@@ -224,16 +247,18 @@ describe('Role hierarchy / privilege escalation prevention', () => {
 
   it('ADMIN can remove a plain MEMBER', async () => {
     const { admin, member, groupId } = await setupGroup();
-    const res = await request(app).post('/api/group/members/remove')
+    const res = await request(app)
+      .post('/api/group/members/remove')
       .set('Authorization', `Bearer ${tokenFor(admin)}`)
       .send({ id: groupId, userId: member._id.toString() });
     expect(res.status).toBe(200);
   });
 
-  it('a non-member cannot change anyone\'s role', async () => {
+  it("a non-member cannot change anyone's role", async () => {
     const { member, groupId } = await setupGroup();
     const outsider = await createUser();
-    const res = await request(app).post('/api/group/members/role')
+    const res = await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(outsider)}`)
       .send({ id: groupId, userId: member._id.toString(), role: 'ADMIN' });
     expect(res.status).toBe(404);
@@ -241,12 +266,14 @@ describe('Role hierarchy / privilege escalation prevention', () => {
 
   it('OWNER can promote MEMBER to ADMIN and back', async () => {
     const { owner, member, groupId } = await setupGroup();
-    const promote = await request(app).post('/api/group/members/role')
+    const promote = await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: member._id.toString(), role: 'ADMIN' });
     expect(promote.status).toBe(200);
 
-    const demote = await request(app).post('/api/group/members/role')
+    const demote = await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: member._id.toString(), role: 'MEMBER' });
     expect(demote.status).toBe(200);
@@ -260,10 +287,14 @@ describe('Member add/remove concurrency', () => {
     const created = await createGroup(owner);
     const groupId = created.body._id;
 
-    const first = await request(app).post('/api/group/members/add')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, userId: target._id.toString() });
-    const second = await request(app).post('/api/group/members/add')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, userId: target._id.toString() });
+    const first = await request(app)
+      .post('/api/group/members/add')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, userId: target._id.toString() });
+    const second = await request(app)
+      .post('/api/group/members/add')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, userId: target._id.toString() });
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
@@ -279,10 +310,14 @@ describe('Member add/remove concurrency', () => {
     const groupId = created.body._id;
 
     const [r1, r2] = await Promise.all([
-      request(app).post('/api/group/members/add')
-        .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, userId: target._id.toString() }),
-      request(app).post('/api/group/members/add')
-        .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, userId: target._id.toString() }),
+      request(app)
+        .post('/api/group/members/add')
+        .set('Authorization', `Bearer ${tokenFor(owner)}`)
+        .send({ id: groupId, userId: target._id.toString() }),
+      request(app)
+        .post('/api/group/members/add')
+        .set('Authorization', `Bearer ${tokenFor(owner)}`)
+        .send({ id: groupId, userId: target._id.toString() }),
     ]);
 
     expect([r1.status, r2.status]).toEqual([200, 200]);
@@ -296,11 +331,15 @@ describe('Member add/remove concurrency', () => {
     const created = await createGroup(owner, [target._id]);
     const groupId = created.body._id;
 
-    await request(app).post('/api/group/members/remove')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, userId: target._id.toString() });
+    await request(app)
+      .post('/api/group/members/remove')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, userId: target._id.toString() });
 
-    const readd = await request(app).post('/api/group/members/add')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, userId: target._id.toString() });
+    const readd = await request(app)
+      .post('/api/group/members/add')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, userId: target._id.toString() });
     expect(readd.status).toBe(200);
 
     const membership = await GroupMember.findOne({ group: groupId, user: target._id });
@@ -319,7 +358,8 @@ describe('A plain MEMBER can add a friend directly (ADD_MEMBER is not admin-only
     const created = await createGroup(owner, [member._id]);
     const groupId = created.body._id;
 
-    const res = await request(app).post('/api/group/members/add')
+    const res = await request(app)
+      .post('/api/group/members/add')
       .set('Authorization', `Bearer ${tokenFor(member)}`)
       .send({ id: groupId, userId: friend._id.toString() });
     expect(res.status).toBe(200);
@@ -335,7 +375,8 @@ describe('A plain MEMBER can add a friend directly (ADD_MEMBER is not admin-only
     const friend = await createUser();
     const created = await createGroup(owner);
 
-    const res = await request(app).post('/api/group/members/add')
+    const res = await request(app)
+      .post('/api/group/members/add')
       .set('Authorization', `Bearer ${tokenFor(outsider)}`)
       .send({ id: created.body._id, userId: friend._id.toString() });
     expect(res.status).toBe(404);
@@ -345,31 +386,38 @@ describe('A plain MEMBER can add a friend directly (ADD_MEMBER is not admin-only
   // removed, then got directly re-added stayed permanently invisible in
   // rooms/list — nothing cleared the stale ConversationUserState.deletedAt
   // tombstone on re-add. See unhideConversationForUser.js.
-  it('reappears in the target\'s inbox after being deleted, removed, then re-added', async () => {
+  it("reappears in the target's inbox after being deleted, removed, then re-added", async () => {
     const owner = await createUser();
     const target = await createUser();
     const created = await createGroup(owner, [target._id]);
     const groupId = created.body._id;
 
-    await request(app).post('/api/group/members/remove')
+    await request(app)
+      .post('/api/group/members/remove')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: target._id.toString() });
 
-    await request(app).post('/api/conversation/delete')
+    await request(app)
+      .post('/api/conversation/delete')
       .set('Authorization', `Bearer ${tokenFor(target)}`)
       .send({ conversationId: groupId });
 
-    const listBefore = await request(app).post('/api/rooms/list')
-      .set('Authorization', `Bearer ${tokenFor(target)}`).send({});
+    const listBefore = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(target)}`)
+      .send({});
     expect(listBefore.body.rooms.map((r) => r._id)).not.toContain(groupId);
 
-    const readd = await request(app).post('/api/group/members/add')
+    const readd = await request(app)
+      .post('/api/group/members/add')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: target._id.toString() });
     expect(readd.status).toBe(200);
 
-    const listAfter = await request(app).post('/api/rooms/list')
-      .set('Authorization', `Bearer ${tokenFor(target)}`).send({});
+    const listAfter = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(target)}`)
+      .send({});
     expect(listAfter.body.rooms.map((r) => r._id)).toContain(groupId);
   });
 });
@@ -380,7 +428,8 @@ describe('Admin privacy boundary inside groups', () => {
     const admin = await createAdmin();
     const created = await createGroup(owner);
 
-    const res = await request(app).post('/api/group/members/add')
+    const res = await request(app)
+      .post('/api/group/members/add')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: created.body._id, userId: admin._id.toString() });
     expect(res.status).toBe(404);
@@ -397,8 +446,10 @@ describe('Admin privacy boundary inside groups', () => {
     const created = await createGroup(admin, [member._id]);
     const groupId = created.body._id;
 
-    const membersRes = await request(app).post('/api/group/members')
-      .set('Authorization', `Bearer ${tokenFor(member)}`).send({ id: groupId });
+    const membersRes = await request(app)
+      .post('/api/group/members')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({ id: groupId });
     expect(membersRes.status).toBe(200);
     const found = membersRes.body.members.find((m) => m.user._id === admin._id.toString());
     expect(found).toBeDefined();
@@ -411,10 +462,14 @@ describe('Message authorization in groups', () => {
     const member = await createUser();
     const created = await createGroup(owner, [member._id]);
 
-    const res = await request(app).post('/api/message')
+    const res = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(member)}`)
       .send({
-        roomID: created.body._id, content: 'hi', type: 'text', author: owner._id.toString(),
+        roomID: created.body._id,
+        content: 'hi',
+        type: 'text',
+        author: owner._id.toString(),
       });
 
     expect(res.status).toBe(200);
@@ -427,7 +482,8 @@ describe('Message authorization in groups', () => {
     const outsider = await createUser();
     const created = await createGroup(owner);
 
-    const res = await request(app).post('/api/message')
+    const res = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(outsider)}`)
       .send({ roomID: created.body._id, content: 'hi', type: 'text' });
     expect(res.status).toBe(403);
@@ -439,34 +495,39 @@ describe('Message authorization in groups', () => {
     const member = await createUser();
     const created = await createGroup(owner, [admin._id, member._id]);
     const groupId = created.body._id;
-    await request(app).post('/api/group/members/role')
+    await request(app)
+      .post('/api/group/members/role')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: admin._id.toString(), role: 'ADMIN' });
 
-    const sendRes = await request(app).post('/api/message')
+    const sendRes = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(member)}`)
       .send({ roomID: groupId, content: 'hi', type: 'text' });
     const messageID = sendRes.body.message._id;
 
-    const delRes = await request(app).post('/api/message/delete')
+    const delRes = await request(app)
+      .post('/api/message/delete')
       .set('Authorization', `Bearer ${tokenFor(admin)}`)
       .send({ roomID: groupId, messageID, forEveryone: true });
     expect(delRes.status).toBe(200);
   });
 
-  it('a plain MEMBER cannot delete-for-everyone another member\'s message', async () => {
+  it("a plain MEMBER cannot delete-for-everyone another member's message", async () => {
     const owner = await createUser();
     const memberA = await createUser();
     const memberB = await createUser();
     const created = await createGroup(owner, [memberA._id, memberB._id]);
     const groupId = created.body._id;
 
-    const sendRes = await request(app).post('/api/message')
+    const sendRes = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(memberA)}`)
       .send({ roomID: groupId, content: 'hi', type: 'text' });
     const messageID = sendRes.body.message._id;
 
-    const delRes = await request(app).post('/api/message/delete')
+    const delRes = await request(app)
+      .post('/api/message/delete')
       .set('Authorization', `Bearer ${tokenFor(memberB)}`)
       .send({ roomID: groupId, messageID, forEveryone: true });
     expect(delRes.status).toBe(403);
@@ -478,13 +539,16 @@ describe('Blocked-user restrictions do not apply inside groups', () => {
     const owner = await createUser();
     const userA = await createUser();
     const userB = await createUser();
-    await request(app).post('/api/block')
-      .set('Authorization', `Bearer ${tokenFor(userA)}`).send({ username: userB.username });
+    await request(app)
+      .post('/api/block')
+      .set('Authorization', `Bearer ${tokenFor(userA)}`)
+      .send({ username: userB.username });
 
     const created = await createGroup(owner, [userA._id, userB._id]);
     const groupId = created.body._id;
 
-    const res = await request(app).post('/api/message')
+    const res = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(userB)}`)
       .send({ roomID: groupId, content: 'hi', type: 'text' });
     expect(res.status).toBe(200);
@@ -497,8 +561,10 @@ describe('Group deletion lifecycle', () => {
     const member = await createUser();
     const created = await createGroup(owner, [member._id]);
 
-    const res = await request(app).post('/api/group/delete')
-      .set('Authorization', `Bearer ${tokenFor(member)}`).send({ id: created.body._id });
+    const res = await request(app)
+      .post('/api/group/delete')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({ id: created.body._id });
     expect(res.status).toBe(403);
   });
 
@@ -508,19 +574,25 @@ describe('Group deletion lifecycle', () => {
     const created = await createGroup(owner, [member._id]);
     const groupId = created.body._id;
 
-    const res = await request(app).post('/api/group/delete')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId });
+    const res = await request(app)
+      .post('/api/group/delete')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId });
     expect(res.status).toBe(200);
 
     const room = await Room.findById(groupId);
     expect(room.disabledAt).not.toBeNull();
 
-    const ownerGet = await request(app).post('/api/group/get')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId });
+    const ownerGet = await request(app)
+      .post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId });
     expect(ownerGet.status).toBe(404);
 
-    const memberGet = await request(app).post('/api/group/get')
-      .set('Authorization', `Bearer ${tokenFor(member)}`).send({ id: groupId });
+    const memberGet = await request(app)
+      .post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({ id: groupId });
     expect(memberGet.status).toBe(404);
   });
 
@@ -530,12 +602,15 @@ describe('Group deletion lifecycle', () => {
     const created = await createGroup(owner, [member._id]);
     const groupId = created.body._id;
 
-    await request(app).post('/api/message')
+    await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ roomID: groupId, content: 'hi', type: 'text' });
 
-    const res = await request(app).post('/api/room/remove')
-      .set('Authorization', `Bearer ${tokenFor(member)}`).send({ id: groupId });
+    const res = await request(app)
+      .post('/api/room/remove')
+      .set('Authorization', `Bearer ${tokenFor(member)}`)
+      .send({ id: groupId });
     expect(res.status).toBe(200);
 
     const room = await Room.findById(groupId);
@@ -551,8 +626,10 @@ describe('Group deletion lifecycle', () => {
     const owner = await createUser();
     const created = await createGroup(owner);
 
-    const res = await request(app).post('/api/room/remove')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: created.body._id });
+    const res = await request(app)
+      .post('/api/room/remove')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: created.body._id });
     expect(res.status).toBe(400);
 
     const room = await Room.findById(created.body._id);
@@ -564,16 +641,22 @@ describe('Cursor pagination / member list limits', () => {
   it('clamps an oversized limit and paginates without duplicates or gaps', async () => {
     const owner = await createUser();
     const members = await Promise.all(Array.from({ length: 12 }, () => createUser()));
-    const created = await createGroup(owner, members.map((m) => m._id));
+    const created = await createGroup(
+      owner,
+      members.map((m) => m._id),
+    );
     const groupId = created.body._id;
 
-    const page1 = await request(app).post('/api/group/members')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, limit: 5 });
+    const page1 = await request(app)
+      .post('/api/group/members')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, limit: 5 });
     expect(page1.status).toBe(200);
     expect(page1.body.members.length).toBe(5);
     expect(page1.body.cursor).toBeTruthy();
 
-    const page2 = await request(app).post('/api/group/members')
+    const page2 = await request(app)
+      .post('/api/group/members')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, limit: 5, cursor: page1.body.cursor });
     expect(page2.body.members.length).toBe(5);
@@ -582,8 +665,10 @@ describe('Cursor pagination / member list limits', () => {
     const ids2 = page2.body.members.map((m) => m._id);
     expect(ids1.filter((id) => ids2.includes(id)).length).toBe(0); // no overlap
 
-    const requestedTooMany = await request(app).post('/api/group/members')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({ id: groupId, limit: 99999 });
+    const requestedTooMany = await request(app)
+      .post('/api/group/members')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ id: groupId, limit: 99999 });
     expect(requestedTooMany.body.limit).toBeLessThanOrEqual(100);
   });
 });
@@ -615,12 +700,15 @@ describe('Legacy GroupMember rows with no status field (pre-D-037)', () => {
     });
     await Room.updateOne({ _id: groupId }, { $addToSet: { people: legacyMember._id } });
 
-    const getRes = await request(app).post('/api/group/get')
-      .set('Authorization', `Bearer ${tokenFor(legacyMember)}`).send({ id: groupId });
+    const getRes = await request(app)
+      .post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(legacyMember)}`)
+      .send({ id: groupId });
     expect(getRes.status).toBe(200);
     expect(getRes.body.group.myRole).toBe('MEMBER');
 
-    const msgRes = await request(app).post('/api/message')
+    const msgRes = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(legacyMember)}`)
       .send({ roomID: groupId, content: 'hi from a legacy member', type: 'text' });
     expect(msgRes.status).toBe(200);
@@ -641,8 +729,10 @@ describe('Legacy GroupMember rows with no status field (pre-D-037)', () => {
       updatedAt: new Date(),
     });
 
-    const getRes = await request(app).post('/api/group/get')
-      .set('Authorization', `Bearer ${tokenFor(formerMember)}`).send({ id: groupId });
+    const getRes = await request(app)
+      .post('/api/group/get')
+      .set('Authorization', `Bearer ${tokenFor(formerMember)}`)
+      .send({ id: groupId });
     expect(getRes.status).toBe(404);
   });
 });

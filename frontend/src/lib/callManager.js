@@ -37,12 +37,14 @@ const consume = async (recvTransport, producer) => {
     roomID,
     producerID: producer.producerID,
   });
-  const {
-    producerId, id, kind, rtpParameters,
-  } = data;
+  const { producerId, id, kind, rtpParameters } = data;
 
   const consumer = await recvTransport.consume({
-    id, producerId, kind, rtpParameters, codecOptions: {},
+    id,
+    producerId,
+    kind,
+    rtpParameters,
+    codecOptions: {},
   });
 
   const stream = new MediaStream();
@@ -96,7 +98,9 @@ const subscribe = async (deviceInstance, socketID) => {
       transportId: recvTransport.id,
       dtlsParameters,
       socketID,
-    }).then(callback).catch(errback);
+    })
+      .then(callback)
+      .catch(errback);
   });
 
   recvTransport.on('connectionstatechange', async (state) => {
@@ -232,8 +236,16 @@ const rejoin = async () => {
     // already discarded — close what's closeable, then null everything so
     // onProducersChanged() (still subscribed) treats every remote producer
     // as new-to-consume once RTC_PRODUCERS redispatches below.
-    try { sendTransport?.close(); } catch (e) { /* already gone */ }
-    try { window.transport?.close(); } catch (e) { /* already gone */ }
+    try {
+      sendTransport?.close();
+    } catch (e) {
+      /* already gone */
+    }
+    try {
+      window.transport?.close();
+    } catch (e) {
+      /* already gone */
+    }
     sendTransport = null;
     audioProducer = null;
     videoProducer = null;
@@ -391,9 +403,7 @@ async function stopScreen() {
 // invoked it.
 async function leave() {
   const io = getIO();
-  const {
-    localStream, audioStream, videoStream, screenStream,
-  } = getGlobal();
+  const { localStream, audioStream, videoStream, screenStream } = getGlobal();
   const endingRoomID = roomID;
   const { counterpart } = store.getState().rtc;
 
@@ -412,16 +422,22 @@ async function leave() {
     if (!stream) return;
     try {
       stream.getTracks().forEach((track) => track.stop());
-    } catch (e) { /* already stopped */ }
+    } catch (e) {
+      /* already stopped */
+    }
   });
 
   try {
     if (sendTransport) sendTransport.close();
-  } catch (e) { /* already closed */ }
+  } catch (e) {
+    /* already closed */
+  }
 
   try {
     if (io && endingRoomID) await io.request('leave', { roomID: endingRoomID });
-  } catch (e) { /* best-effort notify */ }
+  } catch (e) {
+    /* best-effort notify */
+  }
 
   if (unsubscribeFromProducers) {
     unsubscribeFromProducers();

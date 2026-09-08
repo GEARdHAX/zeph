@@ -34,7 +34,10 @@ module.exports = async (req, res) => {
   if (!updated) return res.status(409).json({ error: true, reason: 'REQUEST_NOT_PENDING' });
 
   await GroupAuditLog.create({
-    group: room._id, actor: actorId, action: 'request_denied', target: userId,
+    group: room._id,
+    actor: actorId,
+    action: 'request_denied',
+    target: userId,
   });
 
   logger.info({ groupId: room._id, actorId, targetId: userId }, 'group_join_request_denied');

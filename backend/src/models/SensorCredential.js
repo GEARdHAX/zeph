@@ -18,7 +18,9 @@ const SensorCredentialSchema = new Schema({
   // deliberately separate concepts: redeploying the same sensor to a new
   // host, or running two sensors on one host, are both real scenarios).
   sensorId: {
-    type: String, required: true, unique: true,
+    type: String,
+    required: true,
+    unique: true,
   },
   hostId: { type: String, required: true },
 

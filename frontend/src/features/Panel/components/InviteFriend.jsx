@@ -3,9 +3,7 @@ import { toast } from 'react-toastify';
 import { Copy, Share2, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { createFriendInvite } from '../../../actions/invites';
 
 function InviteFriend({ onClose }) {
@@ -63,7 +61,12 @@ function InviteFriend({ onClose }) {
             <Share2 className="h-4 w-4" />
             Share
           </Button>
-          <Button onClick={() => setShowQr((v) => !v)} disabled={!url} variant="secondary" className="justify-start gap-2">
+          <Button
+            onClick={() => setShowQr((v) => !v)}
+            disabled={!url}
+            variant="secondary"
+            className="justify-start gap-2"
+          >
             <QrCode className="h-4 w-4" />
             {showQr ? 'Hide QR' : 'Show QR'}
           </Button>

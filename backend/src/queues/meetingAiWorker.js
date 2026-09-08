@@ -16,27 +16,37 @@ const { transcribeMeetingAudio, generateMeetingSummary } = require('../ai/meetin
 // MEETING_TOO_SHORT/INSUFFICIENT_* are permanent eligibility verdicts that
 // SHOULD keep the id (retrying changes nothing).
 const TRANSIENT_REASONS = new Set([
-  'RATE_LIMITED', 'QUOTA_EXCEEDED', 'PROVIDER_UNAVAILABLE', 'GENERATION_IN_PROGRESS',
-  'TRANSCRIPTION_FAILED', 'AUDIO_FETCH_FAILED',
+  'RATE_LIMITED',
+  'QUOTA_EXCEEDED',
+  'PROVIDER_UNAVAILABLE',
+  'GENERATION_IN_PROGRESS',
+  'TRANSCRIPTION_FAILED',
+  'AUDIO_FETCH_FAILED',
 ]);
 
 const processMeetingJob = async (job) => {
-  const {
-    meetingId, mediaId, userId, requestId,
-  } = job.data;
+  const { meetingId, mediaId, userId, requestId } = job.data;
   const queueWaitMs = Date.now() - job.timestamp;
   const removeIfTransient = async (reason) => {
     if (TRANSIENT_REASONS.has(reason)) {
-      await job.remove().catch((err) => logger.warn({ err, meetingId }, 'meeting_ai_worker_transient_job_remove_failed'));
+      await job
+        .remove()
+        .catch((err) => logger.warn({ err, meetingId }, 'meeting_ai_worker_transient_job_remove_failed'));
     }
   };
 
   if (mediaId) {
     const transcribeResult = await transcribeMeetingAudio({ meetingId, mediaId, userId });
     if (!transcribeResult.ok) {
-      logger.info({
-        requestId, meetingId, reason: transcribeResult.reason, queueWaitMs,
-      }, 'meeting_ai_worker_transcription_unavailable');
+      logger.info(
+        {
+          requestId,
+          meetingId,
+          reason: transcribeResult.reason,
+          queueWaitMs,
+        },
+        'meeting_ai_worker_transcription_unavailable',
+      );
       await removeIfTransient(transcribeResult.reason);
       return;
     }
@@ -44,9 +54,15 @@ const processMeetingJob = async (job) => {
 
   const summaryResult = await generateMeetingSummary({ meetingId, userId, requestId });
   if (!summaryResult.ok) {
-    logger.info({
-      requestId, meetingId, reason: summaryResult.reason, queueWaitMs,
-    }, 'meeting_ai_worker_summary_unavailable');
+    logger.info(
+      {
+        requestId,
+        meetingId,
+        reason: summaryResult.reason,
+        queueWaitMs,
+      },
+      'meeting_ai_worker_summary_unavailable',
+    );
     await removeIfTransient(summaryResult.reason);
     return;
   }
@@ -64,9 +80,16 @@ const startMeetingAiWorker = () => {
     return null;
   }
   const worker = new Worker(QUEUE_NAME, processMeetingJob, { connection, concurrency: 1 });
-  worker.on('failed', (job, err) => logger.error({
-    err, meetingId: job?.data?.meetingId, attemptsMade: job?.attemptsMade,
-  }, 'meeting_ai_worker_job_failed'));
+  worker.on('failed', (job, err) =>
+    logger.error(
+      {
+        err,
+        meetingId: job?.data?.meetingId,
+        attemptsMade: job?.attemptsMade,
+      },
+      'meeting_ai_worker_job_failed',
+    ),
+  );
   logger.info('Meeting AI worker started');
   return worker;
 };

@@ -124,7 +124,12 @@ function Meetings({ meeting, onDeleted }) {
 
       <div className="flex flex-1 flex-col justify-center min-w-0">
         <div className="text-xs font-bold text-foreground truncate">{title}</div>
-        <div className={cn('text-[11px] truncate mt-0.5', hasActivePeers ? 'text-emerald-500 font-medium' : 'text-muted-foreground')}>
+        <div
+          className={cn(
+            'text-[11px] truncate mt-0.5',
+            hasActivePeers ? 'text-emerald-500 font-medium' : 'text-muted-foreground',
+          )}
+        >
           {text}
         </div>
         <div className="text-[10px] text-muted-foreground/60 truncate font-mono mt-0.5">{`ID: ${meeting._id}`}</div>

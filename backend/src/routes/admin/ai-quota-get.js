@@ -13,7 +13,9 @@ module.exports = async (req, res) => {
   if (!isPrivileged(req.user)) return res.status(404).json({ error: true });
 
   const { userId } = req.params;
-  const target = await User.findById(userId).select('_id username firstName lastName').catch(() => null);
+  const target = await User.findById(userId)
+    .select('_id username firstName lastName')
+    .catch(() => null);
   if (!target) return res.status(404).json({ error: true });
 
   const config = store.config || {};
@@ -21,7 +23,10 @@ module.exports = async (req, res) => {
 
   res.status(200).json({
     user: {
-      _id: target._id, username: target.username, firstName: target.firstName, lastName: target.lastName,
+      _id: target._id,
+      username: target.username,
+      firstName: target.firstName,
+      lastName: target.lastName,
     },
     // null when Redis isn't configured — the frontend shows "quota tracking
     // is not active on this server" rather than fake zeros.

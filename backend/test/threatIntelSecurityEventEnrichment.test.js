@@ -4,7 +4,11 @@ const db = require('./helpers/db');
 const SecurityEvent = require('../src/models/SecurityEvent');
 const SecurityEventService = require('../src/services/securityEventService');
 const { shouldEnrich } = require('../src/services/threatIntel/securityEventEnrichment');
-const { MOCK_MALICIOUS_IP, MOCK_CLEAN_IP, buildMockProvider } = require('../src/services/threatIntel/providers/mockProvider');
+const {
+  MOCK_MALICIOUS_IP,
+  MOCK_CLEAN_IP,
+  buildMockProvider,
+} = require('../src/services/threatIntel/providers/mockProvider');
 
 jest.mock('../src/services/threatIntel/provider');
 // eslint-disable-next-line import/order
@@ -25,7 +29,12 @@ afterAll(async () => {
 
 beforeEach(() => {
   store.config = {
-    ...config, redisUrl: null, abuseIpDbEnabled: true, abuseIpDbApiKey: 'test-key', abuseIpDbDailyBudget: 800, threatIntelCacheTtlSeconds: 21600,
+    ...config,
+    redisUrl: null,
+    abuseIpDbEnabled: true,
+    abuseIpDbApiKey: 'test-key',
+    abuseIpDbDailyBudget: 800,
+    threatIntelCacheTtlSeconds: 21600,
   };
   threatIntelService.resetBreakerForTests();
 });
@@ -35,15 +44,24 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 150); });
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 150);
+  });
 
 describe('threatIntel/securityEventEnrichment — shouldEnrich (spec section 16)', () => {
-  it.each(['LOGIN_SUCCESS', 'LOGIN_FAILED', 'RATE_LIMIT_TRIGGERED', 'UNAUTHORIZED_ACCESS', 'PERMISSION_DENIED', 'FILE_UPLOAD_REJECTED', 'NETWORK_CONNECTION', 'NETWORK_ANOMALY'])(
-    'enriches %s',
-    (type) => {
-      expect(shouldEnrich(type)).toBe(true);
-    },
-  );
+  it.each([
+    'LOGIN_SUCCESS',
+    'LOGIN_FAILED',
+    'RATE_LIMIT_TRIGGERED',
+    'UNAUTHORIZED_ACCESS',
+    'PERMISSION_DENIED',
+    'FILE_UPLOAD_REJECTED',
+    'NETWORK_CONNECTION',
+    'NETWORK_ANOMALY',
+  ])('enriches %s', (type) => {
+    expect(shouldEnrich(type)).toBe(true);
+  });
 
   it.each(['MESSAGE_SENT', 'GROUP_JOIN', 'LOGOUT', 'ADMIN_ACTION'])('does not enrich ordinary event %s', (type) => {
     expect(shouldEnrich(type)).toBe(false);
@@ -139,7 +157,7 @@ describe('threatIntel/securityEventEnrichment — end to end via SecurityEventSe
     expect(saved.metadata.threatIntelligence).toBeUndefined();
   });
 
-  it('enrichment failure never affects the original event\'s own persisted data', async () => {
+  it("enrichment failure never affects the original event's own persisted data", async () => {
     getProvider.mockReturnValue(buildMockProvider({ failOn: [MOCK_MALICIOUS_IP], failReason: 'server_error' }));
     const eventId = SecurityEventService.record({
       type: 'LOGIN_FAILED',

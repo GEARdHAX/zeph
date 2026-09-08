@@ -34,9 +34,11 @@ const createUser = async (overrides = {}) => {
 };
 const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root' });
 
-const call = (from, roomId, meetingId = 'm1') => request(app).post('/api/meeting/call')
-  .set('Authorization', `Bearer ${tokenFor(from)}`)
-  .send({ roomID: roomId, meetingID: meetingId });
+const call = (from, roomId, meetingId = 'm1') =>
+  request(app)
+    .post('/api/meeting/call')
+    .set('Authorization', `Bearer ${tokenFor(from)}`)
+    .send({ roomID: roomId, meetingID: meetingId });
 
 describe('Call authorization (meeting/call.js)', () => {
   it('rejects calling into a room whose other participant has been hard-deleted', async () => {
@@ -64,7 +66,8 @@ describe('Call authorization (meeting/call.js)', () => {
     const caller = await createUser();
     const recipient = await createUser();
     const room = await Room.create({ people: [caller._id, recipient._id], isGroup: false });
-    await request(app).post('/api/block')
+    await request(app)
+      .post('/api/block')
       .set('Authorization', `Bearer ${tokenFor(recipient)}`)
       .send({ username: caller.username });
 

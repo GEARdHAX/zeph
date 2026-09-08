@@ -17,7 +17,8 @@ module.exports = async (req, res) => {
   if (!normalized) return res.status(400).json({ error: true, reason: 'INVALID_INDICATOR' });
 
   const indicator = await ThreatIndicator.findOne({
-    normalizedIndicator: normalized.normalized, type: normalized.type,
+    normalizedIndicator: normalized.normalized,
+    type: normalized.type,
   }).lean();
 
   if (!indicator) return res.status(404).json({ error: true, reason: 'NOT_FOUND' });

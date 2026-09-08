@@ -36,7 +36,12 @@ const closeQueueConnection = async () => {
     const conn = connection;
     await Promise.race([
       conn.quit().catch(() => {}),
-      new Promise((resolve) => { setTimeout(() => { conn.disconnect(); resolve(); }, 500); }),
+      new Promise((resolve) => {
+        setTimeout(() => {
+          conn.disconnect();
+          resolve();
+        }, 500);
+      }),
     ]);
     connection = null;
   }

@@ -70,32 +70,47 @@ const checkQuota = async ({ userId, ip, config }) => {
     if (userMinuteCount >= limits.perUserPerMinute) {
       const ttl = await redis.ttl(minuteBucketKey(userId)).catch(() => -1);
       return {
-        allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'user_per_minute', ...buildReset(ttl, 60),
+        allowed: false,
+        reason: REJECTION_REASONS.RATE_LIMITED,
+        detail: 'user_per_minute',
+        ...buildReset(ttl, 60),
       };
     }
     if (userDayCount >= limits.perUserPerDay) {
       // The day-bucket key's TTL is ~26h (set generously in recordUsage) —
       // NOT a reliable "resets at" signal. Use the actual date rollover.
       return {
-        allowed: false, reason: REJECTION_REASONS.QUOTA_EXCEEDED, detail: 'user_per_day', ...buildReset(secondsUntilUtcMidnight(), secondsUntilUtcMidnight()),
+        allowed: false,
+        reason: REJECTION_REASONS.QUOTA_EXCEEDED,
+        detail: 'user_per_day',
+        ...buildReset(secondsUntilUtcMidnight(), secondsUntilUtcMidnight()),
       };
     }
     if (ipMinuteCount >= limits.perIpPerMinute) {
       const ttl = await redis.ttl(ipMinuteBucketKey(ip)).catch(() => -1);
       return {
-        allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'ip_per_minute', ...buildReset(ttl, 60),
+        allowed: false,
+        reason: REJECTION_REASONS.RATE_LIMITED,
+        detail: 'ip_per_minute',
+        ...buildReset(ttl, 60),
       };
     }
     // Concurrent limits clear as soon as in-flight requests finish — a few
     // seconds at most; no precise "resetAt", just a short retry hint.
     if (userConcurrent >= limits.perUserConcurrent) {
       return {
-        allowed: false, reason: REJECTION_REASONS.RATE_LIMITED, detail: 'user_concurrent', ...buildReset(0, 10),
+        allowed: false,
+        reason: REJECTION_REASONS.RATE_LIMITED,
+        detail: 'user_concurrent',
+        ...buildReset(0, 10),
       };
     }
     if (globalConcurrent >= limits.globalConcurrent) {
       return {
-        allowed: false, reason: REJECTION_REASONS.QUOTA_EXCEEDED, detail: 'global_concurrent', ...buildReset(0, 15),
+        allowed: false,
+        reason: REJECTION_REASONS.QUOTA_EXCEEDED,
+        detail: 'global_concurrent',
+        ...buildReset(0, 15),
       };
     }
 
@@ -115,10 +130,14 @@ const recordUsage = async ({ userId, ip }) => {
   const redis = getClient();
   if (!redis) return;
   try {
-    await redis.multi()
-      .incr(minuteBucketKey(userId)).expire(minuteBucketKey(userId), 60)
-      .incr(dayBucketKey(userId)).expire(dayBucketKey(userId), 26 * 60 * 60)
-      .incr(ipMinuteBucketKey(ip)).expire(ipMinuteBucketKey(ip), 60)
+    await redis
+      .multi()
+      .incr(minuteBucketKey(userId))
+      .expire(minuteBucketKey(userId), 60)
+      .incr(dayBucketKey(userId))
+      .expire(dayBucketKey(userId), 26 * 60 * 60)
+      .incr(ipMinuteBucketKey(ip))
+      .expire(ipMinuteBucketKey(ip), 60)
       .exec();
   } catch (err) {
     logger.warn({ err }, 'ai_quota_record_usage_failed');
@@ -137,9 +156,12 @@ const acquireConcurrency = async (userId) => {
   const redis = getClient();
   if (!redis) return;
   try {
-    await redis.multi()
-      .incr(`${PREFIX}user:${userId}:concurrent`).expire(`${PREFIX}user:${userId}:concurrent`, CONCURRENCY_TTL_SECONDS)
-      .incr(`${PREFIX}global:concurrent`).expire(`${PREFIX}global:concurrent`, CONCURRENCY_TTL_SECONDS)
+    await redis
+      .multi()
+      .incr(`${PREFIX}user:${userId}:concurrent`)
+      .expire(`${PREFIX}user:${userId}:concurrent`, CONCURRENCY_TTL_SECONDS)
+      .incr(`${PREFIX}global:concurrent`)
+      .expire(`${PREFIX}global:concurrent`, CONCURRENCY_TTL_SECONDS)
       .exec();
   } catch (err) {
     logger.warn({ err }, 'ai_quota_acquire_failed');
@@ -150,10 +172,7 @@ const releaseConcurrency = async (userId) => {
   const redis = getClient();
   if (!redis) return;
   try {
-    await redis.multi()
-      .decr(`${PREFIX}user:${userId}:concurrent`)
-      .decr(`${PREFIX}global:concurrent`)
-      .exec();
+    await redis.multi().decr(`${PREFIX}user:${userId}:concurrent`).decr(`${PREFIX}global:concurrent`).exec();
   } catch (err) {
     logger.warn({ err }, 'ai_quota_release_failed');
   }
@@ -203,7 +222,7 @@ const resetUserQuota = async (userId, types) => {
   const redis = getClient();
   if (!redis) return { ok: false, reason: 'REDIS_UNAVAILABLE' };
 
-  const wanted = (types && types.includes('all')) ? QUOTA_TYPES : (types || []).filter((t) => QUOTA_TYPES.includes(t));
+  const wanted = types && types.includes('all') ? QUOTA_TYPES : (types || []).filter((t) => QUOTA_TYPES.includes(t));
   if (wanted.length === 0) return { ok: false, reason: 'NO_VALID_TYPES' };
 
   const keys = [];

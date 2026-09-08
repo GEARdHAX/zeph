@@ -113,7 +113,11 @@ describeIfRedis('GET /api/users/:username — served from cache on a repeat requ
 
     const Image = require('../src/models/Image');
     const image = await Image.create({
-      shield: 'shield', name: 'pic.jpg', author: target._id, size: 100, shieldedID: 'shieldedid123',
+      shield: 'shield',
+      name: 'pic.jpg',
+      author: target._id,
+      size: 100,
+      shieldedID: 'shieldedid123',
     });
 
     await request(app)

@@ -15,7 +15,14 @@ const disabledProvider = {
   name: 'disabled',
   async lookupIndicator() {
     return {
-      found: false, malicious: false, confidence: 0, severity: 'low', categories: [], source: 'disabled', metadata: {}, sourceId: null,
+      found: false,
+      malicious: false,
+      confidence: 0,
+      severity: 'low',
+      categories: [],
+      source: 'disabled',
+      metadata: {},
+      sourceId: null,
     };
   },
 };

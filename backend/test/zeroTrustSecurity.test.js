@@ -34,10 +34,11 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const ageSession = (session) => Session.updateOne(
-  { _id: session._id },
-  { $set: { createdAt: new Date(Date.now() - NEW_SESSION_THRESHOLD_MS - 60000) } },
-);
+const ageSession = (session) =>
+  Session.updateOne(
+    { _id: session._id },
+    { $set: { createdAt: new Date(Date.now() - NEW_SESSION_THRESHOLD_MS - 60000) } },
+  );
 
 // Every request payload below carries a client-controlled field that, if
 // this middleware trusted it, would let a caller forge their own security
@@ -62,7 +63,9 @@ describe('Zero Trust — client cannot manipulate its own security posture (spec
     expect(res.status).toBe(200);
     // Confirm via the emitted event that a real score was computed, not
     // whatever the client tried to inject.
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
     const event = await SecurityEvent.findOne({ type: 'ZERO_TRUST_ALLOW', 'actor.userId': user._id.toString() });
     expect(event.metadata.riskScore).toBe(30); // NEW_SESSION + UNKNOWN_DEVICE, computed server-side
   });
@@ -178,8 +181,8 @@ describe('Zero Trust — RBAC cannot be bypassed by Zero Trust (spec section 14/
   });
 });
 
-describe('Zero Trust — session isolation (spec section 35: cannot access another user\'s session)', () => {
-  it('a step-up token issued for user A cannot be consumed using user B\'s auth token', async () => {
+describe("Zero Trust — session isolation (spec section 35: cannot access another user's session)", () => {
+  it("a step-up token issued for user A cannot be consumed using user B's auth token", async () => {
     const userA = await createUser({ password: 'password-a' });
     const userB = await createUser({ password: 'password-b' });
     const { token: tokenA } = await tokenForDevice(userA);
@@ -212,22 +215,29 @@ describe('Zero Trust — session isolation (spec section 35: cannot access anoth
     expect([200, 428]).toContain(res.status); // documents current behavior; the real proof is below
   });
 
-  it('a step-up token minted for one user is provably rejected by verifyAndConsumeStepUpToken when presented with another user\'s id', async () => {
+  it("a step-up token minted for one user is provably rejected by verifyAndConsumeStepUpToken when presented with another user's id", async () => {
     const { issueStepUpToken, verifyAndConsumeStepUpToken } = require('../src/services/zeroTrust/stepUp');
     const userA = await createUser({ password: 'password-a' });
     const userB = await createUser({ password: 'password-b' });
 
     const issued = await issueStepUpToken({
-      userId: userA._id, sessionId: null, resource: 'account', action: 'change_password', password: 'password-a',
+      userId: userA._id,
+      sessionId: null,
+      resource: 'account',
+      action: 'change_password',
+      password: 'password-a',
     });
     const consumeAttempt = await verifyAndConsumeStepUpToken({
-      rawToken: issued.token, userId: userB._id, resource: 'account', action: 'change_password',
+      rawToken: issued.token,
+      userId: userB._id,
+      resource: 'account',
+      action: 'change_password',
     });
     expect(consumeAttempt.ok).toBe(false);
     expect(consumeAttempt.reason).toBe('user_mismatch');
   });
 
-  it('the security events API never returns another user\'s events to a non-admin (it 404s before any query runs)', async () => {
+  it("the security events API never returns another user's events to a non-admin (it 404s before any query runs)", async () => {
     const user = await createUser();
     await SecurityEvent.create({
       eventId: 'evt-someone-else',
@@ -261,7 +271,9 @@ describe('Zero Trust — sensitive credentials are never logged (spec section 35
       .field('password', 'correct-password-123');
     expect(stepUp.status).toBe(200);
 
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
     const allEvents = await SecurityEvent.find({}).lean();
     const serialized = JSON.stringify(allEvents);
     expect(serialized).not.toContain(stepUp.body.token);
@@ -278,7 +290,9 @@ describe('Zero Trust — sensitive credentials are never logged (spec section 35
       .set('Authorization', `Bearer ${token}`)
       .field('password', 'brand-new-secret-password');
 
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
     const allEvents = await SecurityEvent.find({}).lean();
     expect(JSON.stringify(allEvents)).not.toContain('brand-new-secret-password');
   });

@@ -14,7 +14,7 @@ const summarize = (latenciesMs, { errors = 0, total = latenciesMs.length } = {})
   return {
     total,
     errors,
-    errorRate: total > 0 ? +(errors / total * 100).toFixed(2) : 0,
+    errorRate: total > 0 ? +((errors / total) * 100).toFixed(2) : 0,
     p50: percentile(sorted, 50),
     p95: percentile(sorted, 95),
     p99: percentile(sorted, 99),
@@ -27,7 +27,9 @@ const printSummary = (label, stats, extra = {}) => {
   console.log(`\n${label}`);
   console.log('-'.repeat(label.length));
   console.log(`  total: ${stats.total}   errors: ${stats.errors} (${stats.errorRate}%)`);
-  console.log(`  p50: ${stats.p50}ms   p95: ${stats.p95}ms   p99: ${stats.p99}ms   min: ${stats.min}ms   max: ${stats.max}ms`);
+  console.log(
+    `  p50: ${stats.p50}ms   p95: ${stats.p95}ms   p99: ${stats.p99}ms   min: ${stats.min}ms   max: ${stats.max}ms`,
+  );
   Object.entries(extra).forEach(([k, v]) => console.log(`  ${k}: ${v}`));
 };
 

@@ -1,9 +1,7 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { useGlobal, setGlobal } from 'reactn';
 import Div100vh from 'react-div-100vh';
-import {
-  Route, Routes, useLocation, useNavigate,
-} from 'react-router-dom';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { cn } from '@/lib/utils';
 import CreateGroup from '../../features/Group/Create';
@@ -113,15 +111,93 @@ function Home() {
             <Route path="/" element={<Welcome />} />
             <Route path="/favorites" element={<Welcome />} />
             <Route path="/meetings" element={<Welcome />} />
-            <Route path="/settings" element={<div className="h-full w-full"><div className="block md:hidden h-full"><Settings /></div><div className="hidden md:block h-full"><Welcome /></div></div>} />
+            <Route
+              path="/settings"
+              element={
+                <div className="h-full w-full">
+                  <div className="block md:hidden h-full">
+                    <Settings />
+                  </div>
+                  <div className="hidden md:block h-full">
+                    <Welcome />
+                  </div>
+                </div>
+              }
+            />
             <Route path="/notifications" element={<NotificationsPlaceholder />} />
-            <Route path="/profile" element={<div className="h-full w-full"><div className="block md:hidden h-full"><Settings /></div><div className="hidden md:block h-full"><Welcome /></div></div>} />
-            <Route path="/admin" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><Admin /></Suspense></RequireAdmin>} />
-            <Route path="/admin/security-events" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><SecurityEvents /></Suspense></RequireAdmin>} />
-            <Route path="/admin/threat-intelligence" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><ThreatIntelligence /></Suspense></RequireAdmin>} />
-            <Route path="/admin/sensors" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><Sensors /></Suspense></RequireAdmin>} />
-            <Route path="/admin/network-intelligence" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><NetworkIntelligence /></Suspense></RequireAdmin>} />
-            <Route path="/admin/ai-incidents" element={<RequireAdmin><Suspense fallback={<LazyFallback />}><SecurityAiIncidents /></Suspense></RequireAdmin>} />
+            <Route
+              path="/profile"
+              element={
+                <div className="h-full w-full">
+                  <div className="block md:hidden h-full">
+                    <Settings />
+                  </div>
+                  <div className="hidden md:block h-full">
+                    <Welcome />
+                  </div>
+                </div>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <RequireAdmin>
+                  <Suspense fallback={<LazyFallback />}>
+                    <Admin />
+                  </Suspense>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/security-events"
+              element={
+                <RequireAdmin>
+                  <Suspense fallback={<LazyFallback />}>
+                    <SecurityEvents />
+                  </Suspense>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/threat-intelligence"
+              element={
+                <RequireAdmin>
+                  <Suspense fallback={<LazyFallback />}>
+                    <ThreatIntelligence />
+                  </Suspense>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/sensors"
+              element={
+                <RequireAdmin>
+                  <Suspense fallback={<LazyFallback />}>
+                    <Sensors />
+                  </Suspense>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/network-intelligence"
+              element={
+                <RequireAdmin>
+                  <Suspense fallback={<LazyFallback />}>
+                    <NetworkIntelligence />
+                  </Suspense>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/ai-incidents"
+              element={
+                <RequireAdmin>
+                  <Suspense fallback={<LazyFallback />}>
+                    <SecurityAiIncidents />
+                  </Suspense>
+                </RequireAdmin>
+              }
+            />
             <Route path="/meeting/:id" element={<Meeting />} />
             <Route path="/room/:id" element={<Conversation />} />
             <Route path="/room/:id/info" element={<Details />} />
@@ -134,9 +210,7 @@ function Home() {
           <div
             className={cn(
               'h-full border-l border-border bg-card transition-all duration-300 ease-in-out overflow-hidden z-20',
-              showDetails
-                ? 'w-full sm:w-[320px] lg:w-[360px] flex shrink-0 shadow-lg'
-                : 'w-0 hidden',
+              showDetails ? 'w-full sm:w-[320px] lg:w-[360px] flex shrink-0 shadow-lg' : 'w-0 hidden',
             )}
           >
             <Details />

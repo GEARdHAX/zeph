@@ -1,13 +1,13 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Popup from './Popup';
 import { getUserAiQuota, resetUserAiQuota } from '../../../actions/adminAiQuota';
 
 vi.mock('../../../actions/admin', () => ({
-  postCreate: vi.fn(), postUpdate: vi.fn(), postDelete: vi.fn(),
+  postCreate: vi.fn(),
+  postUpdate: vi.fn(),
+  postDelete: vi.fn(),
 }));
 vi.mock('../../../actions/adminAiQuota', () => ({
   getUserAiQuota: vi.fn(),
@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 describe('Popup — AI usage panel', () => {
-  it('loads and shows the user\'s current usage against the limits', async () => {
+  it("loads and shows the user's current usage against the limits", async () => {
     getUserAiQuota.mockResolvedValueOnce(QUOTA);
     render(<Popup type="ai-quota" user={USER} onClose={vi.fn()} />);
 
@@ -64,7 +64,9 @@ describe('Popup — AI usage panel', () => {
 
   it('"Reset all AI usage" calls the backend with ["all"]', async () => {
     getUserAiQuota.mockResolvedValueOnce(QUOTA);
-    resetUserAiQuota.mockResolvedValueOnce({ data: { ok: true, cleared: ['minute', 'day', 'concurrent'], usage: QUOTA.data.usage } });
+    resetUserAiQuota.mockResolvedValueOnce({
+      data: { ok: true, cleared: ['minute', 'day', 'concurrent'], usage: QUOTA.data.usage },
+    });
     const user = userEvent.setup();
     render(<Popup type="ai-quota" user={USER} onClose={vi.fn()} />);
 

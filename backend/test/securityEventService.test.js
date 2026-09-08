@@ -7,7 +7,10 @@ const logger = require('../src/logger');
 // tests need a short wait for that write to settle before asserting on it,
 // and afterEach needs the same wait before clearDatabase() so a slow test's
 // pending write can never bleed into the next test's assertions.
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 50); });
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 50);
+  });
 
 beforeAll(async () => {
   await db.connect();

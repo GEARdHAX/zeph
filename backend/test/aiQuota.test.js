@@ -1,8 +1,12 @@
 const store = require('../src/store');
 const config = require('../config');
 const {
-  checkQuota, recordUsage, acquireConcurrency, releaseConcurrency,
-  secondsUntilUtcMidnight, buildReset,
+  checkQuota,
+  recordUsage,
+  acquireConcurrency,
+  releaseConcurrency,
+  secondsUntilUtcMidnight,
+  buildReset,
 } = require('../src/ai/quota');
 
 // Same convention as test/helpers/app.js: tests never touch a real external
@@ -11,7 +15,9 @@ const {
 // is the one behavior verifiable without a live Redis instance, matching
 // how every other Redis-backed module in this codebase (threatIntel/quota.js,
 // securityAi/cache.js) is tested at the unit level.
-beforeAll(() => { store.config = { ...config, redisUrl: null }; });
+beforeAll(() => {
+  store.config = { ...config, redisUrl: null };
+});
 
 describe('checkQuota — no Redis configured (fails open)', () => {
   it('allows the request — a missing quota backend must not itself block AI', async () => {

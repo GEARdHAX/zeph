@@ -1,9 +1,5 @@
-import {
-  useState, useEffect, useMemo, useCallback, useRef,
-} from 'react';
-import {
-  X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RefreshCw,
-} from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ZephSpinner } from '@/components/ui/zeph-spinner';
@@ -109,17 +105,24 @@ function MediaViewerShell({ messages, initialMessage, onClose }) {
   // viewer renders a blank "File / Unknown size" card with a dead URL
   // instead of the "could not load" error state.
   const isNewFormat = !!(message?.media && typeof message.media === 'object' && message.media._id);
-  const filename = message && (isNewFormat
-    ? message.media.originalName || `${message.media.category || 'file'}`
-    : (category === 'image' ? undefined : (message.file?.name || 'File')));
-  const fileUrl = message && (isNewFormat
-    ? `${Config.url || ''}/api/media/${message.media._id}`
-    : (category === 'image'
-      ? `${Config.url || ''}/api/images/${message.content}/2048`
-      : `${Config.url || ''}/api/files/${message.content}`));
-  const thumbnailUrl = isNewFormat && message.media.thumbnailKey
-    ? `${Config.url || ''}/api/media/${message.media._id}/thumbnail`
-    : undefined;
+  const filename =
+    message &&
+    (isNewFormat
+      ? message.media.originalName || `${message.media.category || 'file'}`
+      : category === 'image'
+        ? undefined
+        : message.file?.name || 'File');
+  const fileUrl =
+    message &&
+    (isNewFormat
+      ? `${Config.url || ''}/api/media/${message.media._id}`
+      : category === 'image'
+        ? `${Config.url || ''}/api/images/${message.content}/2048`
+        : `${Config.url || ''}/api/files/${message.content}`);
+  const thumbnailUrl =
+    isNewFormat && message.media.thumbnailKey
+      ? `${Config.url || ''}/api/media/${message.media._id}/thumbnail`
+      : undefined;
   const fileSize = message && (isNewFormat ? message.media.size : message.file?.size);
 
   // Native <audio>/<video>/<img src> and downloadFile.js's fetch() can't
@@ -129,7 +132,9 @@ function MediaViewerShell({ messages, initialMessage, onClose }) {
   // via axios (which does carry the header) before handing it to any
   // native element or the download button.
   const {
-    url: resolvedUrl, loading: mediaLoading, error: mediaError,
+    url: resolvedUrl,
+    loading: mediaLoading,
+    error: mediaError,
   } = useAuthorizedMediaUrl(fileUrl, { authorized: isNewFormat });
   const { url: resolvedThumbnailUrl } = useAuthorizedMediaUrl(thumbnailUrl, { authorized: isNewFormat });
 
@@ -191,9 +196,7 @@ function MediaViewerShell({ messages, initialMessage, onClose }) {
             <X className="h-4.5 w-4.5" />
           </Button>
 
-          <span className="max-w-[45%] truncate text-xs font-medium text-white/80 sm:max-w-[60%]">
-            {filename}
-          </span>
+          <span className="max-w-[45%] truncate text-xs font-medium text-white/80 sm:max-w-[60%]">{filename}</span>
 
           <div className="flex items-center gap-1">
             {category === 'image' && (

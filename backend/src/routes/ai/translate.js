@@ -19,14 +19,20 @@ module.exports = async (req, res) => {
   // honest 413 instead of a silently truncated translation).
   if (text.length > MAX_MESSAGE_CHARS) {
     return res.status(413).json({
-      error: true, reason: 'INPUT_TOO_LARGE', message: `Text is too long (max ${MAX_MESSAGE_CHARS} characters).`, requestId,
+      error: true,
+      reason: 'INPUT_TOO_LARGE',
+      message: `Text is too long (max ${MAX_MESSAGE_CHARS} characters).`,
+      requestId,
     });
   }
 
   const config = store.config;
   if (!aiTextEnabled(config)) {
     return res.status(503).json({
-      error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'AI features are not enabled on this server.', requestId,
+      error: true,
+      reason: REJECTION_REASONS.AI_DISABLED,
+      message: 'AI features are not enabled on this server.',
+      requestId,
     });
   }
 

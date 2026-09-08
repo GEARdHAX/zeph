@@ -12,9 +12,7 @@ const VALID_SOURCES = new Set(['abuseipdb', 'mock', 'unknown']);
 module.exports = async (req, res) => {
   if (!isPrivileged(req.user)) return res.status(404).json({ error: true });
 
-  const {
-    type, malicious, severity, source, cursor, limit: limitParam,
-  } = req.query;
+  const { type, malicious, severity, source, cursor, limit: limitParam } = req.query;
 
   let limit = Number(limitParam) || DEFAULT_LIMIT;
   limit = Math.min(Math.max(limit, 1), MAX_LIMIT);
@@ -28,7 +26,8 @@ module.exports = async (req, res) => {
     query.status = malicious === 'true' ? 'MALICIOUS' : { $ne: 'MALICIOUS' };
   }
   if (severity) {
-    if (!['low', 'medium', 'high', 'critical'].includes(severity)) return res.status(400).json({ error: true, reason: 'INVALID_SEVERITY' });
+    if (!['low', 'medium', 'high', 'critical'].includes(severity))
+      return res.status(400).json({ error: true, reason: 'INVALID_SEVERITY' });
     query.severity = severity;
   }
   if (source) {
@@ -41,10 +40,7 @@ module.exports = async (req, res) => {
     query.updatedAt = { $lt: parsedCursor };
   }
 
-  const indicators = await ThreatIndicator.find(query)
-    .sort({ updatedAt: -1 })
-    .limit(limit)
-    .lean();
+  const indicators = await ThreatIndicator.find(query).sort({ updatedAt: -1 }).limit(limit).lean();
 
   const nextCursor = indicators.length === limit ? indicators[indicators.length - 1].updatedAt.toISOString() : null;
 

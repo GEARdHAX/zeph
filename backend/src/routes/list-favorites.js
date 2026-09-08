@@ -33,7 +33,9 @@ module.exports = async (req, res, next) => {
       for (const room of user.favorites) {
         // eslint-disable-next-line no-await-in-loop
         const violation = await roomHasBoundaryViolation({
-          room, callerID: req.user.id, callerLevel: req.user.level,
+          room,
+          callerID: req.user.id,
+          callerLevel: req.user.level,
         });
         if (!violation) {
           // Built as a plain object, NOT reassigned onto `room.people` —

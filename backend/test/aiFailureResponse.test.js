@@ -3,8 +3,14 @@ const { aiFailureResponse } = require('../src/ai/telemetry');
 // Minimal Express res stub.
 const mockRes = () => {
   const r = { statusCode: null, body: null };
-  r.status = (code) => { r.statusCode = code; return r; };
-  r.json = (payload) => { r.body = payload; return r; };
+  r.status = (code) => {
+    r.statusCode = code;
+    return r;
+  };
+  r.json = (payload) => {
+    r.body = payload;
+    return r;
+  };
   return r;
 };
 

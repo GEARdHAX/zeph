@@ -20,7 +20,8 @@ afterEach(async () => {
   await db.clearDatabase();
 });
 
-const bucketSafeBase = () => new Date(Math.floor(Date.now() / CORRELATION_WINDOW_MS) * CORRELATION_WINDOW_MS + 2 * 60 * 1000);
+const bucketSafeBase = () =>
+  new Date(Math.floor(Date.now() / CORRELATION_WINDOW_MS) * CORRELATION_WINDOW_MS + 2 * 60 * 1000);
 
 describe('resource exhaustion — 10,000 events from one sensor collapse into one incident', () => {
   it('10,000 correlatable events, same sensor, same time bucket -> exactly ONE incident, not 10,000', async () => {

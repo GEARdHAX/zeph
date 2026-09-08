@@ -98,7 +98,9 @@ describe('inspectArchive', () => {
 
   it('rejects a zip with an excessive entry count', () => {
     const entries = Array.from({ length: 2500 }, (_, i) => ({
-      name: `f${i}.txt`, uncompressedSize: 1, compressedSize: 1,
+      name: `f${i}.txt`,
+      uncompressedSize: 1,
+      compressedSize: 1,
     }));
     const zip = buildZip({ entries });
     const filePath = tmpZip(zip);

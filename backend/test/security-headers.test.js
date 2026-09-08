@@ -13,10 +13,12 @@ const helmet = require('helmet');
 // on every CI run.
 const buildHelmetApp = () => {
   const app = express();
-  app.use(helmet({
-    contentSecurityPolicy: false,
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-  }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
   app.get('/test', (req, res) => res.status(200).json({ ok: true }));
   return app;
 };

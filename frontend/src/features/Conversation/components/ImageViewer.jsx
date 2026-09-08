@@ -1,6 +1,4 @@
-import {
-  memo, useState, useCallback, useRef, useEffect,
-} from 'react';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { Loader2, ImageOff } from 'lucide-react';
 
 const MIN_SCALE = 1;
@@ -9,9 +7,7 @@ const MAX_SCALE = 4;
 // Fit-to-screen by default (object-contain), CSS-transform zoom/rotate —
 // no canvas work needed since this is preview-only, not the pre-upload
 // editor (getCroppedImageBlob.js handles that separate, already-solved case).
-function ImageViewer({
-  src, alt, scale, rotation,
-}) {
+function ImageViewer({ src, alt, scale, rotation }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [containerSize, setContainerSize] = useState(null);
@@ -51,9 +47,10 @@ function ImageViewer({
   }
 
   const isSideways = rotation % 180 !== 0;
-  const constrainedStyle = isSideways && containerSize
-    ? { maxWidth: containerSize.height, maxHeight: containerSize.width }
-    : { maxWidth: '100%', maxHeight: '100%' };
+  const constrainedStyle =
+    isSideways && containerSize
+      ? { maxWidth: containerSize.height, maxHeight: containerSize.width }
+      : { maxWidth: '100%', maxHeight: '100%' };
 
   return (
     <div ref={containerRef} className="relative flex h-full w-full items-center justify-center overflow-hidden">

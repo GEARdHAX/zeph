@@ -35,13 +35,14 @@ afterEach(async () => {
   await db.clearDatabase();
 });
 
-const createUser = async () => User.create({
-  username: `user-${Math.random().toString(36).slice(2)}`,
-  email: `${Math.random().toString(36).slice(2)}@example.com`,
-  firstName: 'Test',
-  lastName: 'User',
-  password: 'irrelevant-not-hashed-for-this-test',
-});
+const createUser = async () =>
+  User.create({
+    username: `user-${Math.random().toString(36).slice(2)}`,
+    email: `${Math.random().toString(36).slice(2)}@example.com`,
+    firstName: 'Test',
+    lastName: 'User',
+    password: 'irrelevant-not-hashed-for-this-test',
+  });
 
 describe('mediasoup join/produce authorization (Phase 9)', () => {
   it('DENIES a user with no relation to the meeting — the exact exploit this audit found', async () => {
@@ -79,13 +80,23 @@ describe('mediasoup join/produce authorization (Phase 9)', () => {
     const member = await createUser();
     const room = await Room.create({ people: [owner._id, member._id], isGroup: true, title: 'Group' });
     await GroupMember.create({
-      group: room._id, user: owner._id, role: 'OWNER', active: true, status: 'ACTIVE',
+      group: room._id,
+      user: owner._id,
+      role: 'OWNER',
+      active: true,
+      status: 'ACTIVE',
     });
     await GroupMember.create({
-      group: room._id, user: member._id, role: 'MEMBER', active: true, status: 'ACTIVE',
+      group: room._id,
+      user: member._id,
+      role: 'MEMBER',
+      active: true,
+      status: 'ACTIVE',
     });
     const meeting = await Meeting.create({
-      caller: owner._id, callToGroup: true, group: room._id,
+      caller: owner._id,
+      callToGroup: true,
+      group: room._id,
     });
 
     const result = await authorizeMeetingJoin(meeting._id.toString(), member._id.toString());
@@ -97,16 +108,26 @@ describe('mediasoup join/produce authorization (Phase 9)', () => {
     const removedUser = await createUser();
     const room = await Room.create({ people: [owner._id], isGroup: true, title: 'Group' });
     await GroupMember.create({
-      group: room._id, user: owner._id, role: 'OWNER', active: true, status: 'ACTIVE',
+      group: room._id,
+      user: owner._id,
+      role: 'OWNER',
+      active: true,
+      status: 'ACTIVE',
     });
     // removedUser was a member when the meeting started, then removed —
     // membership row is deactivated (matches the app's real removal pattern,
     // e.g. cleanupDeletedUser.js/members-remove.js: active:false, not deleted).
     await GroupMember.create({
-      group: room._id, user: removedUser._id, role: 'MEMBER', active: false, status: 'REMOVED',
+      group: room._id,
+      user: removedUser._id,
+      role: 'MEMBER',
+      active: false,
+      status: 'REMOVED',
     });
     const meeting = await Meeting.create({
-      caller: owner._id, callToGroup: true, group: room._id,
+      caller: owner._id,
+      callToGroup: true,
+      group: room._id,
     });
 
     const result = await authorizeMeetingJoin(meeting._id.toString(), removedUser._id.toString());
@@ -117,7 +138,8 @@ describe('mediasoup join/produce authorization (Phase 9)', () => {
     const caller = await createUser();
     const rejoiningUser = await createUser();
     const meeting = await Meeting.create({
-      caller: caller._id, users: [caller._id, rejoiningUser._id],
+      caller: caller._id,
+      users: [caller._id, rejoiningUser._id],
     });
 
     const result = await authorizeMeetingJoin(meeting._id.toString(), rejoiningUser._id.toString());

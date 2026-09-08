@@ -22,22 +22,27 @@ const getQueue = () => {
 // while transcription/summarization is already running enqueues nothing new
 // (Phase 14: "Prevent duplicate summary generation"). BullMQ custom job ids
 // cannot contain ':', hence the '-' separator.
-const enqueueMeetingSummaryJob = async ({
-  meetingId, mediaId, userId, requestId,
-}) => {
+const enqueueMeetingSummaryJob = async ({ meetingId, mediaId, userId, requestId }) => {
   const q = getQueue();
   if (!q) return { enqueued: false };
   try {
-    await q.add('process-meeting', {
-      meetingId, mediaId, userId, requestId,
-    }, {
-      jobId: `meeting-${meetingId}`,
-      attempts: 2,
-      backoff: { type: 'exponential', delay: 5000 },
-      timeout: 120000, // transcription of up to a 25MB audio file can genuinely take a while
-      removeOnComplete: { age: 24 * 60 * 60 },
-      removeOnFail: { age: 24 * 60 * 60 },
-    });
+    await q.add(
+      'process-meeting',
+      {
+        meetingId,
+        mediaId,
+        userId,
+        requestId,
+      },
+      {
+        jobId: `meeting-${meetingId}`,
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 5000 },
+        timeout: 120000, // transcription of up to a 25MB audio file can genuinely take a while
+        removeOnComplete: { age: 24 * 60 * 60 },
+        removeOnFail: { age: 24 * 60 * 60 },
+      },
+    );
     return { enqueued: true };
   } catch (err) {
     logger.warn({ err, meetingId }, 'meeting_ai_enqueue_failed');

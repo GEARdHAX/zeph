@@ -1,6 +1,4 @@
-const {
-  buildBoundedContext, boundText, estimateTokens, MAX_MESSAGE_CHARS,
-} = require('../src/ai/contextBuilder');
+const { buildBoundedContext, boundText, estimateTokens, MAX_MESSAGE_CHARS } = require('../src/ai/contextBuilder');
 
 describe('estimateTokens', () => {
   it('estimates roughly chars/4', () => {
@@ -15,14 +13,20 @@ describe('estimateTokens', () => {
 
 describe('buildBoundedContext', () => {
   it('includes all messages when under the token budget', () => {
-    const messages = [{ author: 'Alice', content: 'hi' }, { author: 'Bob', content: 'hello' }];
+    const messages = [
+      { author: 'Alice', content: 'hi' },
+      { author: 'Bob', content: 'hello' },
+    ];
     const result = buildBoundedContext(messages, { aiMaxInputTokens: 4000 });
     expect(result.messagesUsed).toBe(2);
     expect(result.text).toContain('Alice: hi');
   });
 
   it('drops the oldest messages to stay within the token budget, keeping the most recent', () => {
-    const messages = Array.from({ length: 500 }, (_, i) => ({ author: 'U', content: `message number ${i} with some padding text` }));
+    const messages = Array.from({ length: 500 }, (_, i) => ({
+      author: 'U',
+      content: `message number ${i} with some padding text`,
+    }));
     const result = buildBoundedContext(messages, { aiMaxInputTokens: 100 });
     expect(result.inputTokenEstimate).toBeLessThanOrEqual(100);
     expect(result.messagesUsed).toBeLessThan(500);

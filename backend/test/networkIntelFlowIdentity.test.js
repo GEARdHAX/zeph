@@ -1,7 +1,11 @@
 const { flowIdentity } = require('../src/services/networkIntel/flowIdentity');
 
 const BASE = {
-  sourceIp: '10.0.0.5', sourcePort: 5555, destinationIp: '203.0.113.5', destinationPort: 443, protocol: 'TCP',
+  sourceIp: '10.0.0.5',
+  sourcePort: 5555,
+  destinationIp: '203.0.113.5',
+  destinationPort: 443,
+  protocol: 'TCP',
 };
 
 describe('flowIdentity', () => {
@@ -10,7 +14,9 @@ describe('flowIdentity', () => {
   });
 
   it('is case-insensitive on protocol and IPs', () => {
-    expect(flowIdentity(BASE)).toBe(flowIdentity({ ...BASE, protocol: 'tcp', destinationIp: '203.0.113.5'.toUpperCase() }));
+    expect(flowIdentity(BASE)).toBe(
+      flowIdentity({ ...BASE, protocol: 'tcp', destinationIp: '203.0.113.5'.toUpperCase() }),
+    );
   });
 
   it('differs when the destination port changes', () => {

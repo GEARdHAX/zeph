@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
 
 vi.mock('axios');
@@ -43,7 +41,9 @@ describe('uploadMedia', () => {
       if (url.includes('/presign')) {
         return Promise.resolve({
           data: {
-            mediaId: 'media-2', uploadUrl: 'https://fake-r2/media-2', storageKey: 'user/media-2.pdf',
+            mediaId: 'media-2',
+            uploadUrl: 'https://fake-r2/media-2',
+            storageKey: 'user/media-2.pdf',
           },
         });
       }
@@ -63,7 +63,10 @@ describe('uploadMedia', () => {
       expect.objectContaining({ filename: 'doc.pdf', size: file.size }),
     );
     expect(axios.put).toHaveBeenCalledWith('https://fake-r2/media-2', file, expect.any(Object));
-    expect(axios.post).toHaveBeenCalledWith(expect.stringContaining('/upload/media/media-2/complete'), expect.any(Object));
+    expect(axios.post).toHaveBeenCalledWith(
+      expect.stringContaining('/upload/media/media-2/complete'),
+      expect.any(Object),
+    );
     expect(res.data.media._id).toBe('media-2');
   });
 

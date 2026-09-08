@@ -4,7 +4,11 @@ const config = require('../config');
 const db = require('./helpers/db');
 const SecurityEvent = require('../src/models/SecurityEvent');
 const { evaluateFlow, evaluateDnsQuery } = require('../src/services/networkIntel/networkRules');
-const { MOCK_MALICIOUS_IP, MOCK_CLEAN_IP, buildMockProvider } = require('../src/services/threatIntel/providers/mockProvider');
+const {
+  MOCK_MALICIOUS_IP,
+  MOCK_CLEAN_IP,
+  buildMockProvider,
+} = require('../src/services/threatIntel/providers/mockProvider');
 
 jest.mock('../src/services/threatIntel/provider');
 // eslint-disable-next-line import/order
@@ -16,7 +20,10 @@ const { closeThreatIntelCacheConnection } = require('../src/services/threatIntel
 // eslint-disable-next-line import/order
 const { closeNetworkIntelConnection } = require('../src/services/networkIntel/cache');
 
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 150); });
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 150);
+  });
 
 beforeAll(async () => {
   await db.connect();
@@ -70,7 +77,9 @@ describe('networkRules.evaluateFlow — threat intelligence integration (spec se
   // block below.
   it('an ordinary flow to a malicious IP does NOT spend provider quota on its own (LOW priority, no Redis to escalate it)', async () => {
     await evaluateFlow({
-      sensorId: 'sensor-1', hostId: 'host-1', flow: { destinationIp: MOCK_MALICIOUS_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      flow: { destinationIp: MOCK_MALICIOUS_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
     });
     await flush();
 
@@ -80,7 +89,9 @@ describe('networkRules.evaluateFlow — threat intelligence integration (spec se
 
   it('a flow to a clean IP produces no THREAT_INTEL_NETWORK_MATCH', async () => {
     await evaluateFlow({
-      sensorId: 'sensor-1', hostId: 'host-1', flow: { destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      flow: { destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
     });
     await flush();
 
@@ -90,7 +101,9 @@ describe('networkRules.evaluateFlow — threat intelligence integration (spec se
 
   it('a flow to a private IP produces no THREAT_INTEL_NETWORK_MATCH (never sent to the provider — spec section 38)', async () => {
     await evaluateFlow({
-      sensorId: 'sensor-1', hostId: 'host-1', flow: { destinationIp: '10.0.0.5', destinationPort: 443, protocol: 'TCP', pid: 100 },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      flow: { destinationIp: '10.0.0.5', destinationPort: 443, protocol: 'TCP', pid: 100 },
     });
     await flush();
 
@@ -101,7 +114,9 @@ describe('networkRules.evaluateFlow — threat intelligence integration (spec se
   it('does nothing when NETWORK_SENSOR_ENABLED is false', async () => {
     store.config.networkSensorEnabled = false;
     await evaluateFlow({
-      sensorId: 'sensor-1', hostId: 'host-1', flow: { destinationIp: MOCK_MALICIOUS_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      flow: { destinationIp: MOCK_MALICIOUS_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
     });
     await flush();
 
@@ -111,7 +126,9 @@ describe('networkRules.evaluateFlow — threat intelligence integration (spec se
 
   it('does nothing when the flow has no process (pid) attribution', async () => {
     await evaluateFlow({
-      sensorId: 'sensor-1', hostId: 'host-1', flow: { destinationIp: MOCK_MALICIOUS_IP, destinationPort: 443, protocol: 'TCP' },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      flow: { destinationIp: MOCK_MALICIOUS_IP, destinationPort: 443, protocol: 'TCP' },
     });
     await flush();
 
@@ -122,7 +139,9 @@ describe('networkRules.evaluateFlow — threat intelligence integration (spec se
   it('a trusted destination does not trip the unusual-destination rule', async () => {
     store.config.networkBaselineTrusted = `${MOCK_CLEAN_IP}`;
     await evaluateFlow({
-      sensorId: 'sensor-1', hostId: 'host-1', flow: { destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      flow: { destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
     });
     await flush();
 
@@ -132,7 +151,9 @@ describe('networkRules.evaluateFlow — threat intelligence integration (spec se
 
   it('an untrusted destination DOES trip the unusual-destination rule on first sighting', async () => {
     await evaluateFlow({
-      sensorId: 'sensor-1', hostId: 'host-1', flow: { destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      flow: { destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 100 },
     });
     await flush();
 
@@ -145,7 +166,9 @@ describe('networkRules.evaluateDnsQuery — threat intelligence integration', ()
   it('routes the domain through ThreatIntelService (never calls AbuseIPDB directly) and honestly finds no match today (IP-only provider)', async () => {
     const lookupSpy = jest.spyOn(threatIntelService, 'lookup');
     await evaluateDnsQuery({
-      sensorId: 'sensor-1', hostId: 'host-1', dns: { domain: 'example.com', pid: 100, processName: 'node' },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      dns: { domain: 'example.com', pid: 100, processName: 'node' },
     });
     await flush();
 
@@ -158,7 +181,9 @@ describe('networkRules.evaluateDnsQuery — threat intelligence integration', ()
     store.config.networkDnsAnalysisEnabled = false;
     const lookupSpy = jest.spyOn(threatIntelService, 'lookup');
     await evaluateDnsQuery({
-      sensorId: 'sensor-1', hostId: 'host-1', dns: { domain: 'example.com', pid: 100 },
+      sensorId: 'sensor-1',
+      hostId: 'host-1',
+      dns: { domain: 'example.com', pid: 100 },
     });
     expect(lookupSpy).not.toHaveBeenCalled();
   });
@@ -185,8 +210,13 @@ describeIfRedis('networkRules.evaluateFlow — rule-driven detection (real Redis
     for (let port = 1; port <= 6; port++) {
       // eslint-disable-next-line no-await-in-loop
       await evaluateFlow({
-        sensorId, hostId: 'host-1', flow: {
-          destinationIp: MOCK_CLEAN_IP, destinationPort: port, protocol: 'TCP', pid: 1000,
+        sensorId,
+        hostId: 'host-1',
+        flow: {
+          destinationIp: MOCK_CLEAN_IP,
+          destinationPort: port,
+          protocol: 'TCP',
+          pid: 1000,
         },
       });
     }
@@ -204,8 +234,13 @@ describeIfRedis('networkRules.evaluateFlow — rule-driven detection (real Redis
     for (let i = 1; i <= 6; i++) {
       // eslint-disable-next-line no-await-in-loop
       await evaluateFlow({
-        sensorId, hostId: 'host-1', flow: {
-          destinationIp: `198.51.100.${i}`, destinationPort: 443, protocol: 'TCP', pid: 2000,
+        sensorId,
+        hostId: 'host-1',
+        flow: {
+          destinationIp: `198.51.100.${i}`,
+          destinationPort: 443,
+          protocol: 'TCP',
+          pid: 2000,
         },
       });
     }
@@ -226,8 +261,13 @@ describeIfRedis('networkRules.evaluateFlow — rule-driven detection (real Redis
         Date.now = () => baseTime + i * 2000; // 2s apart — clears MIN_MEAN_GAP_MS, well within CoV tolerance
         // eslint-disable-next-line no-await-in-loop
         await evaluateFlow({
-          sensorId, hostId: 'host-1', flow: {
-            destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 3000,
+          sensorId,
+          hostId: 'host-1',
+          flow: {
+            destinationIp: MOCK_CLEAN_IP,
+            destinationPort: 443,
+            protocol: 'TCP',
+            pid: 3000,
           },
         });
       }
@@ -245,8 +285,14 @@ describeIfRedis('networkRules.evaluateFlow — rule-driven detection (real Redis
     const sensorId = `sensor-exfil-${Date.now()}`;
     store.config.networkExfilThresholdBytes = 1000;
     await evaluateFlow({
-      sensorId, hostId: 'host-1', flow: {
-        destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 4000, bytesSent: 1500,
+      sensorId,
+      hostId: 'host-1',
+      flow: {
+        destinationIp: MOCK_CLEAN_IP,
+        destinationPort: 443,
+        protocol: 'TCP',
+        pid: 4000,
+        bytesSent: 1500,
       },
     });
     await flush();
@@ -260,8 +306,14 @@ describeIfRedis('networkRules.evaluateFlow — rule-driven detection (real Redis
     store.config.networkExfilThresholdBytes = 1000;
     store.config.networkBaselineTrusted = MOCK_CLEAN_IP;
     await evaluateFlow({
-      sensorId, hostId: 'host-1', flow: {
-        destinationIp: MOCK_CLEAN_IP, destinationPort: 443, protocol: 'TCP', pid: 4001, bytesSent: 5000,
+      sensorId,
+      hostId: 'host-1',
+      flow: {
+        destinationIp: MOCK_CLEAN_IP,
+        destinationPort: 443,
+        protocol: 'TCP',
+        pid: 4001,
+        bytesSent: 5000,
       },
     });
     await flush();
@@ -274,8 +326,14 @@ describeIfRedis('networkRules.evaluateFlow — rule-driven detection (real Redis
     const sensorId = `sensor-escalate-${Date.now()}`;
     store.config.networkExfilThresholdBytes = 1000;
     await evaluateFlow({
-      sensorId, hostId: 'host-1', flow: {
-        destinationIp: MOCK_MALICIOUS_IP, destinationPort: 443, protocol: 'TCP', pid: 5000, bytesSent: 2000,
+      sensorId,
+      hostId: 'host-1',
+      flow: {
+        destinationIp: MOCK_MALICIOUS_IP,
+        destinationPort: 443,
+        protocol: 'TCP',
+        pid: 5000,
+        bytesSent: 2000,
       },
     });
     await flush();

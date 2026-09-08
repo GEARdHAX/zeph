@@ -45,6 +45,7 @@ const RISK_BANDS = Object.freeze([
   { max: 100, level: 'CRITICAL' },
 ]);
 
-const riskLevelFor = (score) => (RISK_BANDS.find((band) => score <= band.max) || RISK_BANDS[RISK_BANDS.length - 1]).level;
+const riskLevelFor = (score) =>
+  (RISK_BANDS.find((band) => score <= band.max) || RISK_BANDS[RISK_BANDS.length - 1]).level;
 
 module.exports = { RISK_WEIGHTS, RISK_BANDS, riskLevelFor };

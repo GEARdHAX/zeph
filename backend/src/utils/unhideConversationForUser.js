@@ -10,11 +10,12 @@ const logger = require('../logger');
 // never gets cleared by anything else. deletedBefore is intentionally NOT
 // cleared (same as message.js) — rejoining reveals the conversation again,
 // not the pre-delete history.
-const unhideConversationForUser = (conversationId, userId) => ConversationUserState.updateOne(
-  { conversation: conversationId, user: userId, deletedAt: { $ne: null } },
-  { $set: { deletedAt: null } },
-).catch((err) => {
-  logger.warn({ err, conversationId, userId }, 'Failed to clear conversation deletedAt on group join');
-});
+const unhideConversationForUser = (conversationId, userId) =>
+  ConversationUserState.updateOne(
+    { conversation: conversationId, user: userId, deletedAt: { $ne: null } },
+    { $set: { deletedAt: null } },
+  ).catch((err) => {
+    logger.warn({ err, conversationId, userId }, 'Failed to clear conversation deletedAt on group join');
+  });
 
 module.exports = unhideConversationForUser;

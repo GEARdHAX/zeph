@@ -61,8 +61,7 @@ function VideoViewer({ src, poster }) {
                 rate === value && 'bg-white/15 text-white',
               )}
             >
-              {value}
-              x
+              {value}x
             </Button>
           ))}
         </div>

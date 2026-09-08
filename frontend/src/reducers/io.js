@@ -67,11 +67,17 @@ const reducer = (state = initialState, action) => {
       if (action.forEveryone) {
         return {
           ...state,
-          messages: state.messages.map((m) => (m._id === action.messageID
-            ? {
-              ...m, deletedForEveryone: true, deletedAt: action.deletedAt || new Date().toISOString(), content: null, file: null,
-            }
-            : m)),
+          messages: state.messages.map((m) =>
+            m._id === action.messageID
+              ? {
+                  ...m,
+                  deletedForEveryone: true,
+                  deletedAt: action.deletedAt || new Date().toISOString(),
+                  content: null,
+                  file: null,
+                }
+              : m,
+          ),
         };
       }
       return {
@@ -85,17 +91,19 @@ const reducer = (state = initialState, action) => {
     case Actions.MESSAGE_DELIVERED:
       return {
         ...state,
-        messages: state.messages.map((m) => (m._id === action.messageID
-          ? { ...m, deliveredTo: [...new Set([...(m.deliveredTo || []), action.readerID])] }
-          : m)),
+        messages: state.messages.map((m) =>
+          m._id === action.messageID
+            ? { ...m, deliveredTo: [...new Set([...(m.deliveredTo || []), action.readerID])] }
+            : m,
+        ),
       };
     case Actions.MESSAGE_READ: {
       const ids = new Set(action.messageIDs);
       return {
         ...state,
-        messages: state.messages.map((m) => (ids.has(m._id)
-          ? { ...m, readBy: [...new Set([...(m.readBy || []), action.readerID])] }
-          : m)),
+        messages: state.messages.map((m) =>
+          ids.has(m._id) ? { ...m, readBy: [...new Set([...(m.readBy || []), action.readerID])] } : m,
+        ),
       };
     }
     // Hidden/deleted conversations disappear from the normal inbox the same
@@ -117,9 +125,10 @@ const reducer = (state = initialState, action) => {
     // partner's picture change/removal never reflected on this client
     // until the conversation was manually reopened.
     case Actions.USER_PROFILE_UPDATED: {
-      const patchPeople = (people) => (people || []).map((person) => (
-        person._id === action.userId ? { ...person, picture: action.picture } : person
-      ));
+      const patchPeople = (people) =>
+        (people || []).map((person) =>
+          person._id === action.userId ? { ...person, picture: action.picture } : person,
+        );
       return {
         ...state,
         rooms: state.rooms.map((room) => ({ ...room, people: patchPeople(room.people) })),
@@ -139,9 +148,10 @@ const reducer = (state = initialState, action) => {
     case Actions.ROOM_ACCESS_REVOKED:
       return {
         ...state,
-        room: (state.room && state.room._id === action.groupId)
-          ? { ...state.room, accessRevoked: { reason: action.reason, actorName: action.actorName } }
-          : state.room,
+        room:
+          state.room && state.room._id === action.groupId
+            ? { ...state.room, accessRevoked: { reason: action.reason, actorName: action.actorName } }
+            : state.room,
       };
     case Actions.REFRESH_MEETINGS:
       return {

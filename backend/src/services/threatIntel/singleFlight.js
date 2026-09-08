@@ -74,11 +74,17 @@ const waitForResult = async (indicatorKey, readCacheFn) => {
     const result = await readCacheFn(indicatorKey);
     if (result) return result;
     // eslint-disable-next-line no-await-in-loop
-    await new Promise((resolve) => { setTimeout(resolve, WAIT_POLL_INTERVAL_MS); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, WAIT_POLL_INTERVAL_MS);
+    });
   }
   return null;
 };
 
 module.exports = {
-  tryAcquireLock, releaseLock, waitForResult, LOCK_TTL_MS, WAIT_TIMEOUT_MS,
+  tryAcquireLock,
+  releaseLock,
+  waitForResult,
+  LOCK_TTL_MS,
+  WAIT_TIMEOUT_MS,
 };

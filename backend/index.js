@@ -24,10 +24,12 @@ const compression = require('compression');
 const app = express();
 // Request-ID + structured access logging. skip() keeps the 5s health-check
 // poll (Docker/load-balancer) out of the logs — it's not signal.
-app.use(pinoHttp({
-  logger,
-  autoLogging: { ignore: (req) => req.url === '/healthz' },
-}));
+app.use(
+  pinoHttp({
+    logger,
+    autoLogging: { ignore: (req) => req.url === '/healthz' },
+  }),
+);
 // Phase 7 audit finding: no security-headers middleware existed at all
 // (X-Content-Type-Options, X-Frame-Options, HSTS, etc. were all absent).
 // crossOriginResourcePolicy is relaxed to 'cross-origin' (helmet's default
@@ -55,10 +57,12 @@ app.use(pinoHttp({
 // moment. Enabling this correctly requires testing a real production Vite
 // build against a real candidate policy — tracked as a known gap (see
 // docs/PHASE9-SECURITY-REPORT.md) rather than guessed at here.
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
 // gzip/br response compression — meaningful payload savings on slow/metered mobile connections.
 app.use(compression());
 const http = require('http');
@@ -202,10 +206,7 @@ if (Config.nodemailerEnabled) {
           logger.error({ err: e }, 'Failed to send scheduled email');
           // e.message only (SMTP response text/code) — never the configured
           // credentials, which nodemailer/pino never surface on the error.
-          await Email.updateOne(
-            { _id: email._id },
-            { $inc: { attempts: 1 }, $set: { lastError: e.message } },
-          );
+          await Email.updateOne({ _id: email._id }, { $inc: { attempts: 1 }, $set: { lastError: e.message } });
         }
       }
 

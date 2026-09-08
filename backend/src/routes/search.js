@@ -77,13 +77,14 @@ module.exports = (req, res, next) => {
           const rel = relationships.find(
             (r) => r.requester.toString() === u._id.toString() || r.recipient.toString() === u._id.toString(),
           );
-          const withRelationship = (!rel || rel.status === 'blocked')
-            ? { ...u, relationshipStatus: null }
-            : {
-              ...u,
-              relationshipStatus: rel.status,
-              relationshipDirection: rel.requester.toString() === req.user.id.toString() ? 'outgoing' : 'incoming',
-            };
+          const withRelationship =
+            !rel || rel.status === 'blocked'
+              ? { ...u, relationshipStatus: null }
+              : {
+                  ...u,
+                  relationshipStatus: rel.status,
+                  relationshipDirection: rel.requester.toString() === req.user.id.toString() ? 'outgoing' : 'incoming',
+                };
 
           // `level` was only projected through for the boundary/console use
           // above — never send it to a non-privileged caller as a side

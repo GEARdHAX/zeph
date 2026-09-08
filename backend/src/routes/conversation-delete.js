@@ -32,7 +32,7 @@ module.exports = async (req, res) => {
   // completely unchanged. See DECISIONS.md.
   const isMember = room.people.some((person) => person.toString() === userID.toString());
   if (!isMember) {
-    const wasGroupMember = room.isGroup && await groupPolicy.wasEverMember(room._id, userID);
+    const wasGroupMember = room.isGroup && (await groupPolicy.wasEverMember(room._id, userID));
     if (!wasGroupMember) {
       return res.status(403).json({ status: 'error' });
     }

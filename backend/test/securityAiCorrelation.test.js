@@ -1,6 +1,11 @@
 const db = require('./helpers/db');
 const SecurityIncident = require('../src/models/SecurityIncident');
-const { correlateEvent, correlationKeyFor, contextForIncident, CORRELATION_WINDOW_MS } = require('../src/services/securityAi/correlation');
+const {
+  correlateEvent,
+  correlationKeyFor,
+  contextForIncident,
+  CORRELATION_WINDOW_MS,
+} = require('../src/services/securityAi/correlation');
 
 // correlation.js buckets on fixed epoch-aligned windows (a documented,
 // accepted tradeoff — see its own comment) — a test using bare `new
@@ -9,7 +14,8 @@ const { correlateEvent, correlationKeyFor, contextForIncident, CORRELATION_WINDO
 // run. bucketSafeBase() returns a timestamp a safe distance (2 minutes)
 // after its own bucket start, so any offset under ~10 minutes added to it
 // is guaranteed to stay in the SAME bucket regardless of when the test runs.
-const bucketSafeBase = () => new Date(Math.floor(Date.now() / CORRELATION_WINDOW_MS) * CORRELATION_WINDOW_MS + 2 * 60 * 1000);
+const bucketSafeBase = () =>
+  new Date(Math.floor(Date.now() / CORRELATION_WINDOW_MS) * CORRELATION_WINDOW_MS + 2 * 60 * 1000);
 
 beforeAll(async () => {
   await db.connect();
@@ -72,9 +78,14 @@ describe('correlateEvent', () => {
   it('merges a second related event into the SAME incident, not a new one', async () => {
     const t = bucketSafeBase();
     await correlateEvent(makeEvent({ timestamp: t }));
-    const second = await correlateEvent(makeEvent({
-      type: 'THREAT_INTEL_NETWORK_MATCH', severity: 'high', sourceSystem: 'network_sensor', timestamp: new Date(t.getTime() + 60000),
-    }));
+    const second = await correlateEvent(
+      makeEvent({
+        type: 'THREAT_INTEL_NETWORK_MATCH',
+        severity: 'high',
+        sourceSystem: 'network_sensor',
+        timestamp: new Date(t.getTime() + 60000),
+      }),
+    );
 
     const count = await SecurityIncident.countDocuments();
     expect(count).toBe(1);
@@ -122,7 +133,8 @@ describe('correlateEvent', () => {
 describe('contextForIncident', () => {
   it('builds a bounded feature-vector-shaped context from an incident, never raw event data', () => {
     const context = contextForIncident({
-      signals: ['process_anomaly', 'malicious_ip', 'port_scan'], hosts: ['host-1', 'host-2'],
+      signals: ['process_anomaly', 'malicious_ip', 'port_scan'],
+      hosts: ['host-1', 'host-2'],
     });
     expect(context.processAnomalyCount).toBe(1);
     expect(context.maliciousIpCount).toBe(1);

@@ -29,7 +29,9 @@ module.exports = async (socket, data) => {
     const isMember = room.people.some((person) => person.toString() === readerID.toString());
     if (!isMember) return;
     const boundaryViolation = await roomHasBoundaryViolation({
-      room, callerID: readerID, callerLevel: socket.decoded_token.level,
+      room,
+      callerID: readerID,
+      callerLevel: socket.decoded_token.level,
     });
     if (boundaryViolation) return;
   }

@@ -18,11 +18,13 @@ function SearchBar() {
   // on explicit submit (Enter), never per keystroke, same contract as
   // AddPeople.jsx (see useExplicitSearch).
   const {
-    results, loading: searching, search: runPeopleSearch, reset: resetPeopleSearch,
-  } = useExplicitSearch(
-    (value, signal) => search(value, undefined, signal).then((res) => res.data.users || []),
-    { minLength: MIN_PEOPLE_QUERY_LENGTH },
-  );
+    results,
+    loading: searching,
+    search: runPeopleSearch,
+    reset: resetPeopleSearch,
+  } = useExplicitSearch((value, signal) => search(value, undefined, signal).then((res) => res.data.users || []), {
+    minLength: MIN_PEOPLE_QUERY_LENGTH,
+  });
 
   const setSearchLoading = useGlobal('searchLoading')[1];
   useEffect(() => {

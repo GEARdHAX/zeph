@@ -1,13 +1,9 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ThreatIntelligence from './ThreatIntelligence';
-import {
-  listThreatIndicators, getThreatIndicator, getThreatIntelStatus,
-} from '../../actions/threatIntelligence';
+import { listThreatIndicators, getThreatIndicator, getThreatIntelStatus } from '../../actions/threatIntelligence';
 
 vi.mock('../../actions/threatIntelligence', () => ({
   listThreatIndicators: vi.fn(),
@@ -27,7 +23,13 @@ const INDICATOR = {
 };
 
 const STATUS = {
-  provider: 'abuseipdb', enabled: true, circuitState: 'CLOSED', dailyBudget: 800, usedToday: 12, remainingToday: 788, redisConfigured: true,
+  provider: 'abuseipdb',
+  enabled: true,
+  circuitState: 'CLOSED',
+  dailyBudget: 800,
+  usedToday: 12,
+  remainingToday: 788,
+  redisConfigured: true,
 };
 
 function renderPage() {
@@ -82,9 +84,9 @@ describe('ThreatIntelligence viewer', () => {
 
     await user.selectOptions(screen.getByDisplayValue('All types'), 'DOMAIN');
 
-    await waitFor(() => expect(listThreatIndicators).toHaveBeenLastCalledWith(
-      expect.objectContaining({ type: 'DOMAIN' }),
-    ));
+    await waitFor(() =>
+      expect(listThreatIndicators).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'DOMAIN' })),
+    );
   });
 
   it('clicking a row opens the detail panel with the full indicator', async () => {

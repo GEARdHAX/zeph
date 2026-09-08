@@ -40,9 +40,11 @@ const server = http.createServer((req, res) => {
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { content: 'This is a simulated AI response for load testing.' } }],
-      }));
+      res.end(
+        JSON.stringify({
+          choices: [{ message: { content: 'This is a simulated AI response for load testing.' } }],
+        }),
+      );
     }, artificialDelayMs);
   });
 });
@@ -50,5 +52,7 @@ const server = http.createServer((req, res) => {
 if (process.env.SIMULATE_RATE_LIMIT_EVERY) rateLimitEvery = Number(process.env.SIMULATE_RATE_LIMIT_EVERY);
 
 server.listen(port, () => {
-  console.log(`Mock Groq server listening on :${port} (artificial delay ${artificialDelayMs}ms${rateLimitEvery ? `, simulating 429 every ${rateLimitEvery} requests` : ''})`);
+  console.log(
+    `Mock Groq server listening on :${port} (artificial delay ${artificialDelayMs}ms${rateLimitEvery ? `, simulating 429 every ${rateLimitEvery} requests` : ''})`,
+  );
 });

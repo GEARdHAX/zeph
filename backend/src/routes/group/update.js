@@ -14,9 +14,7 @@ const ALLOWED_PRIVACY = ['PUBLIC', 'PRIVATE', 'INVITE_ONLY'];
 const MAX_SLOW_MODE_SECONDS = 6 * 60 * 60;
 
 module.exports = async (req, res) => {
-  const {
-    id, name, description, privacy, picture, slowModeSeconds,
-  } = req.fields;
+  const { id, name, description, privacy, picture, slowModeSeconds } = req.fields;
 
   const room = await Room.findOne({ _id: id, isGroup: true }).catch(() => null);
   if (!room || room.disabledAt) return res.status(404).json({ error: true });
@@ -25,7 +23,10 @@ module.exports = async (req, res) => {
   if (!membership) return res.status(404).json({ error: true });
 
   if (!groupPolicy.hasCapability(membership.role, groupPolicy.Capabilities.EDIT_GROUP)) {
-    logger.warn({ groupId: room._id, actorId: req.user.id, reason: 'missing_capability' }, 'group_unauthorized_access_attempt');
+    logger.warn(
+      { groupId: room._id, actorId: req.user.id, reason: 'missing_capability' },
+      'group_unauthorized_access_attempt',
+    );
     return res.status(403).json({ error: true });
   }
 
@@ -44,7 +45,10 @@ module.exports = async (req, res) => {
 
   await Room.updateOne({ _id: room._id }, { $set: update });
   await GroupAuditLog.create({
-    group: room._id, actor: req.user.id, action: 'settings_changed', metadata: update,
+    group: room._id,
+    actor: req.user.id,
+    action: 'settings_changed',
+    metadata: update,
   });
 
   broadcastToGroup(room.people, 'group:updated', { groupId: room._id, ...update }, { excludeUserId: req.user.id });

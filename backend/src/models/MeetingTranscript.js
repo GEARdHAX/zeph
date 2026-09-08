@@ -16,7 +16,10 @@ const Schema = mongoose.Schema;
 // meeting itself.
 const MeetingTranscriptSchema = new Schema({
   meeting: {
-    type: Schema.ObjectId, ref: 'meetings', required: true, unique: true,
+    type: Schema.ObjectId,
+    ref: 'meetings',
+    required: true,
+    unique: true,
   },
   transcript: { type: String, required: true },
   summary: { type: String, default: null },

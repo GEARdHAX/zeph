@@ -21,9 +21,7 @@ function Welcome() {
       {/* Main Center Area */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 text-center z-10">
         {/* Name Title */}
-        <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          {fullName}
-        </h2>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{fullName}</h2>
 
         {/* Large Center Avatar Circle with Glow & Gradient Border */}
         <div className="my-8 relative flex items-center justify-center">
@@ -36,9 +34,7 @@ function Welcome() {
                 className="h-full w-full rounded-full object-cover"
               />
             ) : (
-              <span className="text-4xl font-extrabold tracking-wider text-white">
-                {initials}
-              </span>
+              <span className="text-4xl font-extrabold tracking-wider text-white">{initials}</span>
             )}
           </div>
         </div>

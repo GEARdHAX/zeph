@@ -115,7 +115,7 @@ describe('GET /api/users/:username — profile resolution', () => {
     });
   });
 
-  it('includes the target\'s bio', async () => {
+  it("includes the target's bio", async () => {
     const me = await createUser();
     const target = await User.create({
       username: 'BioUser',
@@ -140,7 +140,10 @@ describe('GET /api/users/:username — profile resolution', () => {
     const target = await createUser({ username: 'Accepted' });
     const respondedAt = new Date();
     await Relationship.create({
-      requester: me._id, recipient: target._id, status: 'accepted', respondedAt,
+      requester: me._id,
+      recipient: target._id,
+      status: 'accepted',
+      respondedAt,
     });
 
     const res = await request(app)
@@ -191,7 +194,10 @@ describe('GET /api/users/:username — profile resolution', () => {
 
     await GroupMember.create({ group: group._id, user: me._id, role: 'OWNER' });
     await GroupMember.create({
-      group: group._id, user: target._id, role: 'MEMBER', active: false,
+      group: group._id,
+      user: target._id,
+      role: 'MEMBER',
+      active: false,
     });
 
     const res = await request(app)
@@ -219,7 +225,10 @@ describe('GET /api/users/:username — profile resolution', () => {
     await GroupMember.create({ group: group._id, user: me._id, role: 'OWNER' });
     await GroupMember.create({ group: group._id, user: target._id, role: 'MEMBER' });
     await Relationship.create({
-      requester: me._id, recipient: target._id, status: 'blocked', blockedBy: me._id,
+      requester: me._id,
+      recipient: target._id,
+      status: 'blocked',
+      blockedBy: me._id,
     });
 
     const res = await request(app)

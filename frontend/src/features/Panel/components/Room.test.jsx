@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, beforeEach, vi,
-} from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setGlobal } from 'reactn';
@@ -22,7 +20,10 @@ const ME = { id: 'user-1' };
 const OTHER = { _id: 'user-2', firstName: 'Other', lastName: 'Person' };
 
 const makeRoom = (overrides = {}) => ({
-  _id: 'room-1', isGroup: false, people: [{ _id: 'user-1' }, OTHER], ...overrides,
+  _id: 'room-1',
+  isGroup: false,
+  people: [{ _id: 'user-1' }, OTHER],
+  ...overrides,
 });
 
 // Surfaces the current router path as text so a redirect can be asserted
@@ -34,7 +35,10 @@ function LocationProbe() {
 
 function renderRoom(room, initialRooms = [room], initialPath = '/') {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   store.dispatch({ type: Actions.SET_ROOMS, rooms: initialRooms });
@@ -58,26 +62,42 @@ beforeEach(async () => {
 
 describe('Panel Room row — last message preview', () => {
   it('shows the message content when not deleted', () => {
-    renderRoom(makeRoom({ lastMessage: { content: 'hello there', type: 'text', author: 'user-2', date: new Date().toISOString() } }));
+    renderRoom(
+      makeRoom({
+        lastMessage: { content: 'hello there', type: 'text', author: 'user-2', date: new Date().toISOString() },
+      }),
+    );
     expect(screen.getByText('hello there')).toBeInTheDocument();
   });
 
   it('shows "This message was deleted" when the last message is tombstoned', () => {
-    renderRoom(makeRoom({
-      lastMessage: {
-        content: null, deletedForEveryone: true, type: 'text', author: 'user-2', date: new Date().toISOString(),
-      },
-    }));
+    renderRoom(
+      makeRoom({
+        lastMessage: {
+          content: null,
+          deletedForEveryone: true,
+          type: 'text',
+          author: 'user-2',
+          date: new Date().toISOString(),
+        },
+      }),
+    );
     expect(screen.getByText('This message was deleted')).toBeInTheDocument();
     expect(screen.queryByText('null')).not.toBeInTheDocument();
   });
 
   it('prefixes "You: " before the deleted placeholder when I authored the deleted message', () => {
-    renderRoom(makeRoom({
-      lastMessage: {
-        content: null, deletedForEveryone: true, type: 'text', author: 'user-1', date: new Date().toISOString(),
-      },
-    }));
+    renderRoom(
+      makeRoom({
+        lastMessage: {
+          content: null,
+          deletedForEveryone: true,
+          type: 'text',
+          author: 'user-1',
+          date: new Date().toISOString(),
+        },
+      }),
+    );
     expect(screen.getByText('You: This message was deleted')).toBeInTheDocument();
   });
 });
@@ -93,12 +113,16 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remove conversation' }));
 
-    expect(axios).toHaveBeenCalledWith(expect.objectContaining({
-      method: 'post',
-      url: expect.stringContaining('/api/conversation/delete'),
-      data: { conversationId: 'room-1' },
-    }));
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(axios).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'post',
+        url: expect.stringContaining('/api/conversation/delete'),
+        data: { conversationId: 'room-1' },
+      }),
+    );
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
     expect(store.getState().io.rooms.map((r) => r._id)).not.toContain('room-1');
   });
 
@@ -108,7 +132,9 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
     const store = renderRoom(makeRoom());
 
     await user.click(screen.getByRole('button', { name: 'Remove conversation' }));
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
     expect(store.getState().io.rooms.map((r) => r._id)).toContain('room-1');
   });
@@ -120,7 +146,9 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
 
     expect(screen.getByTestId('location-probe').textContent).toBe('/room/room-1');
     await user.click(screen.getByRole('button', { name: 'Remove conversation' }));
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
     expect(screen.getByTestId('location-probe').textContent).toBe('/');
   });
@@ -131,7 +159,9 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
     renderRoom(makeRoom(), [makeRoom()], '/room/some-other-room');
 
     await user.click(screen.getByRole('button', { name: 'Remove conversation' }));
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
     expect(screen.getByTestId('location-probe').textContent).toBe('/room/some-other-room');
   });
@@ -142,7 +172,9 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
     renderRoom(makeRoom(), [makeRoom()], '/room/room-1');
 
     await user.click(screen.getByRole('button', { name: 'Remove conversation' }));
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
     expect(screen.getByTestId('location-probe').textContent).toBe('/room/room-1');
   });
@@ -169,7 +201,10 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
 
   it('does not render a remove button for a vault row', () => {
     const rootReducer = combineReducers({
-      emoji, io, messages, rtc,
+      emoji,
+      io,
+      messages,
+      rtc,
     });
     const store = createStore(rootReducer, applyMiddleware(thunk));
     render(
@@ -191,7 +226,10 @@ describe('Panel Room row — remove from inbox (non-vault)', () => {
 describe('Panel Room row — removed-conversations list (restore)', () => {
   function renderRemovedRow(room, onRestored) {
     const rootReducer = combineReducers({
-      emoji, io, messages, rtc,
+      emoji,
+      io,
+      messages,
+      rtc,
     });
     const store = createStore(rootReducer, applyMiddleware(thunk));
     render(
@@ -213,9 +251,16 @@ describe('Panel Room row — removed-conversations list (restore)', () => {
   it('clicking the row does not navigate (same as an inVault row — no click-through into a hidden/removed conversation)', async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <Provider store={createStore(combineReducers({
-        emoji, io, messages, rtc,
-      }), applyMiddleware(thunk))}
+      <Provider
+        store={createStore(
+          combineReducers({
+            emoji,
+            io,
+            messages,
+            rtc,
+          }),
+          applyMiddleware(thunk),
+        )}
       >
         <MemoryRouter initialEntries={['/']}>
           <LocationProbe />
@@ -243,12 +288,16 @@ describe('Panel Room row — removed-conversations list (restore)', () => {
 
     await user.click(screen.getByRole('button', { name: /restore/i }));
 
-    expect(axios).toHaveBeenCalledWith(expect.objectContaining({
-      method: 'post',
-      url: expect.stringContaining('/api/conversation/restore'),
-      data: { conversationId: 'room-1' },
-    }));
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(axios).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'post',
+        url: expect.stringContaining('/api/conversation/restore'),
+        data: { conversationId: 'room-1' },
+      }),
+    );
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
     expect(onRestored).toHaveBeenCalledWith('room-1');
   });
 
@@ -259,7 +308,9 @@ describe('Panel Room row — removed-conversations list (restore)', () => {
     renderRemovedRow(makeRoom(), onRestored);
 
     await user.click(screen.getByRole('button', { name: /restore/i }));
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
     expect(onRestored).not.toHaveBeenCalled();
   });

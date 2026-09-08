@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createTourController } from './tourController';
 import { getTourState, TourStatus } from './tourStorage';
 
@@ -135,7 +133,7 @@ describe('tourController', () => {
   // before being skipped — these two tests exercise that REAL timing
   // rather than faking it, so they're intentionally slower than the rest
   // of the suite and given a matching test-level timeout.
-  it('never crashes when every step\'s target element is missing — cleanly stops instead (spec: missing/dynamic DOM elements)', async () => {
+  it("never crashes when every step's target element is missing — cleanly stops instead (spec: missing/dynamic DOM elements)", async () => {
     document.body.innerHTML = ''; // remove every target this tour references
     // stepTargetTimeoutMs shrunk from the real 3s default — proves the
     // same skip-on-timeout behavior without the test waiting out real time.

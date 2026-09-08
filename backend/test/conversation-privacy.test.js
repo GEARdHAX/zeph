@@ -59,7 +59,7 @@ const unlockWithPin = async (user, pin) => {
 };
 
 describe('POST /api/conversation/delete', () => {
-  it('removes the conversation from the requester\'s own list-rooms only', async () => {
+  it("removes the conversation from the requester's own list-rooms only", async () => {
     const a = await createUser();
     const b = await createUser();
     const room = await Room.create({ people: [a._id, b._id], isGroup: false, lastMessage: null });
@@ -132,7 +132,7 @@ describe('POST /api/conversation/delete', () => {
     expect(await ConversationUserState.findOne({ conversation: room._id, user: stranger._id })).toBeNull();
   });
 
-  it('join-room still works after delete — deleting only removes the inbox listing, not the deleter\'s own access', async () => {
+  it("join-room still works after delete — deleting only removes the inbox listing, not the deleter's own access", async () => {
     const a = await createUser();
     const room = await Room.create({ people: [a._id], isGroup: false });
 
@@ -227,7 +227,9 @@ describe('POST /api/conversation/hide + unhide', () => {
       .set('Authorization', `Bearer ${tokenFor(a)}`)
       .field('conversationId', room._id.toString());
 
-    const noToken = await request(app).get('/api/vault/list').set('Authorization', `Bearer ${tokenFor(a)}`);
+    const noToken = await request(app)
+      .get('/api/vault/list')
+      .set('Authorization', `Bearer ${tokenFor(a)}`);
     expect(noToken.status).toBe(401);
 
     const vaultToken = await unlockWithPin(a, '1234');
@@ -263,7 +265,10 @@ describe('POST /api/conversation/hide + unhide', () => {
       .field('firstMessageID', message._id.toString());
     expect(more.status).toBe(403);
 
-    const sync = await request(app).post('/api/messages/sync').set('Authorization', auth).field('roomID', room._id.toString());
+    const sync = await request(app)
+      .post('/api/messages/sync')
+      .set('Authorization', auth)
+      .field('roomID', room._id.toString());
     expect(sync.status).toBe(403);
   });
 
@@ -334,11 +339,7 @@ describe('POST /api/conversation/hide + unhide', () => {
     // Simulate the vault token having expired — an already-expired token,
     // not the same valid one — proves more-messages doesn't trust the
     // earlier join-room success and re-checks independently.
-    const expiredToken = jwt.sign(
-      { id: a._id.toString(), purpose: 'vault' },
-      config.secret,
-      { expiresIn: -1 },
-    );
+    const expiredToken = jwt.sign({ id: a._id.toString(), purpose: 'vault' }, config.secret, { expiresIn: -1 });
     const more = await request(app)
       .post('/api/messages/more')
       .set('Authorization', auth)
@@ -385,13 +386,27 @@ describe('POST /api/conversation/hide + unhide', () => {
     const room = await Room.create({ people: [a._id], isGroup: false });
     await setPin(a, '1234');
 
-    await request(app).post('/api/conversation/hide').set('Authorization', `Bearer ${tokenFor(a)}`).field('conversationId', room._id.toString());
-    const secondHide = await request(app).post('/api/conversation/hide').set('Authorization', `Bearer ${tokenFor(a)}`).field('conversationId', room._id.toString());
+    await request(app)
+      .post('/api/conversation/hide')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('conversationId', room._id.toString());
+    const secondHide = await request(app)
+      .post('/api/conversation/hide')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('conversationId', room._id.toString());
     expect(secondHide.status).toBe(200);
 
     const vaultToken = await unlockWithPin(a, '1234');
-    await request(app).post('/api/conversation/unhide').set('Authorization', `Bearer ${tokenFor(a)}`).set('X-Vault-Token', vaultToken).field('conversationId', room._id.toString());
-    const secondUnhide = await request(app).post('/api/conversation/unhide').set('Authorization', `Bearer ${tokenFor(a)}`).set('X-Vault-Token', vaultToken).field('conversationId', room._id.toString());
+    await request(app)
+      .post('/api/conversation/unhide')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .set('X-Vault-Token', vaultToken)
+      .field('conversationId', room._id.toString());
+    const secondUnhide = await request(app)
+      .post('/api/conversation/unhide')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .set('X-Vault-Token', vaultToken)
+      .field('conversationId', room._id.toString());
     expect(secondUnhide.status).toBe(200);
 
     const states = await ConversationUserState.find({ conversation: room._id, user: a._id });
@@ -404,7 +419,10 @@ describe('POST /api/conversation/hide + unhide', () => {
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
     await setPin(a, '1234');
 
-    await request(app).post('/api/conversation/hide').set('Authorization', `Bearer ${tokenFor(a)}`).field('conversationId', room._id.toString());
+    await request(app)
+      .post('/api/conversation/hide')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('conversationId', room._id.toString());
 
     await request(app)
       .post('/api/message')
@@ -416,7 +434,9 @@ describe('POST /api/conversation/hide + unhide', () => {
     const state = await ConversationUserState.findOne({ conversation: room._id, user: a._id });
     expect(state.isHidden).toBe(true);
 
-    const list = await request(app).post('/api/rooms/list').set('Authorization', `Bearer ${tokenFor(a)}`);
+    const list = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(a)}`);
     expect(list.body.rooms.find((r) => r._id === room._id.toString())).toBeUndefined();
   });
 
@@ -438,7 +458,9 @@ describe('POST /api/conversation/hide + unhide', () => {
 describe('GET /api/vault/status', () => {
   it('reports not configured for a fresh user', async () => {
     const a = await createUser();
-    const res = await request(app).get('/api/vault/status').set('Authorization', `Bearer ${tokenFor(a)}`);
+    const res = await request(app)
+      .get('/api/vault/status')
+      .set('Authorization', `Bearer ${tokenFor(a)}`);
     expect(res.status).toBe(200);
     expect(res.body.configured).toBe(false);
   });
@@ -446,7 +468,9 @@ describe('GET /api/vault/status', () => {
   it('reports configured after PIN setup, without exposing the hash', async () => {
     const a = await createUser();
     await setPin(a, '1234');
-    const res = await request(app).get('/api/vault/status').set('Authorization', `Bearer ${tokenFor(a)}`);
+    const res = await request(app)
+      .get('/api/vault/status')
+      .set('Authorization', `Bearer ${tokenFor(a)}`);
     expect(res.body.configured).toBe(true);
     expect(res.body.hasPin).toBe(true);
     expect(JSON.stringify(res.body)).not.toMatch(/\$argon2/);
@@ -475,8 +499,14 @@ describe('Vault PIN setup and unlock', () => {
     const b = await createUser();
     await setPin(a, '1234');
 
-    const wrongPin = await request(app).post('/api/vault/unlock/pin').set('Authorization', `Bearer ${tokenFor(a)}`).field('pin', '9999');
-    const noVault = await request(app).post('/api/vault/unlock/pin').set('Authorization', `Bearer ${tokenFor(b)}`).field('pin', '9999');
+    const wrongPin = await request(app)
+      .post('/api/vault/unlock/pin')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('pin', '9999');
+    const noVault = await request(app)
+      .post('/api/vault/unlock/pin')
+      .set('Authorization', `Bearer ${tokenFor(b)}`)
+      .field('pin', '9999');
 
     expect(wrongPin.status).toBe(401);
     expect(noVault.status).toBe(401);
@@ -506,7 +536,10 @@ describe('Vault PIN setup and unlock', () => {
     const a = await createUser();
     const room = await Room.create({ people: [a._id], isGroup: false });
     await setPin(a, '1234');
-    await request(app).post('/api/conversation/hide').set('Authorization', `Bearer ${tokenFor(a)}`).field('conversationId', room._id.toString());
+    await request(app)
+      .post('/api/conversation/hide')
+      .set('Authorization', `Bearer ${tokenFor(a)}`)
+      .field('conversationId', room._id.toString());
 
     const expiredToken = jwt.sign({ id: a._id.toString(), purpose: 'vault' }, config.secret, { expiresIn: -1 });
     const res = await request(app)
@@ -516,7 +549,7 @@ describe('Vault PIN setup and unlock', () => {
     expect(res.status).toBe(401);
   });
 
-  it('a vault token issued to user A cannot be used to satisfy user B\'s request', async () => {
+  it("a vault token issued to user A cannot be used to satisfy user B's request", async () => {
     const a = await createUser();
     const b = await createUser();
     await setPin(a, '1234');
@@ -560,7 +593,11 @@ describe('WebAuthn vault registration authorization', () => {
   it('once a credential already exists, register/options requires a valid vault token', async () => {
     const a = await createUser();
     await VaultCredential.create({
-      user: a._id, credentialID: 'existing-cred', publicKey: Buffer.from('x'), counter: 0, transports: [],
+      user: a._id,
+      credentialID: 'existing-cred',
+      publicKey: Buffer.from('x'),
+      counter: 0,
+      transports: [],
     });
 
     const noToken = await request(app)
@@ -574,11 +611,15 @@ describe('WebAuthn challenge single-use', () => {
   it('a second /auth/options call invalidates the first challenge (no replay across attempts)', async () => {
     const a = await createUser();
 
-    const first = await request(app).post('/api/vault/webauthn/auth/options').set('Authorization', `Bearer ${tokenFor(a)}`);
+    const first = await request(app)
+      .post('/api/vault/webauthn/auth/options')
+      .set('Authorization', `Bearer ${tokenFor(a)}`);
     expect(first.status).toBe(200);
     const firstChallenge = first.body.challenge;
 
-    await request(app).post('/api/vault/webauthn/auth/options').set('Authorization', `Bearer ${tokenFor(a)}`);
+    await request(app)
+      .post('/api/vault/webauthn/auth/options')
+      .set('Authorization', `Bearer ${tokenFor(a)}`);
 
     // Attempting to verify against the first (now-superseded) challenge with
     // a bogus response fails regardless — this asserts the challenge store
@@ -626,12 +667,13 @@ describe('Multi-device Socket.IO sync', () => {
     await new Promise((resolve) => server.close(resolve));
   });
 
-  const connectAndAuth = (token) => new Promise((resolve, reject) => {
-    const client = ioc(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
-    client.on('connect', () => client.emit('authenticate', { token }));
-    client.on('authenticated', () => resolve(client));
-    client.on('unauthorized', (err) => reject(new Error(JSON.stringify(err))));
-  });
+  const connectAndAuth = (token) =>
+    new Promise((resolve, reject) => {
+      const client = ioc(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
+      client.on('connect', () => client.emit('authenticate', { token }));
+      client.on('authenticated', () => resolve(client));
+      client.on('unauthorized', (err) => reject(new Error(JSON.stringify(err))));
+    });
 
   it('hiding on device A emits conversation-hidden to device B (same user), and not to the other participant', async () => {
     const a = await createUser();
@@ -644,7 +686,9 @@ describe('Multi-device Socket.IO sync', () => {
 
     const deviceBEvent = new Promise((resolve) => deviceB.on('conversation-hidden', resolve));
     let otherGotEvent = false;
-    otherParticipant.on('conversation-hidden', () => { otherGotEvent = true; });
+    otherParticipant.on('conversation-hidden', () => {
+      otherGotEvent = true;
+    });
 
     await request(httpApp)
       .post('/api/conversation/hide')
@@ -654,7 +698,9 @@ describe('Multi-device Socket.IO sync', () => {
     const event = await deviceBEvent;
     expect(event.conversationId).toBe(room._id.toString());
 
-    await new Promise((resolve) => { setTimeout(resolve, 150); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 150);
+    });
     expect(otherGotEvent).toBe(false);
 
     deviceA.close();

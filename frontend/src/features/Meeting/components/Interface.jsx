@@ -2,9 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Config from '../../../config';
 
-function Interface({
-  audio, video, peer = {}, isMaximized, isScreen,
-}) {
+function Interface({ audio, video, peer = {}, isMaximized, isScreen }) {
   const audioRef = useRef(null);
   const videoRef = useRef(null);
 
@@ -23,12 +21,7 @@ function Interface({
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-3xl border border-border/40 bg-card/60 backdrop-blur-xl">
       {audio && (
-        <audio
-          ref={audioRef}
-          onLoadedMetadata={() => audioRef.current.play()}
-          className="hidden"
-          controls={false}
-        />
+        <audio ref={audioRef} onLoadedMetadata={() => audioRef.current.play()} className="hidden" controls={false} />
       )}
 
       {video ? (
@@ -59,9 +52,7 @@ function Interface({
             <span className="text-sm font-bold text-foreground sm:text-base">
               {peer?.firstName ? `${peer.firstName} ${peer.lastName || ''}` : 'Participant'}
             </span>
-            <span className="text-xs text-muted-foreground">
-              {audio ? 'Audio only' : 'Spectator'}
-            </span>
+            <span className="text-xs text-muted-foreground">{audio ? 'Audio only' : 'Spectator'}</span>
           </div>
         </div>
       )}

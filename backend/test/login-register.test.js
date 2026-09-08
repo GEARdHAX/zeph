@@ -108,10 +108,7 @@ describe('POST /api/register — requires both username and email, both unique',
 describe('POST /api/login — accepts either username or email', () => {
   it('logs in with the email address', async () => {
     const user = await createUser({ username: 'loginuser1', email: 'loginuser1@example.com' });
-    const res = await request(app)
-      .post('/api/login')
-      .field('email', user.email)
-      .field('password', 'password123');
+    const res = await request(app).post('/api/login').field('email', user.email).field('password', 'password123');
 
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
@@ -119,10 +116,7 @@ describe('POST /api/login — accepts either username or email', () => {
 
   it('logs in with the @username instead of email', async () => {
     const user = await createUser({ username: 'loginuser2', email: 'loginuser2@example.com' });
-    const res = await request(app)
-      .post('/api/login')
-      .field('email', user.username)
-      .field('password', 'password123');
+    const res = await request(app).post('/api/login').field('email', user.username).field('password', 'password123');
 
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
@@ -130,19 +124,13 @@ describe('POST /api/login — accepts either username or email', () => {
 
   it('rejects a wrong password regardless of which identifier was used', async () => {
     const user = await createUser({ username: 'loginuser3', email: 'loginuser3@example.com' });
-    const res = await request(app)
-      .post('/api/login')
-      .field('email', user.username)
-      .field('password', 'wrongpassword');
+    const res = await request(app).post('/api/login').field('email', user.username).field('password', 'wrongpassword');
 
     expect(res.status).toBe(400);
   });
 
   it('returns 404 for an unknown username or email', async () => {
-    const res = await request(app)
-      .post('/api/login')
-      .field('email', 'doesnotexist')
-      .field('password', 'password123');
+    const res = await request(app).post('/api/login').field('email', 'doesnotexist').field('password', 'password123');
 
     expect(res.status).toBe(404);
   });

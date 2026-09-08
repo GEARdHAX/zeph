@@ -50,7 +50,9 @@ function ThreatIntelligence() {
   };
 
   useEffect(() => {
-    getThreatIntelStatus().then((res) => setStatus(res.data)).catch(() => setStatus(null));
+    getThreatIntelStatus()
+      .then((res) => setStatus(res.data))
+      .catch(() => setStatus(null));
   }, []);
 
   useEffect(() => {
@@ -95,12 +97,16 @@ function ThreatIntelligence() {
             </div>
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Circuit</div>
-              <div className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${status.circuitState === 'OPEN' ? SEVERITY_CLASSES.critical : SEVERITY_CLASSES.low}`}>
+              <div
+                className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${status.circuitState === 'OPEN' ? SEVERITY_CLASSES.critical : SEVERITY_CLASSES.low}`}
+              >
                 {status.circuitState}
               </div>
             </div>
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Today&apos;s Budget</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Today&apos;s Budget
+              </div>
               <div className="mt-0.5 text-sm font-semibold text-foreground">
                 {status.usedToday}
                 {' / '}
@@ -109,7 +115,9 @@ function ThreatIntelligence() {
             </div>
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Redis Cache</div>
-              <div className="mt-0.5 text-sm font-semibold text-foreground">{status.redisConfigured ? 'Connected' : 'Not configured'}</div>
+              <div className="mt-0.5 text-sm font-semibold text-foreground">
+                {status.redisConfigured ? 'Connected' : 'Not configured'}
+              </div>
             </div>
           </div>
         )}
@@ -122,7 +130,11 @@ function ThreatIntelligence() {
             onChange={onFilterChange('type')}
           >
             <option value="">All types</option>
-            {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            {TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
           </select>
           <select
             className="h-9 rounded-xl border border-input bg-card/60 px-3 text-xs font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -139,7 +151,11 @@ function ThreatIntelligence() {
             onChange={onFilterChange('severity')}
           >
             <option value="">All severities</option>
-            {SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}
+            {SEVERITIES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -159,32 +175,43 @@ function ThreatIntelligence() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">Loading…</td></tr>
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                    Loading…
+                  </td>
+                </tr>
               )}
               {!loading && indicators.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No indicators found.</td></tr>
-              )}
-              {!loading && indicators.map((ind) => (
-                <tr
-                  key={ind._id || ind.normalizedIndicator}
-                  className="cursor-pointer border-b border-border/40 hover:bg-muted/40"
-                  onClick={() => onSelectIndicator(ind.normalizedIndicator)}
-                >
-                  <td className="px-4 py-2.5 font-semibold text-foreground">{ind.indicator}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{ind.type}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${SEVERITY_CLASSES[ind.severity] || SEVERITY_CLASSES.low}`}>
-                      {ind.severity}
-                    </span>
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                    No indicators found.
                   </td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{ind.confidence}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{ind.source}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
-                    {new Date(ind.lastSeen).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{ind.status}</td>
                 </tr>
-              ))}
+              )}
+              {!loading &&
+                indicators.map((ind) => (
+                  <tr
+                    key={ind._id || ind.normalizedIndicator}
+                    className="cursor-pointer border-b border-border/40 hover:bg-muted/40"
+                    onClick={() => onSelectIndicator(ind.normalizedIndicator)}
+                  >
+                    <td className="px-4 py-2.5 font-semibold text-foreground">{ind.indicator}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{ind.type}</td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${SEVERITY_CLASSES[ind.severity] || SEVERITY_CLASSES.low}`}
+                      >
+                        {ind.severity}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{ind.confidence}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{ind.source}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
+                      {new Date(ind.lastSeen).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{ind.status}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -222,14 +249,19 @@ function ThreatIntelligence() {
 
       {/* Detail panel */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setSelected(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setSelected(null)}
+        >
           <div
             className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-bold text-foreground">Indicator Detail</h2>
-              <Button variant="ghost" size="sm" className="h-7 rounded-lg text-xs" onClick={() => setSelected(null)}>Close</Button>
+              <Button variant="ghost" size="sm" className="h-7 rounded-lg text-xs" onClick={() => setSelected(null)}>
+                Close
+              </Button>
             </div>
             {selectedLoading ? (
               <div className="py-8 text-center text-xs text-muted-foreground">Loading…</div>

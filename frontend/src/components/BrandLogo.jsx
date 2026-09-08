@@ -17,25 +17,19 @@ import useTheme from '../lib/useTheme';
  *  - 'light': forced light surface variant (white-bg-logo.png)
  *  - 'mark' / 'lockup' / 'full' / 'white' / 'black' aliases for backwards compatibility
  */
-function BrandLogo({
-  variant = 'auto',
-  className = 'h-8 w-8',
-  alt = 'zeph logo placeholder',
-  ...props
-}) {
+function BrandLogo({ variant = 'auto', className = 'h-8 w-8', alt = 'zeph logo placeholder', ...props }) {
   const { theme } = useTheme();
-  const [domTheme, setDomTheme] = useState(() => (
-    typeof document !== 'undefined' && document.documentElement.classList.contains('light')
-      ? 'light'
-      : 'dark'
-  ));
+  const [domTheme, setDomTheme] = useState(() =>
+    typeof document !== 'undefined' && document.documentElement.classList.contains('light') ? 'light' : 'dark',
+  );
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
 
     const syncDomTheme = () => {
-      const isLight = document.documentElement.classList.contains('light')
-        || document.documentElement.getAttribute('data-theme') === 'light';
+      const isLight =
+        document.documentElement.classList.contains('light') ||
+        document.documentElement.getAttribute('data-theme') === 'light';
       setDomTheme(isLight ? 'light' : 'dark');
     };
 

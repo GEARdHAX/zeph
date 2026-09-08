@@ -32,15 +32,17 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
-const createInvite = (actor, groupId, extra = {}) => request(app)
-  .post('/api/group/invites/create')
-  .set('Authorization', `Bearer ${tokenFor(actor)}`)
-  .send({ groupId, ...extra });
+const createInvite = (actor, groupId, extra = {}) =>
+  request(app)
+    .post('/api/group/invites/create')
+    .set('Authorization', `Bearer ${tokenFor(actor)}`)
+    .send({ groupId, ...extra });
 
 const tokenFromUrl = (url) => url.split('/').pop();
 
@@ -156,8 +158,12 @@ describe('Group invite join', () => {
     const token = tokenFromUrl(created.body.url);
 
     const [resA, resB] = await Promise.all([
-      request(app).post(`/api/group/invites/${token}/join`).set('Authorization', `Bearer ${tokenFor(a)}`),
-      request(app).post(`/api/group/invites/${token}/join`).set('Authorization', `Bearer ${tokenFor(b)}`),
+      request(app)
+        .post(`/api/group/invites/${token}/join`)
+        .set('Authorization', `Bearer ${tokenFor(a)}`),
+      request(app)
+        .post(`/api/group/invites/${token}/join`)
+        .set('Authorization', `Bearer ${tokenFor(b)}`),
     ]);
 
     const statuses = [resA.status, resB.status].sort();
@@ -173,7 +179,9 @@ describe('Group invite join', () => {
     const created = await createInvite(owner, group.body._id);
     const token = tokenFromUrl(created.body.url);
 
-    await request(app).post(`/api/group/invites/${token}/revoke`).set('Authorization', `Bearer ${tokenFor(owner)}`);
+    await request(app)
+      .post(`/api/group/invites/${token}/revoke`)
+      .set('Authorization', `Bearer ${tokenFor(owner)}`);
 
     const res = await request(app)
       .post(`/api/group/invites/${token}/join`)
@@ -186,7 +194,7 @@ describe('Group invite join', () => {
   // never includes the joiner) — so their own client never got the event
   // that triggers its sidebar refresh, making the group invisible on their
   // side despite having actually joined. See DECISIONS.md.
-  it('the group appears in the joiner\'s own inbox right after joining', async () => {
+  it("the group appears in the joiner's own inbox right after joining", async () => {
     const owner = await createUser();
     const joiner = await createUser();
     const group = await createGroup(owner);
@@ -260,20 +268,24 @@ describe('Group invite join', () => {
     const group = await createGroup(owner, [joiner._id]);
     const groupId = group.body._id;
 
-    await request(app).post('/api/message')
+    await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ roomID: groupId, content: 'old message before removal', type: 'text' });
 
-    await request(app).post('/api/group/members/remove')
+    await request(app)
+      .post('/api/group/members/remove')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: joiner._id.toString() });
-    await request(app).post('/api/conversation/delete')
+    await request(app)
+      .post('/api/conversation/delete')
       .set('Authorization', `Bearer ${tokenFor(joiner)}`)
       .send({ conversationId: groupId });
 
     const created = await createInvite(owner, groupId);
     const token = tokenFromUrl(created.body.url);
-    await request(app).post(`/api/group/invites/${token}/join`)
+    await request(app)
+      .post(`/api/group/invites/${token}/join`)
       .set('Authorization', `Bearer ${tokenFor(joiner)}`);
 
     // The rejoin itself posts a fresh "joined via invite link" system
@@ -281,8 +293,10 @@ describe('Group invite join', () => {
     // correct lastMessage to show. The regression this guards is the OLD
     // pre-removal message ("old message before removal") never leaking
     // back in as the preview.
-    const list = await request(app).post('/api/rooms/list')
-      .set('Authorization', `Bearer ${tokenFor(joiner)}`).send({});
+    const list = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(joiner)}`)
+      .send({});
     const row = list.body.rooms.find((r) => r._id === groupId);
     expect(row).toBeDefined();
     expect(row.lastMessage).not.toBeNull();
@@ -293,8 +307,10 @@ describe('Group invite join', () => {
     // own — the fix must be per-user, not a global mutation of
     // Room.lastMessage — but they see the same latest message either way
     // since it's genuinely the newest activity for everyone.
-    const ownerList = await request(app).post('/api/rooms/list')
-      .set('Authorization', `Bearer ${tokenFor(owner)}`).send({});
+    const ownerList = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({});
     const ownerRow = ownerList.body.rooms.find((r) => r._id === groupId);
     expect(ownerRow.lastMessage).not.toBeNull();
   });
@@ -309,23 +325,29 @@ describe('Group invite join', () => {
     const group = await createGroup(owner, [target._id]);
     const groupId = group.body._id;
 
-    await request(app).post('/api/message')
+    await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ roomID: groupId, content: 'old message before removal', type: 'text' });
 
-    await request(app).post('/api/group/members/remove')
+    await request(app)
+      .post('/api/group/members/remove')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: target._id.toString() });
-    await request(app).post('/api/conversation/delete')
+    await request(app)
+      .post('/api/conversation/delete')
       .set('Authorization', `Bearer ${tokenFor(target)}`)
       .send({ conversationId: groupId });
 
-    await request(app).post('/api/group/members/add')
+    await request(app)
+      .post('/api/group/members/add')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: groupId, userId: target._id.toString() });
 
-    const list = await request(app).post('/api/rooms/list')
-      .set('Authorization', `Bearer ${tokenFor(target)}`).send({});
+    const list = await request(app)
+      .post('/api/rooms/list')
+      .set('Authorization', `Bearer ${tokenFor(target)}`)
+      .send({});
     const row = list.body.rooms.find((r) => r._id === groupId);
     expect(row).toBeDefined();
     expect(row.lastMessage).toBeNull();

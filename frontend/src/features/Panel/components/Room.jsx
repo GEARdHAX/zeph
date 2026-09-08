@@ -24,9 +24,7 @@ import Config from '../../../config';
 // per-user tombstone, unrelated to the Private Vault's isHidden/vault-auth
 // concept above — the two are independent conversation states with their
 // own list/restore routes).
-function Room({
-  room, inVault, vaultToken, removed, onRestored,
-}) {
+function Room({ room, inVault, vaultToken, removed, onRestored }) {
   const roomsWithNewMessages = useSelector((state) => state.messages.roomsWithNewMessages) || [];
   const user = useGlobal('user')[0] || {};
   const setOver = useGlobal('over')[1];
@@ -91,9 +89,10 @@ function Room({
   const isSelected = location.pathname.startsWith(`/room/${room._id}`);
   const hasUnread = roomsWithNewMessages.includes(room._id);
 
-  const initials = (room.isGroup
-    ? (room.title || 'G').charAt(0)
-    : `${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`
+  const initials = (
+    room.isGroup
+      ? (room.title || 'G').charAt(0)
+      : `${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`
   ).toUpperCase();
 
   const onSelect = () => {
@@ -178,7 +177,7 @@ function Room({
     <div className="group/row relative px-3 py-1">
       <button
         type="button"
-        onClick={(inVault || removed) ? undefined : onSelect}
+        onClick={inVault || removed ? undefined : onSelect}
         className={cn(
           'group relative flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-all duration-200 hover:bg-accent/60',
           isSelected ? 'bg-accent shadow-xs border border-border text-foreground' : 'bg-transparent text-foreground',
@@ -194,9 +193,7 @@ function Room({
                 className="aspect-square size-full object-cover"
               />
             )}
-            <AvatarFallback className="bg-transparent text-xs font-bold text-white">
-              {initials}
-            </AvatarFallback>
+            <AvatarFallback className="bg-transparent text-xs font-bold text-white">{initials}</AvatarFallback>
           </Avatar>
         </div>
 
@@ -223,12 +220,8 @@ function Room({
           </div>
 
           <div className="mt-0.5 flex items-center justify-between gap-1">
-            <span className="truncate text-[11px] text-muted-foreground">
-              {text}
-            </span>
-            <span className="shrink-0 text-[10px] text-muted-foreground/80">
-              {time}
-            </span>
+            <span className="truncate text-[11px] text-muted-foreground">{text}</span>
+            <span className="shrink-0 text-[10px] text-muted-foreground/80">{time}</span>
           </div>
         </div>
 
@@ -271,7 +264,14 @@ function Room({
 
       {removed && (
         <div className="flex items-center justify-end px-3 pb-1 pt-1.5">
-          <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" onClick={onRestore} disabled={busy}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 text-[11px]"
+            onClick={onRestore}
+            disabled={busy}
+          >
             <ArchiveRestore className="h-3 w-3" />
             Restore
           </Button>
@@ -280,7 +280,14 @@ function Room({
 
       {inVault && (
         <div className="flex items-center justify-end gap-1.5 px-3 pb-1 pt-1.5">
-          <Button type="button" variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" onClick={onUnhide} disabled={busy}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 text-[11px]"
+            onClick={onUnhide}
+            disabled={busy}
+          >
             <Unlock className="h-3 w-3" />
             Unhide
           </Button>

@@ -49,8 +49,15 @@ module.exports = async (req, res, next) => {
 
     forceLeaveGroupRoom(req.user.id.toString(), room._id.toString(), { reason: 'left', groupName: room.title });
 
-    logger.info({ groupId: room._id, actorId: req.user.id, targetId: req.user.id, selfLeave: true }, 'group_member_removed');
-    broadcastToGroup(remainingMemberIds, 'group:member:removed', { groupId: room._id, userId: req.user.id, self: false });
+    logger.info(
+      { groupId: room._id, actorId: req.user.id, targetId: req.user.id, selfLeave: true },
+      'group_member_removed',
+    );
+    broadcastToGroup(remainingMemberIds, 'group:member:removed', {
+      groupId: room._id,
+      userId: req.user.id,
+      self: false,
+    });
 
     return res.status(200).json({ status: 'success', message: 'left group' });
   }

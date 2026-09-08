@@ -25,7 +25,9 @@ const postSystemMessage = async (roomId, content, recipientIds) => {
   let message;
   try {
     message = await new Message({
-      room: roomId, content, type: 'system',
+      room: roomId,
+      content,
+      type: 'system',
     }).save();
   } catch (err) {
     logger.error({ err, roomId }, 'Failed to persist system message');

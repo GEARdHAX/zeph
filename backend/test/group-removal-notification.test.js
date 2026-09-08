@@ -32,10 +32,11 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
 // A removed/banned user needs to know WHO did it and WHY (removed vs
 // banned) to render an accurate in-app notice — the previous
@@ -91,7 +92,9 @@ describe('The removed/banned user is told who did it and why', () => {
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: group.body._id, userId: target._id });
 
-    const targetEvent = toSpyCalls.find((c) => c.target === target._id.toString() && c.event === 'group:member:removed');
+    const targetEvent = toSpyCalls.find(
+      (c) => c.target === target._id.toString() && c.event === 'group:member:removed',
+    );
     expect(targetEvent).toBeDefined();
     expect(targetEvent.payload.reason).toBe('removed');
     expect(targetEvent.payload.actorName).toBe('Alice Owner');
@@ -110,7 +113,9 @@ describe('The removed/banned user is told who did it and why', () => {
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ groupId: group.body._id, userId: target._id });
 
-    const targetEvent = toSpyCalls.find((c) => c.target === target._id.toString() && c.event === 'group:member:removed');
+    const targetEvent = toSpyCalls.find(
+      (c) => c.target === target._id.toString() && c.event === 'group:member:removed',
+    );
     expect(targetEvent).toBeDefined();
     expect(targetEvent.payload.reason).toBe('banned');
     expect(targetEvent.payload.actorName).toBe('Bob Owner');
@@ -127,7 +132,9 @@ describe('The removed/banned user is told who did it and why', () => {
       .set('Authorization', `Bearer ${tokenFor(member)}`)
       .send({ id: group.body._id });
 
-    const targetEvent = toSpyCalls.find((c) => c.target === member._id.toString() && c.event === 'group:member:removed');
+    const targetEvent = toSpyCalls.find(
+      (c) => c.target === member._id.toString() && c.event === 'group:member:removed',
+    );
     expect(targetEvent).toBeDefined();
     expect(targetEvent.payload.reason).toBe('left');
   });
@@ -250,7 +257,9 @@ describe('Remaining members see an inline system message for a removal/ban', () 
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: group.body._id, userId: target._id });
 
-    const systemMessageEvents = toSpyCalls.filter((c) => c.event === 'message-in' && c.payload.message.type === 'system');
+    const systemMessageEvents = toSpyCalls.filter(
+      (c) => c.event === 'message-in' && c.payload.message.type === 'system',
+    );
     const recipientTargets = systemMessageEvents.map((c) => c.target);
     expect(recipientTargets).toEqual(expect.arrayContaining([owner._id.toString(), bystander._id.toString()]));
     expect(recipientTargets).not.toContain(target._id.toString());
@@ -519,11 +528,13 @@ describe('room/join reports myJoinInfo (how the caller joined)', () => {
     const target = await createUser();
     const group = await createGroup(owner);
 
-    await request(app).post('/api/group/members/add')
+    await request(app)
+      .post('/api/group/members/add')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: group.body._id, userId: target._id.toString() });
 
-    const res = await request(app).post('/api/room/join')
+    const res = await request(app)
+      .post('/api/room/join')
       .set('Authorization', `Bearer ${tokenFor(target)}`)
       .send({ id: group.body._id });
     expect(res.status).toBe(200);
@@ -534,7 +545,8 @@ describe('room/join reports myJoinInfo (how the caller joined)', () => {
     const owner = await createUser();
     const group = await createGroup(owner);
 
-    const res = await request(app).post('/api/room/join')
+    const res = await request(app)
+      .post('/api/room/join')
       .set('Authorization', `Bearer ${tokenFor(owner)}`)
       .send({ id: group.body._id });
     expect(res.status).toBe(200);
@@ -547,7 +559,8 @@ describe('room/join reports myJoinInfo (how the caller joined)', () => {
     const Room = require('../src/models/Room');
     const room = await Room.create({ people: [a._id, b._id], isGroup: false });
 
-    const res = await request(app).post('/api/room/join')
+    const res = await request(app)
+      .post('/api/room/join')
       .set('Authorization', `Bearer ${tokenFor(a)}`)
       .send({ id: room._id.toString() });
     expect(res.status).toBe(200);

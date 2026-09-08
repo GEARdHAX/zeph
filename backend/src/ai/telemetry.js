@@ -12,20 +12,31 @@ const logger = require('../logger');
 // every response, in every environment, rather than sometimes undefined.
 const resolveRequestId = (req) => req.id || crypto.randomUUID();
 
-const logEligibilityRejected = ({
-  requestId, feature, scope, reason, minMessages, count,
-}) => {
-  logger.info({
-    requestId, feature, scope, reason, minMessages, count,
-  }, 'ai_eligibility_rejected');
+const logEligibilityRejected = ({ requestId, feature, scope, reason, minMessages, count }) => {
+  logger.info(
+    {
+      requestId,
+      feature,
+      scope,
+      reason,
+      minMessages,
+      count,
+    },
+    'ai_eligibility_rejected',
+  );
 };
 
-const logCacheHit = ({
-  requestId, feature, scope, messageCountAtSummary, currentCount,
-}) => {
-  logger.info({
-    requestId, feature, scope, messageCountAtSummary, currentCount,
-  }, 'ai_cache_hit');
+const logCacheHit = ({ requestId, feature, scope, messageCountAtSummary, currentCount }) => {
+  logger.info(
+    {
+      requestId,
+      feature,
+      scope,
+      messageCountAtSummary,
+      currentCount,
+    },
+    'ai_cache_hit',
+  );
 };
 
 const logQueued = ({ requestId, feature, scope }) => {
@@ -56,14 +67,24 @@ const aiFailureResponse = (res, result, requestIdFallback) => {
   }
   if (result.reason === 'GENERATION_IN_PROGRESS') {
     return res.status(409).json({
-      error: true, reason: result.reason, message: 'This is already being generated — check back shortly.', requestId,
+      error: true,
+      reason: result.reason,
+      message: 'This is already being generated — check back shortly.',
+      requestId,
     });
   }
   return res.status(502).json({
-    error: true, reason: result.reason, message: 'AI provider request failed.', requestId,
+    error: true,
+    reason: result.reason,
+    message: 'AI provider request failed.',
+    requestId,
   });
 };
 
 module.exports = {
-  logEligibilityRejected, logCacheHit, logQueued, resolveRequestId, aiFailureResponse,
+  logEligibilityRejected,
+  logCacheHit,
+  logQueued,
+  resolveRequestId,
+  aiFailureResponse,
 };

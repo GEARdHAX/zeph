@@ -47,7 +47,10 @@ const createUser = async () => {
 
 const seedMessages = async (roomId, authorId, count) => {
   const docs = Array.from({ length: count }, (_, i) => ({
-    author: authorId, room: roomId, content: `message ${i}`, type: 'text',
+    author: authorId,
+    room: roomId,
+    content: `message ${i}`,
+    type: 'text',
   }));
   return Message.insertMany(docs);
 };
@@ -107,7 +110,9 @@ describe('Zeph AI routes — disabled by default (AI_PROVIDER unset)', () => {
 
 describe('Zeph AI — eligibility gating (summary)', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('rejects a DM summary below the 30-message minimum with INSUFFICIENT_CONTEXT', async () => {
     enableGroq('a summary');
@@ -168,7 +173,9 @@ describe('Zeph AI — eligibility gating (summary)', () => {
     // Only 5 new messages since the summary — below the 25-message freshness
     // threshold, so the cached summary must be reused, not regenerated.
     await seedMessages(room._id, user._id, 5);
-    global.fetch = async () => { throw new Error('provider should NOT be called for a fresh cached summary'); };
+    global.fetch = async () => {
+      throw new Error('provider should NOT be called for a fresh cached summary');
+    };
 
     const second = await request(app)
       .post('/api/ai/summarize')
@@ -206,7 +213,9 @@ describe('Zeph AI — eligibility gating (summary)', () => {
 
 describe('Zeph AI — authorization (cross-user access)', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('blocks a non-member from summarizing a room they do not belong to', async () => {
     enableGroq('a summary');
@@ -241,7 +250,9 @@ describe('Zeph AI — authorization (cross-user access)', () => {
 
 describe('Zeph AI — translate / rewrite (no room access required)', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('translates client-supplied text without requiring room membership', async () => {
     enableGroq('bonjour');
@@ -284,7 +295,9 @@ describe('Zeph AI — Phase 13 hardening: oversized input rejected before any pr
   it('rejects an oversized translate payload with 413, never calling the provider', async () => {
     store.config.aiProvider = 'groq';
     store.config.groqApiKey = 'test-key';
-    global.fetch = async () => { throw new Error('provider must not be called for oversized input'); };
+    global.fetch = async () => {
+      throw new Error('provider must not be called for oversized input');
+    };
 
     const user = await createUser();
     const res = await request(app)
@@ -299,7 +312,9 @@ describe('Zeph AI — Phase 13 hardening: oversized input rejected before any pr
   it('rejects an oversized rewrite payload with 413, never calling the provider', async () => {
     store.config.aiProvider = 'groq';
     store.config.groqApiKey = 'test-key';
-    global.fetch = async () => { throw new Error('provider must not be called for oversized input'); };
+    global.fetch = async () => {
+      throw new Error('provider must not be called for oversized input');
+    };
 
     const user = await createUser();
     const res = await request(app)
@@ -314,7 +329,9 @@ describe('Zeph AI — Phase 13 hardening: oversized input rejected before any pr
 
 describe('Zeph AI — every response carries a requestId for cross-stage correlation (Phase 11)', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('includes requestId on a successful translate response', async () => {
     enableGroq('bonjour');
@@ -344,7 +361,9 @@ describe('Zeph AI — every response carries a requestId for cross-stage correla
 
 describe('Zeph AI — title / topics', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('rejects a title suggestion below the 5-message minimum', async () => {
     enableGroq('Project Kickoff');
@@ -407,13 +426,17 @@ describe('Zeph AI — title / topics', () => {
 
 describe('Zeph AI — output validation', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('fails safely (not 200, not a crash) when the provider returns empty output', async () => {
     store.config.aiProvider = 'groq';
     store.config.groqApiKey = 'test-key';
     global.fetch = async () => ({
-      ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '   ' } }] }),
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: '   ' } }] }),
     });
 
     const user = await createUser();
@@ -429,7 +452,9 @@ describe('Zeph AI — output validation', () => {
 
 describe('Zeph AI — persistence', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('persists the generated summary to ConversationSummary', async () => {
     enableGroq('a durable summary');

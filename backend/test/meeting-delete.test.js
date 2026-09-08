@@ -34,14 +34,18 @@ const createUser = async (overrides = {}) => {
 };
 
 describe('POST /api/meeting/delete', () => {
-  it('removes a finished meeting from the requesting user\'s history', async () => {
+  it("removes a finished meeting from the requesting user's history", async () => {
     const userA = await createUser();
     const userB = await createUser();
     const meeting = await Meeting.create({
-      users: [userA._id, userB._id], peers: [], caller: userA._id, callee: userB._id,
+      users: [userA._id, userB._id],
+      peers: [],
+      caller: userA._id,
+      callee: userB._id,
     });
 
-    const res = await request(app).post('/api/meeting/delete')
+    const res = await request(app)
+      .post('/api/meeting/delete')
       .set('Authorization', `Bearer ${tokenFor(userA)}`)
       .send({ meetingId: meeting._id.toString() });
     expect(res.status).toBe(200);
@@ -49,23 +53,29 @@ describe('POST /api/meeting/delete', () => {
     const state = await MeetingUserState.findOne({ meeting: meeting._id, user: userA._id });
     expect(state.deletedAt).not.toBeNull();
 
-    const listRes = await request(app).post('/api/meeting/list')
+    const listRes = await request(app)
+      .post('/api/meeting/list')
       .set('Authorization', `Bearer ${tokenFor(userA)}`);
     expect(listRes.body.meetings.find((m) => m._id === meeting._id.toString())).toBeUndefined();
   });
 
-  it('does not remove the meeting from the OTHER participant\'s history', async () => {
+  it("does not remove the meeting from the OTHER participant's history", async () => {
     const userA = await createUser();
     const userB = await createUser();
     const meeting = await Meeting.create({
-      users: [userA._id, userB._id], peers: [], caller: userA._id, callee: userB._id,
+      users: [userA._id, userB._id],
+      peers: [],
+      caller: userA._id,
+      callee: userB._id,
     });
 
-    await request(app).post('/api/meeting/delete')
+    await request(app)
+      .post('/api/meeting/delete')
       .set('Authorization', `Bearer ${tokenFor(userA)}`)
       .send({ meetingId: meeting._id.toString() });
 
-    const listRes = await request(app).post('/api/meeting/list')
+    const listRes = await request(app)
+      .post('/api/meeting/list')
       .set('Authorization', `Bearer ${tokenFor(userB)}`);
     expect(listRes.body.meetings.find((m) => m._id === meeting._id.toString())).toBeDefined();
   });
@@ -74,10 +84,14 @@ describe('POST /api/meeting/delete', () => {
     const userA = await createUser();
     const userB = await createUser();
     const meeting = await Meeting.create({
-      users: [userA._id, userB._id], peers: [{ id: 'peer-1' }], caller: userA._id, callee: userB._id,
+      users: [userA._id, userB._id],
+      peers: [{ id: 'peer-1' }],
+      caller: userA._id,
+      callee: userB._id,
     });
 
-    const res = await request(app).post('/api/meeting/delete')
+    const res = await request(app)
+      .post('/api/meeting/delete')
       .set('Authorization', `Bearer ${tokenFor(userA)}`)
       .send({ meetingId: meeting._id.toString() });
     expect(res.status).toBe(400);
@@ -92,10 +106,14 @@ describe('POST /api/meeting/delete', () => {
     const userB = await createUser();
     const outsider = await createUser();
     const meeting = await Meeting.create({
-      users: [userA._id, userB._id], peers: [], caller: userA._id, callee: userB._id,
+      users: [userA._id, userB._id],
+      peers: [],
+      caller: userA._id,
+      callee: userB._id,
     });
 
-    const res = await request(app).post('/api/meeting/delete')
+    const res = await request(app)
+      .post('/api/meeting/delete')
       .set('Authorization', `Bearer ${tokenFor(outsider)}`)
       .send({ meetingId: meeting._id.toString() });
     expect(res.status).toBe(403);
@@ -105,10 +123,12 @@ describe('POST /api/meeting/delete', () => {
     const userA = await createUser();
     const meeting = await Meeting.create({ users: [userA._id], peers: [] });
 
-    const first = await request(app).post('/api/meeting/delete')
+    const first = await request(app)
+      .post('/api/meeting/delete')
       .set('Authorization', `Bearer ${tokenFor(userA)}`)
       .send({ meetingId: meeting._id.toString() });
-    const second = await request(app).post('/api/meeting/delete')
+    const second = await request(app)
+      .post('/api/meeting/delete')
       .set('Authorization', `Bearer ${tokenFor(userA)}`)
       .send({ meetingId: meeting._id.toString() });
 

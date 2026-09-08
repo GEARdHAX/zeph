@@ -14,14 +14,16 @@ export default function buildMediaTour() {
         element: '[data-tour="attachment-button"]',
         popover: {
           title: 'Attach & send',
-          description: 'Pick an image, video, or document — you\'ll get a preview and editing step before anything sends.',
+          description:
+            "Pick an image, video, or document — you'll get a preview and editing step before anything sends.",
           side: 'top',
         },
       },
       {
         popover: {
           title: 'Select → Preview/Edit → Send',
-          description: 'Crop or trim before sending, and large files are compressed automatically. Nothing uploads until you hit send.',
+          description:
+            'Crop or trim before sending, and large files are compressed automatically. Nothing uploads until you hit send.',
         },
       },
     ],

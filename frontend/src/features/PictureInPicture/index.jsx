@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useGlobal } from 'reactn';
-import {
-  Mic, MicOff, Video, VideoOff, PhoneOff,
-} from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
 import callManager from '../../lib/callManager';
 
 const TILE_WIDTH = 200; // matches the sm:w-[200px] tile size, used to clamp drag bounds
@@ -46,7 +44,7 @@ function PictureInPicture() {
   // nested `.stream` field. The previous `?.stream` access was always
   // undefined, so this tile could only ever show your own local
   // self-preview and never the remote peer's actual video.
-  const activeVideoStream = (video || isScreen) ? (localStream || videoStream) : (streams?.find((s) => s.isVideo) || null);
+  const activeVideoStream = video || isScreen ? localStream || videoStream : streams?.find((s) => s.isVideo) || null;
   const hasVideo = !!activeVideoStream;
   // Remote video/audio are always separate mediasoup producers/streams
   // (see Meeting/components/Interface.jsx, the full-screen equivalent) —
@@ -137,7 +135,9 @@ function PictureInPicture() {
     e.currentTarget.releasePointerCapture(e.pointerId);
     // Defer clearing so the subsequent click event (fired right after
     // pointerup on the same element) can still see dragState.current.moved.
-    setTimeout(() => { dragState.current = null; }, 0);
+    setTimeout(() => {
+      dragState.current = null;
+    }, 0);
   };
 
   const toggleAudio = async (e) => {
@@ -193,12 +193,7 @@ function PictureInPicture() {
             whenever it showed anything other than your own muted
             self-preview. Not `muted`, unlike the video element above. */}
         {remoteAudioStream && (
-          <audio
-            ref={audioRef}
-            onLoadedMetadata={() => audioRef.current?.play()}
-            className="hidden"
-            controls={false}
-          />
+          <audio ref={audioRef} onLoadedMetadata={() => audioRef.current?.play()} className="hidden" controls={false} />
         )}
         {hasVideo ? (
           <video

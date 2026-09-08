@@ -33,15 +33,17 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createGroup = (owner, memberIds = []) => request(app)
-  .post('/api/group/create')
-  .set('Authorization', `Bearer ${tokenFor(owner)}`)
-  .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
+const createGroup = (owner, memberIds = []) =>
+  request(app)
+    .post('/api/group/create')
+    .set('Authorization', `Bearer ${tokenFor(owner)}`)
+    .send({ title: 'Test Group', people: memberIds.map((id) => id.toString()) });
 
-const transfer = (actor, groupId, userId) => request(app)
-  .post('/api/group/ownership/transfer')
-  .set('Authorization', `Bearer ${tokenFor(actor)}`)
-  .send({ groupId, userId });
+const transfer = (actor, groupId, userId) =>
+  request(app)
+    .post('/api/group/ownership/transfer')
+    .set('Authorization', `Bearer ${tokenFor(actor)}`)
+    .send({ groupId, userId });
 
 describe('Ownership transfer', () => {
   it('moves OWNER role, demotes old owner to ADMIN, updates Room.ownerId', async () => {

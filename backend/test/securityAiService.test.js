@@ -12,7 +12,10 @@ const { getProvider } = require('../src/ai/provider');
 // eslint-disable-next-line import/order
 const securityAiService = require('../src/services/securityAi/securityAiService');
 
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 100); });
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 100);
+  });
 
 beforeAll(async () => {
   await db.connect();
@@ -25,7 +28,13 @@ afterAll(async () => {
 
 beforeEach(() => {
   store.config = {
-    ...config, redisUrl: null, aiProvider: 'ollama', ollamaModel: 'llama3.2:1b', aiSecurityLargeModel: null, securityAiTimeoutMs: 8000, securityAiCacheTtlSeconds: 60,
+    ...config,
+    redisUrl: null,
+    aiProvider: 'ollama',
+    ollamaModel: 'llama3.2:1b',
+    aiSecurityLargeModel: null,
+    securityAiTimeoutMs: 8000,
+    securityAiCacheTtlSeconds: 60,
   };
   securityAiService.resetBreakerForTests();
 });
@@ -37,12 +46,22 @@ afterEach(async () => {
 
 describe('securityAiService.analyze — happy path', () => {
   it('returns a validated result for a normal ANOMALY analysis', async () => {
-    getProvider.mockReturnValue(buildMockAiProvider({
-      response: {
-        anomalous: true, confidence: 82, category: 'authentication_behavior', signals: ['repeated_failed_login'], explanation: 'Multiple failed logins from a new device within the window.', recommendedAction: 'STEP_UP',
-      },
-    }));
-    const result = await securityAiService.analyze({ context: { failedLoginCount: 5, newDevice: true }, analysisType: 'ANOMALY' });
+    getProvider.mockReturnValue(
+      buildMockAiProvider({
+        response: {
+          anomalous: true,
+          confidence: 82,
+          category: 'authentication_behavior',
+          signals: ['repeated_failed_login'],
+          explanation: 'Multiple failed logins from a new device within the window.',
+          recommendedAction: 'STEP_UP',
+        },
+      }),
+    );
+    const result = await securityAiService.analyze({
+      context: { failedLoginCount: 5, newDevice: true },
+      analysisType: 'ANOMALY',
+    });
     expect(result.ok).toBe(true);
     expect(result.result.anomalous).toBe(true);
     expect(result.result.confidence).toBe(82);
@@ -78,11 +97,18 @@ describe('securityAiService.analyze — happy path', () => {
   });
 
   it('ALSO persists AI_ANOMALY_DETECTED when the result says anomalous:true', async () => {
-    getProvider.mockReturnValue(buildMockAiProvider({
-      response: {
-        anomalous: true, confidence: 90, category: 'network_behavior', signals: ['malicious_ip'], explanation: 'Confirmed malicious destination correlated with a process anomaly.', recommendedAction: 'DENY',
-      },
-    }));
+    getProvider.mockReturnValue(
+      buildMockAiProvider({
+        response: {
+          anomalous: true,
+          confidence: 90,
+          category: 'network_behavior',
+          signals: ['malicious_ip'],
+          explanation: 'Confirmed malicious destination correlated with a process anomaly.',
+          recommendedAction: 'DENY',
+        },
+      }),
+    );
     await securityAiService.analyze({ context: { maliciousIpCount: 1 }, analysisType: 'ANOMALY' });
     await flush();
     const event = await SecurityEvent.findOne({ type: 'AI_ANOMALY_DETECTED' });
@@ -90,11 +116,18 @@ describe('securityAiService.analyze — happy path', () => {
   });
 
   it('does NOT persist AI_ANOMALY_DETECTED when the result says anomalous:false', async () => {
-    getProvider.mockReturnValue(buildMockAiProvider({
-      response: {
-        anomalous: false, confidence: 5, category: 'other', signals: [], explanation: 'Nothing unusual found.', recommendedAction: null,
-      },
-    }));
+    getProvider.mockReturnValue(
+      buildMockAiProvider({
+        response: {
+          anomalous: false,
+          confidence: 5,
+          category: 'other',
+          signals: [],
+          explanation: 'Nothing unusual found.',
+          recommendedAction: null,
+        },
+      }),
+    );
     await securityAiService.analyze({ context: { failedLoginCount: 1 }, analysisType: 'ANOMALY' });
     await flush();
     const event = await SecurityEvent.findOne({ type: 'AI_ANOMALY_DETECTED' });
@@ -116,11 +149,20 @@ describe('securityAiService.analyze — output validation / hallucination protec
   });
 
   it('never lets the model set riskScore/policyDecision/trusted, even when present in raw output', async () => {
-    getProvider.mockReturnValue(buildMockAiProvider({
-      rawText: JSON.stringify({
-        anomalous: false, confidence: 10, category: 'other', explanation: 'fine', riskScore: 0, policyDecision: 'ALLOW', trusted: true, allow: true,
+    getProvider.mockReturnValue(
+      buildMockAiProvider({
+        rawText: JSON.stringify({
+          anomalous: false,
+          confidence: 10,
+          category: 'other',
+          explanation: 'fine',
+          riskScore: 0,
+          policyDecision: 'ALLOW',
+          trusted: true,
+          allow: true,
+        }),
       }),
-    }));
+    );
     const result = await securityAiService.analyze({ context: { failedLoginCount: 1 }, analysisType: 'ANOMALY' });
     expect(result.ok).toBe(true);
     expect(JSON.stringify(result.result)).not.toMatch(/policyDecision|trusted|riskScore/);
@@ -168,9 +210,9 @@ describe('securityAiService.analyze — provider failure / circuit breaker (spec
 
   it('security continues to function (returns a clean failure) when AI is completely unavailable — never throws or blocks the caller', async () => {
     getProvider.mockReturnValue(buildMockAiProvider({ failWith: new Error('ECONNREFUSED') }));
-    await expect(securityAiService.analyze({ context: { failedLoginCount: 1 }, analysisType: 'ANOMALY' })).resolves.toEqual(
-      expect.objectContaining({ ok: false }),
-    );
+    await expect(
+      securityAiService.analyze({ context: { failedLoginCount: 1 }, analysisType: 'ANOMALY' }),
+    ).resolves.toEqual(expect.objectContaining({ ok: false }));
   });
 });
 

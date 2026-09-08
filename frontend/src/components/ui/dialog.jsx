@@ -33,9 +33,7 @@ function DialogOverlay({ className, ...props }) {
   );
 }
 
-function DialogContent({
-  className, children, showCloseButton = true, ...props
-}) {
+function DialogContent({ className, children, showCloseButton = true, ...props }) {
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -72,9 +70,7 @@ function DialogHeader({ className, ...props }) {
   );
 }
 
-function DialogFooter({
-  className, showCloseButton = false, children, ...props
-}) {
+function DialogFooter({ className, showCloseButton = false, children, ...props }) {
   return (
     <div
       data-slot="dialog-footer"

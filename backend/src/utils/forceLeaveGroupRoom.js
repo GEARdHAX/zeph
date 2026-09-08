@@ -16,15 +16,22 @@ const store = require('../store');
 // "Removed by <name>" inline without an extra round trip, since by the
 // time this fires the target can no longer call any group:* read route to
 // look either up themselves.
-const forceLeaveGroupRoom = (userId, groupId, {
-  reason = 'removed', groupName = null, actorName = null, self = true,
-} = {}) => {
+const forceLeaveGroupRoom = (
+  userId,
+  groupId,
+  { reason = 'removed', groupName = null, actorName = null, self = true } = {},
+) => {
   const sockets = store.socketsByUserID[userId] || [];
   const roomName = `group:${groupId}`;
   sockets.forEach((socket) => {
     socket.leave(roomName);
     socket.emit('group:member:removed', {
-      groupId, userId, self, reason, groupName, actorName,
+      groupId,
+      userId,
+      self,
+      reason,
+      groupName,
+      actorName,
     });
   });
 };

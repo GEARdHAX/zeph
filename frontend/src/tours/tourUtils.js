@@ -9,60 +9,59 @@
 // (falls back to a bounded poll if MutationObserver isn't available — spec
 // §28) rather than an arbitrary setTimeout/setInterval loop running for the
 // full timeout regardless of when the element actually appears.
-export const waitForElement = (selector, {
-  timeoutMs = 4000, root = document.body, signal,
-} = {}) => new Promise((resolve) => {
-  const existing = document.querySelector(selector);
-  if (existing) {
-    resolve(existing);
-    return;
-  }
-
-  let settled = false;
-  let observer = null;
-  let pollId = null;
-  let timeoutId = null;
-
-  const cleanup = () => {
-    if (observer) observer.disconnect();
-    if (pollId) clearInterval(pollId);
-    if (timeoutId) clearTimeout(timeoutId);
-    if (signal) signal.removeEventListener('abort', onAbort);
-  };
-
-  const finish = (result) => {
-    if (settled) return;
-    settled = true;
-    cleanup();
-    resolve(result);
-  };
-
-  const onAbort = () => finish(null);
-  if (signal) {
-    if (signal.aborted) {
-      finish(null);
+export const waitForElement = (selector, { timeoutMs = 4000, root = document.body, signal } = {}) =>
+  new Promise((resolve) => {
+    const existing = document.querySelector(selector);
+    if (existing) {
+      resolve(existing);
       return;
     }
-    signal.addEventListener('abort', onAbort);
-  }
 
-  if (typeof MutationObserver !== 'undefined') {
-    observer = new MutationObserver(() => {
-      const el = document.querySelector(selector);
-      if (el) finish(el);
-    });
-    observer.observe(root, { childList: true, subtree: true });
-  } else {
-    // Fallback for an environment with no MutationObserver — bounded
-    // interval, not an unbounded one; cleared by the timeout below either way.
-    pollId = setInterval(() => {
-      const el = document.querySelector(selector);
-      if (el) finish(el);
-    }, 150);
-  }
+    let settled = false;
+    let observer = null;
+    let pollId = null;
+    let timeoutId = null;
 
-  timeoutId = setTimeout(() => finish(null), timeoutMs);
-});
+    const cleanup = () => {
+      if (observer) observer.disconnect();
+      if (pollId) clearInterval(pollId);
+      if (timeoutId) clearTimeout(timeoutId);
+      if (signal) signal.removeEventListener('abort', onAbort);
+    };
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const onAbort = () => finish(null);
+    if (signal) {
+      if (signal.aborted) {
+        finish(null);
+        return;
+      }
+      signal.addEventListener('abort', onAbort);
+    }
+
+    if (typeof MutationObserver !== 'undefined') {
+      observer = new MutationObserver(() => {
+        const el = document.querySelector(selector);
+        if (el) finish(el);
+      });
+      observer.observe(root, { childList: true, subtree: true });
+    } else {
+      // Fallback for an environment with no MutationObserver — bounded
+      // interval, not an unbounded one; cleared by the timeout below either way.
+      pollId = setInterval(() => {
+        const el = document.querySelector(selector);
+        if (el) finish(el);
+      }, 150);
+    }
+
+    timeoutId = setTimeout(() => finish(null), timeoutMs);
+  });
 
 // Respects the OS/browser-level reduced-motion preference (spec §23/§24).
 // matchMedia can be absent in some test/embedded environments — treat that

@@ -2,7 +2,9 @@ require('dotenv').config();
 const store = require('../src/store');
 const config = require('../config');
 const {
-  getCachedThreatResult, setCachedThreatResult, closeThreatIntelCacheConnection,
+  getCachedThreatResult,
+  setCachedThreatResult,
+  closeThreatIntelCacheConnection,
 } = require('../src/services/threatIntel/cache');
 
 describe('threatIntel cache — Redis unavailable (test default, matches store.config.redisUrl=null)', () => {
@@ -44,7 +46,10 @@ describeIfRedis('threatIntel cache — real Redis', () => {
   it('caches and retrieves a result, including a CLEAN (non-malicious) verdict — negative caching (spec section 6)', async () => {
     const key = `test-clean-${Date.now()}`;
     const cleanResult = {
-      malicious: false, confidence: 0, severity: 'low', source: 'mock',
+      malicious: false,
+      confidence: 0,
+      severity: 'low',
+      source: 'mock',
     };
     await setCachedThreatResult(key, cleanResult, 60);
     const retrieved = await getCachedThreatResult(key);
@@ -54,7 +59,10 @@ describeIfRedis('threatIntel cache — real Redis', () => {
   it('caches a MALICIOUS verdict too', async () => {
     const key = `test-malicious-${Date.now()}`;
     const maliciousResult = {
-      malicious: true, confidence: 92, severity: 'critical', source: 'mock',
+      malicious: true,
+      confidence: 92,
+      severity: 'critical',
+      source: 'mock',
     };
     await setCachedThreatResult(key, maliciousResult, 60);
     const retrieved = await getCachedThreatResult(key);
@@ -64,7 +72,9 @@ describeIfRedis('threatIntel cache — real Redis', () => {
   it('respects TTL — an expired entry is a miss', async () => {
     const key = `test-ttl-${Date.now()}`;
     await setCachedThreatResult(key, { malicious: false }, 1);
-    await new Promise((resolve) => { setTimeout(resolve, 1200); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1200);
+    });
     const retrieved = await getCachedThreatResult(key);
     expect(retrieved).toBeNull();
   });

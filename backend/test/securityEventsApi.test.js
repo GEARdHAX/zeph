@@ -38,19 +38,20 @@ const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root'
 // Bypasses record()'s own async fire-and-forget write so tests get
 // deterministic, immediately-queryable fixtures instead of racing the
 // service's own Mongo write.
-const seedEvent = (overrides = {}) => SecurityEvent.create({
-  eventId: overrides.eventId || `evt-${Math.random().toString(36).slice(2)}`,
-  timestamp: overrides.timestamp || new Date(),
-  type: overrides.type || 'LOGIN_SUCCESS',
-  severity: overrides.severity || 'low',
-  actor: overrides.actor || { userId: null, sessionId: null },
-  source: overrides.source || { ip: null, userAgent: null, deviceId: null },
-  target: overrides.target || { resource: null, resourceId: null, action: null },
-  result: overrides.result || 'success',
-  metadata: overrides.metadata || {},
-  requestId: overrides.requestId || null,
-  sourceSystem: overrides.sourceSystem || 'app',
-});
+const seedEvent = (overrides = {}) =>
+  SecurityEvent.create({
+    eventId: overrides.eventId || `evt-${Math.random().toString(36).slice(2)}`,
+    timestamp: overrides.timestamp || new Date(),
+    type: overrides.type || 'LOGIN_SUCCESS',
+    severity: overrides.severity || 'low',
+    actor: overrides.actor || { userId: null, sessionId: null },
+    source: overrides.source || { ip: null, userAgent: null, deviceId: null },
+    target: overrides.target || { resource: null, resourceId: null, action: null },
+    result: overrides.result || 'success',
+    metadata: overrides.metadata || {},
+    requestId: overrides.requestId || null,
+    sourceSystem: overrides.sourceSystem || 'app',
+  });
 
 describe('GET /api/security/events — RBAC', () => {
   it('returns 404 (not 403) for a standard user — indistinguishable from a nonexistent route', async () => {
@@ -77,7 +78,7 @@ describe('GET /api/security/events — RBAC', () => {
     expect(Array.isArray(res.body.events)).toBe(true);
   });
 
-  it('the admin\'s own access is itself recorded as a ZERO_TRUST_ALLOW event (eventually — record() never blocks the request it instruments)', async () => {
+  it("the admin's own access is itself recorded as a ZERO_TRUST_ALLOW event (eventually — record() never blocks the request it instruments)", async () => {
     const admin = await createAdmin();
     await request(app)
       .get('/api/security/events')
@@ -89,7 +90,9 @@ describe('GET /api/security/events — RBAC', () => {
     // event can genuinely still be in flight when the handler's list query
     // above already ran — same eventual-consistency wait the "End-to-end"
     // describe block below already uses for the identical reason.
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
 
     const followUp = await request(app)
       .get('/api/security/events?type=ZERO_TRUST_ALLOW')
@@ -300,7 +303,9 @@ describe('End-to-end: SecurityEventService.record() -> queryable via the API', (
       result: 'failure',
     });
     // record() writes to Mongo asynchronously — give it a tick to land.
-    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
 
     const res = await request(app)
       .get('/api/security/events?type=LOGIN_FAILED')

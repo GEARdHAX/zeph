@@ -66,7 +66,8 @@ const reducer = (state = initialState, action) => {
         closed: false,
       };
     case Actions.RTC_CONSUMERS:
-      if (state.consumersTimestamp && moment(state.consumersTimestamp).isAfter(moment(action.consumers.timestamp))) return state;
+      if (state.consumersTimestamp && moment(state.consumersTimestamp).isAfter(moment(action.consumers.timestamp)))
+        return state;
       return {
         ...state,
         consumers: action.consumers.content,

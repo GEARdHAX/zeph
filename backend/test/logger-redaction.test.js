@@ -30,9 +30,12 @@ describe('logger redaction (Phase 9 — Authorization header leak into access lo
     // config that was never actually active).
     // eslint-disable-next-line global-require
     const { REDACT_CONFIG } = require('../src/logger');
-    const testLogger = pino({ redact: REDACT_CONFIG }, {
-      write: (line) => logLines.push(line),
-    });
+    const testLogger = pino(
+      { redact: REDACT_CONFIG },
+      {
+        write: (line) => logLines.push(line),
+      },
+    );
 
     app = express();
     app.use(pinoHttp({ logger: testLogger }));
@@ -50,7 +53,10 @@ describe('logger redaction (Phase 9 — Authorization header leak into access lo
   });
 
   it('does not redact non-sensitive headers (log stays useful for debugging)', async () => {
-    await request(app).get('/test').set('Authorization', 'Bearer supersecrettoken123').set('User-Agent', 'test-agent-string');
+    await request(app)
+      .get('/test')
+      .set('Authorization', 'Bearer supersecrettoken123')
+      .set('User-Agent', 'test-agent-string');
 
     const line = logLines.find((l) => l.includes('"headers"'));
     expect(JSON.parse(line).req.headers['user-agent']).toBe('test-agent-string');

@@ -25,9 +25,10 @@ module.exports = async (req, res) => {
     return res.status(404).json({ status: 'error' });
   }
 
-  const isParticipant = meeting.users.some((u) => u.toString() === userID.toString())
-    || (meeting.caller && meeting.caller.toString() === userID.toString())
-    || (meeting.callee && meeting.callee.toString() === userID.toString());
+  const isParticipant =
+    meeting.users.some((u) => u.toString() === userID.toString()) ||
+    (meeting.caller && meeting.caller.toString() === userID.toString()) ||
+    (meeting.callee && meeting.callee.toString() === userID.toString());
   if (!isParticipant) {
     return res.status(403).json({ status: 'error' });
   }

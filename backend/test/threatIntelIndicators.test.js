@@ -1,5 +1,9 @@
 const {
-  IndicatorTypes, detectType, normalizeIndicator, isPrivateOrReservedIp, indicatorKey,
+  IndicatorTypes,
+  detectType,
+  normalizeIndicator,
+  isPrivateOrReservedIp,
+  indicatorKey,
 } = require('../src/services/threatIntel/indicators');
 
 describe('threatIntel/indicators — detectType', () => {
@@ -18,15 +22,12 @@ describe('threatIntel/indicators — detectType', () => {
     expect(detectType(input)).toBe(expected);
   });
 
-  it.each([
-    [''],
-    [null],
-    [undefined],
-    ['not a valid indicator at all'],
-    ['just-some-text-no-tld'],
-  ])('returns null for invalid input: %s', (input) => {
-    expect(detectType(input)).toBeNull();
-  });
+  it.each([[''], [null], [undefined], ['not a valid indicator at all'], ['just-some-text-no-tld']])(
+    'returns null for invalid input: %s',
+    (input) => {
+      expect(detectType(input)).toBeNull();
+    },
+  );
 });
 
 describe('threatIntel/indicators — normalizeIndicator', () => {
@@ -58,8 +59,10 @@ describe('threatIntel/indicators — normalizeIndicator', () => {
   });
 
   it('normalizes hash case consistently for md5/sha1/sha256', () => {
-    expect(normalizeIndicator('5D41402ABC4B2A76B9719D911017C592'))
-      .toEqual({ type: 'HASH', normalized: '5d41402abc4b2a76b9719d911017c592' });
+    expect(normalizeIndicator('5D41402ABC4B2A76B9719D911017C592')).toEqual({
+      type: 'HASH',
+      normalized: '5d41402abc4b2a76b9719d911017c592',
+    });
   });
 
   it('rejects a hash of the wrong length', () => {

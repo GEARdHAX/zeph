@@ -15,7 +15,10 @@ const getClient = () => {
   if (!store.config?.redisUrl) return null;
   if (!client) {
     client = new IORedis(store.config.redisUrl, {
-      maxRetriesPerRequest: 1, connectTimeout: 3000, retryStrategy: () => null, lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+      retryStrategy: () => null,
+      lazyConnect: true,
     });
     client.on('error', (err) => logger.warn({ err }, 'Security AI cache Redis error'));
   }
@@ -44,9 +47,11 @@ const CACHE_PREFIX = 'securityai:result:';
 // sensorId here; callers analyzing an already-aggregated, non-identity-
 // specific incident (the BullMQ worker's INCIDENT_SUMMARY calls) can omit
 // it, since an incident's correlationKey already IS its own identity.
-const contextHash = (analysisType, context, scopeId = '') => crypto.createHash('sha256')
-  .update(`${analysisType}:${scopeId}:${JSON.stringify(context)}`)
-  .digest('hex');
+const contextHash = (analysisType, context, scopeId = '') =>
+  crypto
+    .createHash('sha256')
+    .update(`${analysisType}:${scopeId}:${JSON.stringify(context)}`)
+    .digest('hex');
 
 const getCachedAnalysis = async (analysisType, context, scopeId) => {
   const redis = getClient();
@@ -65,7 +70,8 @@ const setCachedAnalysis = async (analysisType, context, result, ttlSeconds, scop
   const redis = getClient();
   if (!redis) return;
   const key = `${CACHE_PREFIX}${contextHash(analysisType, context, scopeId)}`;
-  await redis.set(key, JSON.stringify(result), 'EX', ttlSeconds)
+  await redis
+    .set(key, JSON.stringify(result), 'EX', ttlSeconds)
     .catch((err) => logger.warn({ err }, 'Failed to write security AI cache'));
 };
 
@@ -77,5 +83,9 @@ const closeSecurityAiCacheConnection = async () => {
 };
 
 module.exports = {
-  getCachedAnalysis, setCachedAnalysis, closeSecurityAiCacheConnection, getClient, contextHash,
+  getCachedAnalysis,
+  setCachedAnalysis,
+  closeSecurityAiCacheConnection,
+  getClient,
+  contextHash,
 };

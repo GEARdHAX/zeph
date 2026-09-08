@@ -171,7 +171,10 @@ export const createTourController = (tourId, { userId, stepTargetTimeoutMs } = {
   const reset = () => {
     destroyActiveTour();
     persist({
-      status: TourStatus.NOT_STARTED, currentStep: 0, completedAt: null, dismissedAt: null,
+      status: TourStatus.NOT_STARTED,
+      currentStep: 0,
+      completedAt: null,
+      dismissedAt: null,
     });
     notify();
   };
@@ -187,6 +190,13 @@ export const createTourController = (tourId, { userId, stepTargetTimeoutMs } = {
   };
 
   return {
-    start, startAt, resume, skip, reset, subscribe, getSnapshot, dispose,
+    start,
+    startAt,
+    resume,
+    skip,
+    reset,
+    subscribe,
+    getSnapshot,
+    dispose,
   };
 };

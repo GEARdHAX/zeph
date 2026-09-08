@@ -19,10 +19,12 @@ module.exports = async (req, res, next) => {
   // candidates for this. See userProfileCache.js and DECISIONS.md for why
   // this field set specifically (and not groupPolicy's membership checks)
   // is safe to serve slightly stale.
-  const user = await getCachedProfile(usernameNormalized, () => User.findOne({ usernameNormalized })
-    .select('username firstName lastName tagLine bio picture discoveryEnabled level')
-    .populate({ path: 'picture', strictPopulate: false })
-    .lean());
+  const user = await getCachedProfile(usernameNormalized, () =>
+    User.findOne({ usernameNormalized })
+      .select('username firstName lastName tagLine bio picture discoveryEnabled level')
+      .populate({ path: 'picture', strictPopulate: false })
+      .lean(),
+  );
 
   const isSelf = user && user._id.toString() === req.user.id.toString();
 
@@ -30,9 +32,11 @@ module.exports = async (req, res, next) => {
   // privileged account viewed by a non-privileged caller" — a distinguishable
   // response for any of these would let an attacker enumerate which
   // usernames are real/privileged. See DECISIONS.md.
-  if (!user
-    || (user.discoveryEnabled === false && !isSelf)
-    || (isPrivileged(user) && !isSelf && !isPrivileged(req.user))) {
+  if (
+    !user ||
+    (user.discoveryEnabled === false && !isSelf) ||
+    (isPrivileged(user) && !isSelf && !isPrivileged(req.user))
+  ) {
     return res.status(404).json({ error: true });
   }
 
@@ -87,7 +91,9 @@ module.exports = async (req, res, next) => {
           .select('title picture')
           .populate({ path: 'picture', strictPopulate: false });
         commonGroups = rooms.map((room) => ({
-          _id: room._id, title: room.title, picture: room.picture,
+          _id: room._id,
+          title: room.title,
+          picture: room.picture,
         }));
       }
     }

@@ -17,7 +17,9 @@ describe('getProvider — groq, missing API key fails closed', () => {
 
 describe('getProvider — gemini', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('fails closed with no GEMINI_API_KEY', () => {
     const provider = getProvider({ aiProvider: 'gemini', geminiApiKey: null });
@@ -30,10 +32,17 @@ describe('getProvider — gemini', () => {
     global.fetch = async (url, opts) => {
       capturedUrl = url;
       capturedBody = JSON.parse(opts.body);
-      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: 'gemini reply' }] } }] }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: 'gemini reply' }] } }] }),
+      };
     };
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'gk', geminiModel: 'gemini-3.5-flash-lite', geminiBaseUrl: 'https://generativelanguage.googleapis.com',
+      aiProvider: 'gemini',
+      geminiApiKey: 'gk',
+      geminiModel: 'gemini-3.5-flash-lite',
+      geminiBaseUrl: 'https://generativelanguage.googleapis.com',
     });
     const result = await provider.generate('say hi');
     expect(result).toBe('gemini reply');
@@ -51,7 +60,10 @@ describe('getProvider — gemini', () => {
       return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }) };
     };
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'super-secret', geminiModel: 'm', geminiBaseUrl: 'https://x',
+      aiProvider: 'gemini',
+      geminiApiKey: 'super-secret',
+      geminiModel: 'm',
+      geminiBaseUrl: 'https://x',
     });
     await provider.generate('hi');
     expect(JSON.stringify(capturedHeaders || {})).not.toContain('super-secret');
@@ -61,7 +73,10 @@ describe('getProvider — gemini', () => {
   it('throws a RATE_LIMITED-coded error on 429', async () => {
     global.fetch = async () => ({ ok: false, status: 429, statusText: 'Too Many Requests' });
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'gk', geminiModel: 'm', geminiBaseUrl: 'https://x',
+      aiProvider: 'gemini',
+      geminiApiKey: 'gk',
+      geminiModel: 'm',
+      geminiBaseUrl: 'https://x',
     });
     await expect(provider.generate('hi')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
   });
@@ -69,15 +84,25 @@ describe('getProvider — gemini', () => {
   it('throws a SERVER_ERROR-coded error on 5xx (so the router treats it as a health failure)', async () => {
     global.fetch = async () => ({ ok: false, status: 503, statusText: 'Service Unavailable' });
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'gk', geminiModel: 'm', geminiBaseUrl: 'https://x',
+      aiProvider: 'gemini',
+      geminiApiKey: 'gk',
+      geminiModel: 'm',
+      geminiBaseUrl: 'https://x',
     });
     await expect(provider.generate('hi')).rejects.toMatchObject({ code: 'SERVER_ERROR' });
   });
 
   it('returns empty string on a safety-blocked response (no candidates) — outputValidation then rejects it', async () => {
-    global.fetch = async () => ({ ok: true, status: 200, json: async () => ({ promptFeedback: { blockReason: 'SAFETY' } }) });
+    global.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ promptFeedback: { blockReason: 'SAFETY' } }),
+    });
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'gk', geminiModel: 'm', geminiBaseUrl: 'https://x',
+      aiProvider: 'gemini',
+      geminiApiKey: 'gk',
+      geminiModel: 'm',
+      geminiBaseUrl: 'https://x',
     });
     expect(await provider.generate('hi')).toBe('');
   });
@@ -86,10 +111,18 @@ describe('getProvider — gemini', () => {
     let capturedUrl;
     global.fetch = async (url) => {
       capturedUrl = url;
-      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ audioTranscription: { text: 't' } }] } }] }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ audioTranscription: { text: 't' } }] } }] }),
+      };
     };
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'gk', geminiModel: 'gemini-3.5-flash-lite', geminiTranscribeModel: 'gemini-3.5-transcribe', geminiBaseUrl: 'https://x',
+      aiProvider: 'gemini',
+      geminiApiKey: 'gk',
+      geminiModel: 'gemini-3.5-flash-lite',
+      geminiTranscribeModel: 'gemini-3.5-transcribe',
+      geminiBaseUrl: 'https://x',
     });
     await provider.transcribe(Buffer.from('audio'), 'meeting.webm');
     expect(capturedUrl).toContain('gemini-3.5-transcribe:generateContent');
@@ -98,20 +131,32 @@ describe('getProvider — gemini', () => {
 
   it('transcribe() reads the audioTranscription.text response shape (dedicated STT model)', async () => {
     global.fetch = async () => ({
-      ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ audioTranscription: { text: 'Alice: hello. Bob: hi.' } }] } }] }),
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ audioTranscription: { text: 'Alice: hello. Bob: hi.' } }] } }],
+      }),
     });
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'gk', geminiTranscribeModel: 'gemini-3.5-transcribe', geminiBaseUrl: 'https://x',
+      aiProvider: 'gemini',
+      geminiApiKey: 'gk',
+      geminiTranscribeModel: 'gemini-3.5-transcribe',
+      geminiBaseUrl: 'https://x',
     });
     expect(await provider.transcribe(Buffer.from('a'), 'x.wav')).toBe('Alice: hello. Bob: hi.');
   });
 
   it('transcribe() also accepts the plain parts[].text shape (fallback for a text model)', async () => {
     global.fetch = async () => ({
-      ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: 'plain transcript' }] } }] }),
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: 'plain transcript' }] } }] }),
     });
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'gk', geminiTranscribeModel: 'm', geminiBaseUrl: 'https://x',
+      aiProvider: 'gemini',
+      geminiApiKey: 'gk',
+      geminiTranscribeModel: 'm',
+      geminiBaseUrl: 'https://x',
     });
     expect(await provider.transcribe(Buffer.from('a'), 'x.wav')).toBe('plain transcript');
   });
@@ -120,10 +165,17 @@ describe('getProvider — gemini', () => {
     let capturedBody;
     global.fetch = async (url, opts) => {
       capturedBody = JSON.parse(opts.body);
-      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ audioTranscription: { text: 't' } }] } }] }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ audioTranscription: { text: 't' } }] } }] }),
+      };
     };
     const provider = getProvider({
-      aiProvider: 'gemini', geminiApiKey: 'gk', geminiTranscribeModel: 'm', geminiBaseUrl: 'https://x',
+      aiProvider: 'gemini',
+      geminiApiKey: 'gk',
+      geminiTranscribeModel: 'm',
+      geminiBaseUrl: 'https://x',
     });
     await provider.transcribe(Buffer.from('fake audio'), 'meeting.wav');
     const audioPart = capturedBody.contents[0].parts.find((p) => p.inlineData);
@@ -134,7 +186,9 @@ describe('getProvider — gemini', () => {
 
 describe('getProvider — groq, configured', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('calls Groq chat completions and returns the message content', async () => {
     let capturedBody;
@@ -194,7 +248,11 @@ describe('getProvider — groq, configured', () => {
       capturedBody = opts.body;
       return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
     };
-    const provider = getProvider({ aiProvider: 'groq', groqApiKey: 'super-secret-key', groqModel: 'llama-3.1-8b-instant' });
+    const provider = getProvider({
+      aiProvider: 'groq',
+      groqApiKey: 'super-secret-key',
+      groqModel: 'llama-3.1-8b-instant',
+    });
     await provider.generate('hi');
     expect(capturedHeaders.Authorization).toBe('Bearer super-secret-key');
     expect(capturedBody).not.toContain('super-secret-key');
@@ -215,7 +273,9 @@ describe('getProvider — groq, configured', () => {
 
 describe('getProvider — groq transcribe() (Meeting AI, Phase 14)', () => {
   const originalFetch = global.fetch;
-  afterEach(() => { global.fetch = originalFetch; });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   it('posts multipart form data to the Whisper endpoint and returns plain text', async () => {
     let capturedUrl;
@@ -259,7 +319,11 @@ describe('getProvider — groq transcribe() (Meeting AI, Phase 14)', () => {
 
 describe('getProvider — ollama transcribe() is unsupported', () => {
   it('throws a clear error rather than silently no-op-ing', async () => {
-    const provider = getProvider({ aiProvider: 'ollama', ollamaUrl: 'http://localhost:11434', ollamaModel: 'llama3.2:1b' });
+    const provider = getProvider({
+      aiProvider: 'ollama',
+      ollamaUrl: 'http://localhost:11434',
+      ollamaModel: 'llama3.2:1b',
+    });
     await expect(provider.transcribe(Buffer.from('audio'), 'a.webm')).rejects.toThrow(/not supported/);
   });
 });

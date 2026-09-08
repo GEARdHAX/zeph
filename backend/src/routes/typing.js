@@ -28,7 +28,9 @@ module.exports = async (req, res) => {
     const isMember = room.people.some((person) => person.toString() === req.user.id.toString());
     if (!isMember) return res.status(403).json({ error: true });
     const boundaryViolation = await roomHasBoundaryViolation({
-      room, callerID: req.user.id, callerLevel: req.user.level,
+      room,
+      callerID: req.user.id,
+      callerLevel: req.user.level,
     });
     if (boundaryViolation) return res.status(404).json({ error: true });
   }

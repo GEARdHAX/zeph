@@ -18,7 +18,10 @@ module.exports = async (req, res) => {
   const config = store.config;
   if (!aiTextEnabled(config)) {
     return res.status(503).json({
-      error: true, reason: REJECTION_REASONS.AI_DISABLED, message: 'AI features are not enabled on this server.', requestId,
+      error: true,
+      reason: REJECTION_REASONS.AI_DISABLED,
+      message: 'AI features are not enabled on this server.',
+      requestId,
     });
   }
 
@@ -29,7 +32,8 @@ module.exports = async (req, res) => {
     return res.status(404).json({ error: true, requestId });
   }
   if (!room) return res.status(404).json({ error: true, requestId });
-  if (!room.isGroup) return res.status(400).json({ error: true, message: 'Topic extraction is only available for groups.', requestId });
+  if (!room.isGroup)
+    return res.status(400).json({ error: true, message: 'Topic extraction is only available for groups.', requestId });
 
   const isMember = room.people.some((person) => person.toString() === req.user.id.toString());
   if (!isMember) return res.status(403).json({ error: true, requestId });
@@ -38,7 +42,12 @@ module.exports = async (req, res) => {
   const eligibility = await checkTopicEligibility(policy, roomID);
   if (!eligibility.eligible) {
     logEligibilityRejected({
-      requestId, feature: 'group_topic_extraction', scope: 'group', reason: eligibility.reason, minMessages: eligibility.minMessages, count: eligibility.count,
+      requestId,
+      feature: 'group_topic_extraction',
+      scope: 'group',
+      reason: eligibility.reason,
+      minMessages: eligibility.minMessages,
+      count: eligibility.count,
     });
     return res.status(422).json({
       error: true,
@@ -48,11 +57,13 @@ module.exports = async (req, res) => {
     });
   }
 
-  const messages = (await Message.find({ room: roomID, type: 'text' })
-    .sort({ _id: -1 })
-    .limit(200)
-    .populate({ path: 'author', select: 'firstName' })
-    .lean())
+  const messages = (
+    await Message.find({ room: roomID, type: 'text' })
+      .sort({ _id: -1 })
+      .limit(200)
+      .populate({ path: 'author', select: 'firstName' })
+      .lean()
+  )
     .reverse()
     .map((m) => ({ author: m.author ? m.author.firstName : 'Deleted User', content: m.content }));
 
@@ -71,5 +82,11 @@ module.exports = async (req, res) => {
   });
 
   if (!result.ok) return aiFailureResponse(res, result, requestId);
-  res.status(200).json({ topics: result.text.split(',').map((t) => t.trim()).filter(Boolean), requestId: result.requestId });
+  res.status(200).json({
+    topics: result.text
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean),
+    requestId: result.requestId,
+  });
 };

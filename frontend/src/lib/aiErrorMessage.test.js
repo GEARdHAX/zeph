@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { getAiErrorMessage, MESSAGES, formatComeBack } from './aiErrorMessage';
 
 describe('getAiErrorMessage', () => {
@@ -13,16 +11,23 @@ describe('getAiErrorMessage', () => {
 
   it('uses the backend meeting-eligibility message verbatim', () => {
     const err = {
-      response: { data: { reason: 'MEETING_TOO_SHORT', message: 'This meeting was too short to summarize. Minimum duration: 5 minutes.' } },
+      response: {
+        data: {
+          reason: 'MEETING_TOO_SHORT',
+          message: 'This meeting was too short to summarize. Minimum duration: 5 minutes.',
+        },
+      },
     };
     expect(getAiErrorMessage(err)).toContain('too short');
   });
 
   it('maps non-quota reason codes to their own distinct message', () => {
-    ['AI_DISABLED', 'PROVIDER_UNAVAILABLE', 'GENERATION_IN_PROGRESS', 'INVALID_OUTPUT', 'INPUT_TOO_LARGE'].forEach((reason) => {
-      const err = { response: { data: { reason } } };
-      expect(getAiErrorMessage(err)).toBe(MESSAGES[reason]);
-    });
+    ['AI_DISABLED', 'PROVIDER_UNAVAILABLE', 'GENERATION_IN_PROGRESS', 'INVALID_OUTPUT', 'INPUT_TOO_LARGE'].forEach(
+      (reason) => {
+        const err = { response: { data: { reason } } };
+        expect(getAiErrorMessage(err)).toBe(MESSAGES[reason]);
+      },
+    );
   });
 
   it('falls back to a backend-provided message for an unrecognized reason', () => {
@@ -50,7 +55,7 @@ describe('getAiErrorMessage — quota (429) messages include a concrete "come ba
   it('RATE_LIMITED with a short retryAfter -> "in about N seconds"', () => {
     const err = { response: { data: { reason: 'RATE_LIMITED', retryAfter: 37 } } };
     const msg = getAiErrorMessage(err);
-    expect(msg).toContain("using AI a bit fast");
+    expect(msg).toContain('using AI a bit fast');
     expect(msg).toMatch(/in about \d+ seconds/);
   });
 
@@ -58,7 +63,9 @@ describe('getAiErrorMessage — quota (429) messages include a concrete "come ba
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(3, 0, 0, 0);
-    const err = { response: { data: { reason: 'QUOTA_EXCEEDED', retryAfter: 60000, resetAt: tomorrow.toISOString() } } };
+    const err = {
+      response: { data: { reason: 'QUOTA_EXCEEDED', retryAfter: 60000, resetAt: tomorrow.toISOString() } },
+    };
     expect(getAiErrorMessage(err)).toContain('resets tomorrow');
   });
 

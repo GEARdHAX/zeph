@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, afterEach, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axios from 'axios';
@@ -59,10 +57,16 @@ vi.mock('./FileViewer', () => ({
 
 const IMAGE_MESSAGE = { _id: 'm1', type: 'image', content: 'shielded-1' };
 const FILE_MESSAGE = {
-  _id: 'm2', type: 'file', content: 'shielded-2', file: { name: 'report.pdf', size: 1024, type: 'application/pdf' },
+  _id: 'm2',
+  type: 'file',
+  content: 'shielded-2',
+  file: { name: 'report.pdf', size: 1024, type: 'application/pdf' },
 };
 const OTHER_FILE_MESSAGE = {
-  _id: 'm3', type: 'file', content: 'shielded-3', file: { name: 'notes.txt', size: 512, type: 'text/plain' },
+  _id: 'm3',
+  type: 'file',
+  content: 'shielded-3',
+  file: { name: 'notes.txt', size: 512, type: 'text/plain' },
 };
 
 beforeEach(() => {
@@ -78,33 +82,25 @@ afterEach(() => {
 
 describe('MediaViewerShell', () => {
   it('renders the ImageViewer for an image message', () => {
-    render(
-      <MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={vi.fn()} />,
-    );
+    render(<MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={vi.fn()} />);
     expect(screen.getByText(/ImageViewer:/)).toBeInTheDocument();
   });
 
   it('renders the PdfViewer for a PDF file message and shows its filename', () => {
-    render(
-      <MediaViewerShell messages={[FILE_MESSAGE]} initialMessage={FILE_MESSAGE} onClose={vi.fn()} />,
-    );
+    render(<MediaViewerShell messages={[FILE_MESSAGE]} initialMessage={FILE_MESSAGE} onClose={vi.fn()} />);
     expect(screen.getByText(/PdfViewer:/)).toBeInTheDocument();
     expect(screen.getByText('report.pdf')).toBeInTheDocument();
   });
 
   it('renders the FileViewer fallback for an unrecognized file type', () => {
-    render(
-      <MediaViewerShell messages={[OTHER_FILE_MESSAGE]} initialMessage={OTHER_FILE_MESSAGE} onClose={vi.fn()} />,
-    );
+    render(<MediaViewerShell messages={[OTHER_FILE_MESSAGE]} initialMessage={OTHER_FILE_MESSAGE} onClose={vi.fn()} />);
     expect(screen.getByText(/FileViewer:/)).toBeInTheDocument();
   });
 
   it('close button calls onClose', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    render(
-      <MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={onClose} />,
-    );
+    render(<MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={onClose} />);
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalled();
   });
@@ -112,9 +108,7 @@ describe('MediaViewerShell', () => {
   it('Escape calls onClose', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    render(
-      <MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={onClose} />,
-    );
+    render(<MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={onClose} />);
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
   });
@@ -151,9 +145,7 @@ describe('MediaViewerShell', () => {
 
   it('does not navigate past the last or before the first message', async () => {
     const user = userEvent.setup();
-    render(
-      <MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={vi.fn()} />,
-    );
+    render(<MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={vi.fn()} />);
     await user.keyboard('{ArrowRight}');
     expect(screen.getByText(/ImageViewer:/)).toBeInTheDocument();
     await user.keyboard('{ArrowLeft}');
@@ -171,9 +163,7 @@ describe('MediaViewerShell', () => {
 
   it('zoom in/out/reset/rotate controls do not crash the viewer for an image message', async () => {
     const user = userEvent.setup();
-    render(
-      <MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={vi.fn()} />,
-    );
+    render(<MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: 'Zoom out' }));
     await user.click(screen.getByRole('button', { name: 'Zoom out' }));
@@ -186,30 +176,20 @@ describe('MediaViewerShell', () => {
 
   it('Download button calls downloadFile with the existing authenticated file URL and filename', async () => {
     const user = userEvent.setup();
-    render(
-      <MediaViewerShell messages={[FILE_MESSAGE]} initialMessage={FILE_MESSAGE} onClose={vi.fn()} />,
-    );
+    render(<MediaViewerShell messages={[FILE_MESSAGE]} initialMessage={FILE_MESSAGE} onClose={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: 'Download' }));
 
-    expect(downloadFile).toHaveBeenCalledWith(
-      expect.stringContaining('/api/files/shielded-2'),
-      'report.pdf',
-    );
+    expect(downloadFile).toHaveBeenCalledWith(expect.stringContaining('/api/files/shielded-2'), 'report.pdf');
   });
 
   it('Download for an image falls back to a default filename', async () => {
     const user = userEvent.setup();
-    render(
-      <MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={vi.fn()} />,
-    );
+    render(<MediaViewerShell messages={[IMAGE_MESSAGE]} initialMessage={IMAGE_MESSAGE} onClose={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: 'Download' }));
 
-    expect(downloadFile).toHaveBeenCalledWith(
-      expect.stringContaining('/api/images/shielded-1/2048'),
-      'image.jpg',
-    );
+    expect(downloadFile).toHaveBeenCalledWith(expect.stringContaining('/api/images/shielded-1/2048'), 'image.jpg');
   });
 });
 
@@ -223,7 +203,11 @@ describe('MediaViewerShell — new-format (message.media) audio/video/image', ()
     _id: 'm4',
     type: 'file',
     media: {
-      _id: 'media-1', category: 'audio', originalName: 'song.mp3', size: 2048, mimeType: 'audio/mpeg',
+      _id: 'media-1',
+      category: 'audio',
+      originalName: 'song.mp3',
+      size: 2048,
+      mimeType: 'audio/mpeg',
     },
   };
 
@@ -233,10 +217,9 @@ describe('MediaViewerShell — new-format (message.media) audio/video/image', ()
       <MediaViewerShell messages={[AUDIO_MEDIA_MESSAGE]} initialMessage={AUDIO_MEDIA_MESSAGE} onClose={vi.fn()} />,
     );
 
-    await waitFor(() => expect(axios.get).toHaveBeenCalledWith(
-      expect.stringContaining('/api/media/media-1'),
-      { responseType: 'blob' },
-    ));
+    await waitFor(() =>
+      expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('/api/media/media-1'), { responseType: 'blob' }),
+    );
     expect(await screen.findByText('AudioViewer:blob:mock-media-url')).toBeInTheDocument();
   });
 
@@ -261,7 +244,12 @@ describe('MediaViewerShell — new-format (message.media) audio/video/image', ()
 
   it('the Download button is disabled until the authorized fetch resolves', async () => {
     let resolveFetch;
-    axios.get.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
+    axios.get.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
     render(
       <MediaViewerShell messages={[AUDIO_MEDIA_MESSAGE]} initialMessage={AUDIO_MEDIA_MESSAGE} onClose={vi.fn()} />,
     );
@@ -291,7 +279,11 @@ describe('MediaViewerShell — new-format (message.media) audio/video/image', ()
   // instead of falling back to the legacy path or an error state.
   it('falls back to the legacy file path when message.media is an unpopulated ObjectId string, not an object', () => {
     const message = {
-      _id: 'm5', type: 'file', content: 'shielded-legacy', file: { name: 'notes.txt', size: 512 }, media: '507f1f77bcf86cd799439011',
+      _id: 'm5',
+      type: 'file',
+      content: 'shielded-legacy',
+      file: { name: 'notes.txt', size: 512 },
+      media: '507f1f77bcf86cd799439011',
     };
     render(<MediaViewerShell messages={[message]} initialMessage={message} onClose={vi.fn()} />);
 

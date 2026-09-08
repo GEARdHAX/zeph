@@ -14,14 +14,10 @@ const Message = require('../models/Message');
 // whose id then silently blocks every re-enqueue for the 24h retention
 // window — the summary would never generate until enough new messages
 // changed the messageCount and thus the id.
-const TRANSIENT_REASONS = new Set([
-  'RATE_LIMITED', 'QUOTA_EXCEEDED', 'PROVIDER_UNAVAILABLE', 'GENERATION_IN_PROGRESS',
-]);
+const TRANSIENT_REASONS = new Set(['RATE_LIMITED', 'QUOTA_EXCEEDED', 'PROVIDER_UNAVAILABLE', 'GENERATION_IN_PROGRESS']);
 
 const processSummaryJob = async (job) => {
-  const {
-    roomId, userId, conversationType, requestId,
-  } = job.data;
+  const { roomId, userId, conversationType, requestId } = job.data;
   // job.timestamp is set by BullMQ at enqueue time — the gap to "now" is
   // real queue wait time (Phase 11), distinct from provider latency
   // (measured separately inside runGoverned).
@@ -29,13 +25,25 @@ const processSummaryJob = async (job) => {
   const currentMessageCount = await Message.countDocuments({ room: roomId, type: 'text' });
 
   const result = await generateAndPersistSummary({
-    roomId, userId, ip: 'queue', currentMessageCount, requestId, scope: conversationType,
+    roomId,
+    userId,
+    ip: 'queue',
+    currentMessageCount,
+    requestId,
+    scope: conversationType,
   });
 
   if (!result.ok) {
-    logger.info({
-      requestId, roomId, reason: result.reason, queueWaitMs, attemptsMade: job.attemptsMade,
-    }, 'ai_worker_summary_unavailable');
+    logger.info(
+      {
+        requestId,
+        roomId,
+        reason: result.reason,
+        queueWaitMs,
+        attemptsMade: job.attemptsMade,
+      },
+      'ai_worker_summary_unavailable',
+    );
     if (TRANSIENT_REASONS.has(result.reason)) {
       // Free the dedupe id so the user's next summarize request enqueues a
       // fresh job instead of being silently swallowed as a "duplicate".
@@ -43,9 +51,15 @@ const processSummaryJob = async (job) => {
     }
     return;
   }
-  logger.info({
-    requestId, roomId, queueWaitMs, attemptsMade: job.attemptsMade,
-  }, 'ai_worker_summary_generated');
+  logger.info(
+    {
+      requestId,
+      roomId,
+      queueWaitMs,
+      attemptsMade: job.attemptsMade,
+    },
+    'ai_worker_summary_generated',
+  );
 };
 
 // concurrency:2 — same reasoning as securityAiWorker.js: the provider call
@@ -58,9 +72,17 @@ const startAiWorker = () => {
     return null;
   }
   const worker = new Worker(QUEUE_NAME, processSummaryJob, { connection, concurrency: 2 });
-  worker.on('failed', (job, err) => logger.error({
-    err, requestId: job?.data?.requestId, roomId: job?.data?.roomId, attemptsMade: job?.attemptsMade,
-  }, 'ai_worker_job_failed'));
+  worker.on('failed', (job, err) =>
+    logger.error(
+      {
+        err,
+        requestId: job?.data?.requestId,
+        roomId: job?.data?.roomId,
+        attemptsMade: job?.attemptsMade,
+      },
+      'ai_worker_job_failed',
+    ),
+  );
   logger.info('Zeph AI worker started');
   return worker;
 };

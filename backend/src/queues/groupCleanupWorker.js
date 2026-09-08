@@ -27,11 +27,17 @@ const processGroupCleanup = async (job) => {
   const mediaIds = messages.map((m) => m.media).filter(Boolean);
 
   if (mediaIds.length) {
-    const mediaDocs = await Media.find({ _id: { $in: mediaIds } }).select('storageKey thumbnailKey').lean();
-    await Promise.all(mediaDocs.flatMap((m) => [
-      m.storageKey ? storage.deleteObject(m.storageKey) : null,
-      m.thumbnailKey ? storage.deleteObject(m.thumbnailKey) : null,
-    ].filter(Boolean)));
+    const mediaDocs = await Media.find({ _id: { $in: mediaIds } })
+      .select('storageKey thumbnailKey')
+      .lean();
+    await Promise.all(
+      mediaDocs.flatMap((m) =>
+        [
+          m.storageKey ? storage.deleteObject(m.storageKey) : null,
+          m.thumbnailKey ? storage.deleteObject(m.thumbnailKey) : null,
+        ].filter(Boolean),
+      ),
+    );
     await Media.deleteMany({ _id: { $in: mediaIds } });
   }
 

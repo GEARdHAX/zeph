@@ -20,13 +20,21 @@ describe('setupRedisAdapter', () => {
   });
 
   it('is a no-op and returns false when redisUrl is an empty string', async () => {
-    const fakeIo = { adapter: () => { throw new Error('should not be called'); } };
+    const fakeIo = {
+      adapter: () => {
+        throw new Error('should not be called');
+      },
+    };
     const result = await setupRedisAdapter(fakeIo, '');
     expect(result).toBe(false);
   });
 
   it('returns false (never throws) when the Redis connection fails', async () => {
-    const fakeIo = { adapter: () => { throw new Error('should not be called — connection never succeeded'); } };
+    const fakeIo = {
+      adapter: () => {
+        throw new Error('should not be called — connection never succeeded');
+      },
+    };
 
     // Port 1 is reserved/unroutable — ioredis fails fast rather than hanging
     // the test suite: retryStrategy:()=>null (set inside the module) bounds

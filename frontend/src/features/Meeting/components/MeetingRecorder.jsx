@@ -3,9 +3,7 @@ import { useGlobal } from 'reactn';
 import { Mic, Square, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import uploadMedia from '../../../actions/uploadMedia';
 import summarizeMeeting from '../../../actions/summarizeMeeting';
 import getMeetingSummary from '../../../actions/getMeetingSummary';
@@ -34,12 +32,15 @@ function MeetingRecorder({ meetingId }) {
   const abortRef = useRef(null);
   const mountedRef = useRef(true);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    clearTimeout(pollTimeoutRef.current);
-    abortRef.current?.abort();
-    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
-  }, []);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      clearTimeout(pollTimeoutRef.current);
+      abortRef.current?.abort();
+      if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+    },
+    [],
+  );
 
   const startRecording = () => {
     if (!audioStream) {
@@ -48,7 +49,9 @@ function MeetingRecorder({ meetingId }) {
     }
     chunksRef.current = [];
     const recorder = new MediaRecorder(audioStream);
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
     recorder.onstop = () => handleRecordingComplete();
     recorder.start();
     mediaRecorderRef.current = recorder;
@@ -137,7 +140,15 @@ function MeetingRecorder({ meetingId }) {
         )}
       </Button>
 
-      <Dialog open={!!summary || !!error} onOpenChange={(next) => { if (!next) { setSummary(null); setError(null); } }}>
+      <Dialog
+        open={!!summary || !!error}
+        onOpenChange={(next) => {
+          if (!next) {
+            setSummary(null);
+            setError(null);
+          }
+        }}
+      >
         <DialogContent className="rounded-2xl border border-border bg-card">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

@@ -11,7 +11,14 @@ const { isPrivileged } = require('../../authorization/policy');
 // ("Recent Network Alerts, Top Suspicious Destinations, Threat Intel
 // Matches, Network Anomalies, Sensor Status" — sensor status is already
 // covered by GET /api/security/sensor/status from Phase 4).
-const ALERT_TYPES = ['PORT_SCAN_ANOMALY', 'HOST_SCAN_ANOMALY', 'POSSIBLE_BEACONING', 'POSSIBLE_DATA_EXFILTRATION', 'THREAT_INTEL_NETWORK_MATCH', 'DNS_ANOMALY'];
+const ALERT_TYPES = [
+  'PORT_SCAN_ANOMALY',
+  'HOST_SCAN_ANOMALY',
+  'POSSIBLE_BEACONING',
+  'POSSIBLE_DATA_EXFILTRATION',
+  'THREAT_INTEL_NETWORK_MATCH',
+  'DNS_ANOMALY',
+];
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const RECENT_ALERTS_LIMIT = 30;
 const TOP_DESTINATIONS_LIMIT = 10;
@@ -38,7 +45,9 @@ module.exports = async (req, res) => {
     SecurityEvent.aggregate([
       {
         $match: {
-          type: { $in: ALERT_TYPES }, timestamp: { $gte: since }, 'metadata.destinationIp': { $exists: true, $ne: null },
+          type: { $in: ALERT_TYPES },
+          timestamp: { $gte: since },
+          'metadata.destinationIp': { $exists: true, $ne: null },
         },
       },
       { $group: { _id: '$metadata.destinationIp', count: { $sum: 1 }, lastSeen: { $max: '$timestamp' } } },
@@ -51,6 +60,10 @@ module.exports = async (req, res) => {
     windowMs: RECENT_WINDOW_MS,
     recentAlerts,
     countsByType: Object.fromEntries(countsByType.map((c) => [c._id, c.count])),
-    topSuspiciousDestinations: topDestinations.map((d) => ({ destinationIp: d._id, count: d.count, lastSeen: d.lastSeen })),
+    topSuspiciousDestinations: topDestinations.map((d) => ({
+      destinationIp: d._id,
+      count: d.count,
+      lastSeen: d.lastSeen,
+    })),
   });
 };

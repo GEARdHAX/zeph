@@ -25,11 +25,9 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: true, reason: 'bio_too_long', maxWords: MAX_WORDS, maxChars: MAX_CHARS });
   }
 
-  const updated = await User.findOneAndUpdate(
-    { _id: req.user.id },
-    { $set: { bio: raw } },
-    { new: true },
-  ).select('-email -password -friends -__v -vaultPinHash');
+  const updated = await User.findOneAndUpdate({ _id: req.user.id }, { $set: { bio: raw } }, { new: true }).select(
+    '-email -password -friends -__v -vaultPinHash',
+  );
 
   await invalidateProfileCache(updated.usernameNormalized);
 

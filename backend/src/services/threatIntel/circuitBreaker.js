@@ -60,7 +60,10 @@ const buildCircuitBreaker = ({ failureThreshold = 5, cooldownMs = 30000 } = {}) 
   };
 
   return {
-    canAttempt, recordSuccess, recordFailure, getState: () => state,
+    canAttempt,
+    recordSuccess,
+    recordFailure,
+    getState: () => state,
   };
 };
 

@@ -7,7 +7,10 @@
 // so callers work with the spec's own CRITICAL/HIGH/MEDIUM/LOW vocabulary
 // and never need to know BullMQ's inverted numeric scale.
 const PRIORITY_VALUES = Object.freeze({
-  CRITICAL: 1, HIGH: 2, MEDIUM: 3, LOW: 4,
+  CRITICAL: 1,
+  HIGH: 2,
+  MEDIUM: 3,
+  LOW: 4,
 });
 
 // Returns null when the incident is NOT worth an AI call at all (spec's

@@ -24,9 +24,7 @@ const isTableSeparator = (line) => {
 // Helper to parse pipe-separated table row into trimmed cell strings
 const parseTableRow = (line) => {
   const trimmed = line.trim();
-  const inner = trimmed.startsWith('|') && trimmed.endsWith('|')
-    ? trimmed.slice(1, -1)
-    : trimmed;
+  const inner = trimmed.startsWith('|') && trimmed.endsWith('|') ? trimmed.slice(1, -1) : trimmed;
   return inner.split('|').map((cell) => cell.trim());
 };
 
@@ -174,12 +172,12 @@ export function parseMessage(text) {
       const nextTrimmed = nextLine.trim();
       if (!nextTrimmed) break;
       if (
-        nextTrimmed.startsWith('```')
-        || /^(?:[-*_]\s*){3,}$/.test(nextTrimmed)
-        || /^(#{1,4})\s+/.test(nextTrimmed)
-        || nextTrimmed.startsWith('>')
-        || (nextTrimmed.startsWith('|') && nextTrimmed.endsWith('|'))
-        || /^(\s*)([-*+]|\d+\.)\s+/.test(nextLine)
+        nextTrimmed.startsWith('```') ||
+        /^(?:[-*_]\s*){3,}$/.test(nextTrimmed) ||
+        /^(#{1,4})\s+/.test(nextTrimmed) ||
+        nextTrimmed.startsWith('>') ||
+        (nextTrimmed.startsWith('|') && nextTrimmed.endsWith('|')) ||
+        /^(\s*)([-*+]|\d+\.)\s+/.test(nextLine)
       ) {
         break;
       }

@@ -29,9 +29,12 @@ module.exports = async (req, res) => {
 
   room.people
     .filter((personId) => personId.toString() !== actorId.toString())
-    .forEach((personId) => forceLeaveGroupRoom(personId.toString(), room._id.toString(), {
-      reason: 'deleted', groupName: room.title,
-    }));
+    .forEach((personId) =>
+      forceLeaveGroupRoom(personId.toString(), room._id.toString(), {
+        reason: 'deleted',
+        groupName: room.title,
+      }),
+    );
   broadcastToGroup(room.people, 'group:updated', { groupId: room._id, disabled: true }, { excludeUserId: actorId });
 
   logger.info({ groupId: room._id, ownerId: actorId }, 'group_delete_requested');

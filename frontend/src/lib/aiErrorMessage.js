@@ -29,7 +29,7 @@ const formatComeBack = (retryAfter, resetAt) => {
     return `Try again in about ${Math.ceil(seconds / 60)} minutes.`;
   }
   // Longer wait — use the reset timestamp if we have it.
-  const reset = resetAt ? new Date(resetAt) : (seconds !== null ? new Date(Date.now() + seconds * 1000) : null);
+  const reset = resetAt ? new Date(resetAt) : seconds !== null ? new Date(Date.now() + seconds * 1000) : null;
   if (!reset || Number.isNaN(reset.getTime())) return 'Please try again later.';
   const now = new Date();
   const tomorrowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -44,8 +44,11 @@ const formatComeBack = (retryAfter, resetAt) => {
 // QUOTA_EXCEEDED) get a base sentence PLUS a concrete "come back in X" built
 // from the 429 body's retryAfter/resetAt.
 const ELIGIBILITY_REASONS = new Set([
-  'INSUFFICIENT_CONTEXT', 'MEETING_TOO_SHORT', 'INSUFFICIENT_PARTICIPANTS',
-  'INSUFFICIENT_TRANSCRIPT', 'MEETING_NOT_ENDED',
+  'INSUFFICIENT_CONTEXT',
+  'MEETING_TOO_SHORT',
+  'INSUFFICIENT_PARTICIPANTS',
+  'INSUFFICIENT_TRANSCRIPT',
+  'MEETING_NOT_ENDED',
 ]);
 const QUOTA_REASONS = new Set(['RATE_LIMITED', 'QUOTA_EXCEEDED']);
 

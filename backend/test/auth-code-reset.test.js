@@ -111,11 +111,12 @@ describe('POST /api/auth/change — consume a reset code', () => {
     const user = await createUser({ email: 'race@example.com' });
     const code = await requestCode(user.email);
 
-    const submit = () => request(app)
-      .post('/api/auth/change')
-      .field('email', user.email)
-      .field('code', code)
-      .field('password', 'racedpassword123');
+    const submit = () =>
+      request(app)
+        .post('/api/auth/change')
+        .field('email', user.email)
+        .field('code', code)
+        .field('password', 'racedpassword123');
 
     const [a, b] = await Promise.all([submit(), submit()]);
     const statuses = [a.status, b.status].sort();
@@ -134,10 +135,7 @@ describe('POST /api/auth/change — consume a reset code', () => {
       .field('password', 'newpassword123');
 
     expect(res.status).toBe(404);
-    const stillOld = await argon2.verify(
-      (await User.findById(user._id)).password,
-      'oldpassword123',
-    );
+    const stillOld = await argon2.verify((await User.findById(user._id)).password, 'oldpassword123');
     expect(stillOld).toBe(true);
   });
 
@@ -154,10 +152,16 @@ describe('POST /api/auth/change — consume a reset code', () => {
       .field('password', 'brandnewpassword123');
     expect(res.status).toBe(200);
 
-    const oldLogin = await request(app).post('/api/login').field('email', user.email).field('password', 'oldpassword123');
+    const oldLogin = await request(app)
+      .post('/api/login')
+      .field('email', user.email)
+      .field('password', 'oldpassword123');
     expect(oldLogin.status).toBe(400);
 
-    const newLogin = await request(app).post('/api/login').field('email', user.email).field('password', 'brandnewpassword123');
+    const newLogin = await request(app)
+      .post('/api/login')
+      .field('email', user.email)
+      .field('password', 'brandnewpassword123');
     expect(newLogin.status).toBe(200);
 
     const revokedSession = await Session.findById(session._id);

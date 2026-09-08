@@ -1,9 +1,7 @@
 import IO from 'socket.io-client';
 import { setGlobal, getGlobal } from 'reactn';
 import { toast } from 'react-toastify';
-import {
-  PhoneIncoming, Users, ShieldOff, UserPlus, UserCheck,
-} from 'lucide-react';
+import { PhoneIncoming, Users, ShieldOff, UserPlus, UserCheck } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Config from '../config';
 import Actions from '../constants/Actions';
@@ -34,7 +32,8 @@ const MEDIA_LABEL = {
 
 const PREVIEW_MAX_LENGTH = 80;
 
-const truncate = (text) => (text.length > PREVIEW_MAX_LENGTH ? `${text.slice(0, PREVIEW_MAX_LENGTH).trimEnd()}…` : text);
+const truncate = (text) =>
+  text.length > PREVIEW_MAX_LENGTH ? `${text.slice(0, PREVIEW_MAX_LENGTH).trimEnd()}…` : text;
 
 // Exported for unit testing — pure function, no socket/store coupling.
 export const previewText = (message) => {
@@ -67,7 +66,7 @@ export function NewMessageToast({ room, message }) {
       </Avatar>
       <div className="min-w-0">
         <div className="truncate text-xs font-semibold text-foreground">
-          {room.isGroup ? (room.title || 'Group') : `${author.firstName || ''} ${author.lastName || ''}`.trim()}
+          {room.isGroup ? room.title || 'Group' : `${author.firstName || ''} ${author.lastName || ''}`.trim()}
         </div>
         <div className="truncate text-xs text-muted-foreground">{previewText(message)}</div>
       </div>
@@ -99,7 +98,9 @@ export function IncomingCallToast({ meetingID, caller, added }) {
       </Avatar>
       <div className="min-w-0">
         <div className="truncate text-xs font-semibold text-foreground">{name || 'Incoming call'}</div>
-        <div className="truncate text-xs text-muted-foreground">{added ? 'Adding you to a meeting…' : 'Incoming call…'}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {added ? 'Adding you to a meeting…' : 'Incoming call…'}
+        </div>
       </div>
     </button>
   );
@@ -144,7 +145,8 @@ export function AddedToGroupToast({ room }) {
 // elsewhere in the app (or on that same page) went unnoticed until they
 // happened to revisit it. See friend-requests/send.js.
 export function FriendRequestReceivedToast({ requester }) {
-  const fullName = `${requester?.firstName || ''} ${requester?.lastName || ''}`.trim() || requester?.username || 'Someone';
+  const fullName =
+    `${requester?.firstName || ''} ${requester?.lastName || ''}`.trim() || requester?.username || 'Someone';
   return (
     <button
       type="button"
@@ -209,9 +211,7 @@ export function FriendRequestAcceptedToast({ accepter }) {
 // AddedToGroupToast this doesn't need a getRooms() round trip first: the
 // room is about to disappear from the list, not appear in it. Clicking
 // navigates home rather than into the now-inaccessible room.
-export function RemovedFromGroupToast({
-  groupName, reason, actorName,
-}) {
+export function RemovedFromGroupToast({ groupName, reason, actorName }) {
   const actionLabel = reason === 'banned' ? 'banned from' : 'removed from';
   return (
     <button
@@ -366,13 +366,17 @@ const initIO = (token) => (dispatch) => {
   // from here).
   io.on('friend-request:received', (data) => {
     if (!getGlobal().inCall) {
-      toast(<FriendRequestReceivedToast requester={data.requester} />, { toastId: `friend-request-${data.relationship._id}` });
+      toast(<FriendRequestReceivedToast requester={data.requester} />, {
+        toastId: `friend-request-${data.relationship._id}`,
+      });
     }
   });
 
   io.on('friend-request:accepted', (data) => {
     if (!getGlobal().inCall) {
-      toast(<FriendRequestAcceptedToast accepter={data.accepter} />, { toastId: `friend-accepted-${data.relationship._id}` });
+      toast(<FriendRequestAcceptedToast accepter={data.accepter} />, {
+        toastId: `friend-accepted-${data.relationship._id}`,
+      });
     }
   });
 
@@ -397,13 +401,14 @@ const initIO = (token) => (dispatch) => {
   // personal room, so every other device/tab of that same user updates too —
   // both land on this one listener regardless of which case it was.
   io.on('message-deleted', (data) => {
-    const {
-      roomID, messageID, forEveryone, deletedAt,
-    } = data;
+    const { roomID, messageID, forEveryone, deletedAt } = data;
     const currentRoom = store.getState().io.room;
     if (currentRoom && currentRoom._id === roomID) {
       store.dispatch({
-        type: Actions.MESSAGE_DELETE, messageID, forEveryone, deletedAt,
+        type: Actions.MESSAGE_DELETE,
+        messageID,
+        forEveryone,
+        deletedAt,
       });
     }
   });
@@ -510,10 +515,9 @@ const initIO = (token) => (dispatch) => {
         document.body.appendChild(audio);
 
         if (!getGlobal().inCall) {
-          toast(
-            <RemovedFromGroupToast groupName={data.groupName} reason={data.reason} actorName={data.actorName} />,
-            { toastId: `group-removed-${data.groupId}` },
-          );
+          toast(<RemovedFromGroupToast groupName={data.groupName} reason={data.reason} actorName={data.actorName} />, {
+            toastId: `group-removed-${data.groupId}`,
+          });
         }
       }
     }
@@ -565,10 +569,9 @@ const initIO = (token) => (dispatch) => {
     const currentMeetingID = getGlobal().meeting?._id;
     if (currentMeetingID === data.meetingID) return;
 
-    toast(
-      <IncomingCallToast meetingID={data.meetingID} caller={data.counterpart} added={data.added} />,
-      { toastId: `call-${data.meetingID}` },
-    );
+    toast(<IncomingCallToast meetingID={data.meetingID} caller={data.counterpart} added={data.added} />, {
+      toastId: `call-${data.meetingID}`,
+    });
   });
 
   io.on('close', (data) => {

@@ -49,23 +49,18 @@ module.exports = async (req, res, next) => {
   // filter below; a 1:1 DM's visibility is unaffected since this only adds
   // group ids.
   const formerGroupIds = await GroupMember.find({
-    user: req.user.id, status: { $in: ['REMOVED', 'BANNED', 'LEFT'] },
+    user: req.user.id,
+    status: { $in: ['REMOVED', 'BANNED', 'LEFT'] },
   }).distinct('group');
 
   Room.find({
     _id: { $nin: [...excludedIds, ...boundaryExcludedIds] },
     $and: [
       {
-        $or: [
-          { people: { $in: [req.user.id] } },
-          { _id: { $in: formerGroupIds }, isGroup: true },
-        ],
+        $or: [{ people: { $in: [req.user.id] } }, { _id: { $in: formerGroupIds }, isGroup: true }],
       },
       {
-        $or: [
-          { lastMessage: { $ne: null } },
-          { isGroup: true },
-        ],
+        $or: [{ lastMessage: { $ne: null } }, { isGroup: true }],
       },
     ],
   })
@@ -92,8 +87,12 @@ module.exports = async (req, res, next) => {
       // that same message is correctly hidden once the conversation is
       // actually opened — a confusing mismatch between the two views.
       const states = await ConversationUserState.find({
-        user: req.user.id, conversation: { $in: rooms.map((r) => r._id) }, deletedBefore: { $ne: null },
-      }).select('conversation deletedBefore').lean();
+        user: req.user.id,
+        conversation: { $in: rooms.map((r) => r._id) },
+        deletedBefore: { $ne: null },
+      })
+        .select('conversation deletedBefore')
+        .lean();
       const cutoffByRoomId = new Map(states.map((s) => [s.conversation.toString(), s.deletedBefore]));
 
       // Built as plain objects, NOT reassigned onto each room's `people`
@@ -103,20 +102,22 @@ module.exports = async (req, res, next) => {
       // serialization (verified empirically: `people` came back over the
       // wire as raw id strings despite this map running first, breaking
       // every DM row in the sidebar). See DECISIONS.md D-036.
-      const sanitizedRooms = await Promise.all(rooms.map(async (room) => {
-        const sanitizedPeople = room.people.map((person) => {
-          const obj = person.toObject ? person.toObject() : person;
-          delete obj.level;
-          return obj;
-        });
-        const cutoff = cutoffByRoomId.get(room._id.toString());
-        const lastMessageHiddenByCutoff = cutoff && room.lastMessage && new Date(room.lastMessage.date) <= cutoff;
-        return {
-          ...room.toObject(),
-          ...(lastMessageHiddenByCutoff ? { lastMessage: null, lastAuthor: null } : {}),
-          people: await attachBlockState(sanitizedPeople, req.user.id),
-        };
-      }));
+      const sanitizedRooms = await Promise.all(
+        rooms.map(async (room) => {
+          const sanitizedPeople = room.people.map((person) => {
+            const obj = person.toObject ? person.toObject() : person;
+            delete obj.level;
+            return obj;
+          });
+          const cutoff = cutoffByRoomId.get(room._id.toString());
+          const lastMessageHiddenByCutoff = cutoff && room.lastMessage && new Date(room.lastMessage.date) <= cutoff;
+          return {
+            ...room.toObject(),
+            ...(lastMessageHiddenByCutoff ? { lastMessage: null, lastAuthor: null } : {}),
+            people: await attachBlockState(sanitizedPeople, req.user.id),
+          };
+        }),
+      );
       res.status(200).json({ limit, rooms: sanitizedRooms });
     });
 };

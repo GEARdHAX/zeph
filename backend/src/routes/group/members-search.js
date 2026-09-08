@@ -12,9 +12,7 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // "return every member" call, and never a search across other groups'
 // membership.
 module.exports = async (req, res) => {
-  let {
-    id, search, limit,
-  } = req.fields;
+  let { id, search, limit } = req.fields;
 
   limit = Number(limit) || DEFAULT_LIMIT;
   limit = Math.min(Math.max(limit, 1), MAX_LIMIT);
@@ -38,12 +36,19 @@ module.exports = async (req, res) => {
   const members = await GroupMember.find({ group: room._id, active: true, user: { $in: matchingUserIds } })
     .sort({ _id: -1 })
     .limit(limit)
-    .populate({ path: 'user', select: '-email -password -friends -__v -level -vaultPinHash', populate: [{ path: 'picture' }] })
+    .populate({
+      path: 'user',
+      select: '-email -password -friends -__v -level -vaultPinHash',
+      populate: [{ path: 'picture' }],
+    })
     .lean();
 
   res.status(200).json({
     members: members.map((m) => ({
-      _id: m._id, user: m.user, role: m.role, joinedAt: m.joinedAt,
+      _id: m._id,
+      user: m.user,
+      role: m.role,
+      joinedAt: m.joinedAt,
     })),
     limit,
   });

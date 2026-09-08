@@ -134,7 +134,8 @@ const computeRiskFactors = async ({ userId, session, ip }) => {
       // spec section 25's "prevent AI risk amplification").
       if (cachedAiResult && cachedAiResult.anomalous && cachedAiResult.confidence >= 70) {
         addFactor('AI_AUTH_ANOMALY', RISK_WEIGHTS.AI_AUTH_ANOMALY, {
-          confidence: cachedAiResult.confidence, analysisId: cachedAiResult.analysisId,
+          confidence: cachedAiResult.confidence,
+          analysisId: cachedAiResult.analysisId,
         });
       }
     } catch (err) {
@@ -161,7 +162,8 @@ const computeRiskFactors = async ({ userId, session, ip }) => {
       const threatResult = await lookup(ip, { type: 'IP', priority: 'LOW' });
       if (threatResult.malicious) {
         addFactor('MALICIOUS_IP', RISK_WEIGHTS.MALICIOUS_IP, {
-          confidence: threatResult.confidence, source: threatResult.source,
+          confidence: threatResult.confidence,
+          source: threatResult.source,
         });
       }
     } catch (err) {

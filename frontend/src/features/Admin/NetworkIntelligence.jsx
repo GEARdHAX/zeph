@@ -44,7 +44,9 @@ function NetworkIntelligence() {
             <Network className="h-4 w-4 text-primary" />
             Network Intelligence
           </h1>
-          <p className="text-xs text-muted-foreground">Flow-level anomalies and threat-intel matches — metadata only, no packet payloads</p>
+          <p className="text-xs text-muted-foreground">
+            Flow-level anomalies and threat-intel matches — metadata only, no packet payloads
+          </p>
         </div>
       </div>
 
@@ -52,7 +54,9 @@ function NetworkIntelligence() {
         {loading && <div className="py-10 text-center text-xs text-muted-foreground">Loading…</div>}
 
         {!loading && !summary && (
-          <div className="py-10 text-center text-xs text-muted-foreground">Unable to load network intelligence summary.</div>
+          <div className="py-10 text-center text-xs text-muted-foreground">
+            Unable to load network intelligence summary.
+          </div>
         )}
 
         {!loading && summary && (
@@ -60,7 +64,9 @@ function NetworkIntelligence() {
             {/* Counts by type */}
             <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border/70 bg-card/40 p-4 shadow-sm backdrop-blur-sm sm:grid-cols-3">
               {Object.keys(summary.countsByType).length === 0 && (
-                <div className="col-span-full text-xs text-muted-foreground">No network anomalies in the last 24 hours.</div>
+                <div className="col-span-full text-xs text-muted-foreground">
+                  No network anomalies in the last 24 hours.
+                </div>
               )}
               {Object.entries(summary.countsByType).map(([type, count]) => (
                 <div key={type}>
@@ -72,7 +78,9 @@ function NetworkIntelligence() {
 
             {/* Top suspicious destinations */}
             <div>
-              <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Top Suspicious Destinations</h2>
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Top Suspicious Destinations
+              </h2>
               <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/40 shadow-sm backdrop-blur-sm">
                 <table className="w-full text-left text-xs">
                   <thead>
@@ -84,13 +92,19 @@ function NetworkIntelligence() {
                   </thead>
                   <tbody>
                     {summary.topSuspiciousDestinations.length === 0 && (
-                      <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">No suspicious destinations.</td></tr>
+                      <tr>
+                        <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
+                          No suspicious destinations.
+                        </td>
+                      </tr>
                     )}
                     {summary.topSuspiciousDestinations.map((d) => (
                       <tr key={d.destinationIp} className="border-b border-border/40">
                         <td className="px-4 py-2.5 font-semibold text-foreground">{d.destinationIp}</td>
                         <td className="px-4 py-2.5 text-muted-foreground">{d.count}</td>
-                        <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{new Date(d.lastSeen).toLocaleString()}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
+                          {new Date(d.lastSeen).toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -100,7 +114,9 @@ function NetworkIntelligence() {
 
             {/* Recent alerts */}
             <div>
-              <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Recent Network Alerts</h2>
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Recent Network Alerts
+              </h2>
               <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/40 shadow-sm backdrop-blur-sm">
                 <table className="w-full text-left text-xs">
                   <thead>
@@ -113,14 +129,22 @@ function NetworkIntelligence() {
                   </thead>
                   <tbody>
                     {summary.recentAlerts.length === 0 && (
-                      <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">No recent alerts.</td></tr>
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                          No recent alerts.
+                        </td>
+                      </tr>
                     )}
                     {summary.recentAlerts.map((event) => (
                       <tr key={event.eventId} className="border-b border-border/40">
-                        <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{new Date(event.timestamp).toLocaleString()}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
+                          {new Date(event.timestamp).toLocaleString()}
+                        </td>
                         <td className="px-4 py-2.5 font-semibold text-foreground">{event.type}</td>
                         <td className="px-4 py-2.5">
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${SEVERITY_CLASSES[event.severity] || SEVERITY_CLASSES.low}`}>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${SEVERITY_CLASSES[event.severity] || SEVERITY_CLASSES.low}`}
+                          >
                             {event.severity}
                           </span>
                         </td>

@@ -2,25 +2,52 @@ const mediaPolicy = require('../src/mediaPolicy');
 
 describe('mediaPolicy.categorizeFile', () => {
   it.each([
-    ['.jpg', 'image'], ['.jpeg', 'image'], ['.png', 'image'], ['.webp', 'image'], ['.gif', 'image'],
-    ['.mp4', 'video'], ['.webm', 'video'], ['.mov', 'video'],
-    ['.mp3', 'audio'], ['.wav', 'audio'], ['.m4a', 'audio'], ['.ogg', 'audio'],
+    ['.jpg', 'image'],
+    ['.jpeg', 'image'],
+    ['.png', 'image'],
+    ['.webp', 'image'],
+    ['.gif', 'image'],
+    ['.mp4', 'video'],
+    ['.webm', 'video'],
+    ['.mov', 'video'],
+    ['.mp3', 'audio'],
+    ['.wav', 'audio'],
+    ['.m4a', 'audio'],
+    ['.ogg', 'audio'],
     ['.pdf', 'pdf'],
-    ['.doc', 'document'], ['.docx', 'document'], ['.xls', 'document'], ['.xlsx', 'document'],
-    ['.csv', 'document'], ['.ppt', 'document'], ['.pptx', 'document'], ['.txt', 'document'],
-    ['.rtf', 'document'], ['.odt', 'document'], ['.ods', 'document'], ['.odp', 'document'],
-    ['.zip', 'archive'], ['.7z', 'archive'], ['.rar', 'archive'], ['.tar', 'archive'], ['.gz', 'archive'],
-    ['.json', 'text'], ['.html', 'text'], ['.js', 'text'], ['.py', 'text'], ['.md', 'text'],
+    ['.doc', 'document'],
+    ['.docx', 'document'],
+    ['.xls', 'document'],
+    ['.xlsx', 'document'],
+    ['.csv', 'document'],
+    ['.ppt', 'document'],
+    ['.pptx', 'document'],
+    ['.txt', 'document'],
+    ['.rtf', 'document'],
+    ['.odt', 'document'],
+    ['.ods', 'document'],
+    ['.odp', 'document'],
+    ['.zip', 'archive'],
+    ['.7z', 'archive'],
+    ['.rar', 'archive'],
+    ['.tar', 'archive'],
+    ['.gz', 'archive'],
+    ['.json', 'text'],
+    ['.html', 'text'],
+    ['.js', 'text'],
+    ['.py', 'text'],
+    ['.md', 'text'],
   ])('categorizes %s as %s', (ext, expected) => {
     expect(mediaPolicy.categorizeFile(ext)).toBe(expected);
   });
 
-  it.each([
-    '.exe', '.dll', '.bat', '.cmd', '.ps1', '.sh', '.msi', '.com', '.scr', '.jar', '.vbs', '.app',
-  ])('blocks %s regardless of case', (ext) => {
-    expect(mediaPolicy.categorizeFile(ext)).toBeNull();
-    expect(mediaPolicy.categorizeFile(ext.toUpperCase())).toBeNull();
-  });
+  it.each(['.exe', '.dll', '.bat', '.cmd', '.ps1', '.sh', '.msi', '.com', '.scr', '.jar', '.vbs', '.app'])(
+    'blocks %s regardless of case',
+    (ext) => {
+      expect(mediaPolicy.categorizeFile(ext)).toBeNull();
+      expect(mediaPolicy.categorizeFile(ext.toUpperCase())).toBeNull();
+    },
+  );
 
   it('returns null for an unrecognized extension', () => {
     expect(mediaPolicy.categorizeFile('.xyz123')).toBeNull();

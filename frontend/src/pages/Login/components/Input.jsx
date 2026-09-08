@@ -1,6 +1,4 @@
-import {
-  User, Lock, Mail, Pencil, Eye, EyeOff,
-} from 'lucide-react';
+import { User, Lock, Mail, Pencil, Eye, EyeOff } from 'lucide-react';
 import { Input as ShadInput } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -33,7 +31,15 @@ const ICON_BY_ID = {
 // via {...props} (visible as React "unknown prop"/"unrecognized event
 // handler" console warnings on every render of this page).
 function Input({
-  id, type, placeholder, value, onChange, className, isPassword, showPassword, onTogglePassword,
+  id,
+  type,
+  placeholder,
+  value,
+  onChange,
+  className,
+  isPassword,
+  showPassword,
+  onTogglePassword,
   // `icon` is intentionally destructured-and-discarded, not read: the icon
   // is derived from `id` via ICON_BY_ID above, not a caller-supplied prop.
   // Left here only so a stray icon="..." at an old call site (e.g.

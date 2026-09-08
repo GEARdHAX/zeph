@@ -1,6 +1,4 @@
-import {
-  useState, useRef, useEffect, useMemo, lazy, Suspense,
-} from 'react';
+import { useState, useRef, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useGlobal } from 'reactn';
 import { useDispatch, useSelector } from 'react-redux';
 import moment from 'moment';
@@ -96,10 +94,7 @@ function Messages({ aiEnabled }) {
   // Derived from the live messages array (not room.images, which is a
   // join-room-time snapshot capped at 50 images and excludes files) so
   // Previous/Next in the viewer reflects newly-arrived attachments too.
-  const mediaMessages = useMemo(
-    () => messages.filter((m) => m.type === 'image' || m.type === 'file'),
-    [messages],
-  );
+  const mediaMessages = useMemo(() => messages.filter((m) => m.type === 'image' || m.type === 'file'), [messages]);
 
   const messagesList = messages.map((message, index) => {
     const previous = messages[index - 1];
@@ -188,11 +183,7 @@ function Messages({ aiEnabled }) {
       <div className="flex flex-col w-full px-3 sm:px-6">
         {open && (
           <Suspense fallback={<LazyFallback />}>
-            <MediaViewerShell
-              messages={mediaMessages}
-              initialMessage={open}
-              onClose={() => setOpen(null)}
-            />
+            <MediaViewerShell messages={mediaMessages} initialMessage={open} onClose={() => setOpen(null)} />
           </Suspense>
         )}
 
@@ -205,22 +196,26 @@ function Messages({ aiEnabled }) {
             until older messages suddenly appeared. */}
         {loading && messages.length > 0 && (
           <div className="flex justify-center py-3">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" role="status" aria-label="Loading older messages" />
+            <Loader2
+              className="h-4 w-4 animate-spin text-muted-foreground"
+              role="status"
+              aria-label="Loading older messages"
+            />
           </div>
         )}
 
         {messagesList}
 
-        {messages.length === 0 && !loading && (
-          room.myJoinInfo ? (
+        {messages.length === 0 &&
+          !loading &&
+          (room.myJoinInfo ? (
             <JoinedEmptyState joinInfo={room.myJoinInfo} />
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
               <div className="text-sm font-semibold text-foreground">No messages here yet</div>
               <div className="text-xs text-muted-foreground mt-1">Send a message to start the conversation!</div>
             </div>
-          )
-        )}
+          ))}
 
         {typing && (
           <div className="flex w-full items-end gap-2 px-1 sm:px-2 pt-2 pb-1 animate-in fade-in slide-in-from-bottom-2 duration-200">

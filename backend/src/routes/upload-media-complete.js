@@ -35,7 +35,10 @@ module.exports = async (req, res) => {
   await media.save();
 
   const originalExtension = path.extname(media.originalName || '').toLowerCase();
-  const tempPath = path.join(os.tmpdir(), `upload-complete-${crypto.randomBytes(8).toString('hex')}${originalExtension}`);
+  const tempPath = path.join(
+    os.tmpdir(),
+    `upload-complete-${crypto.randomBytes(8).toString('hex')}${originalExtension}`,
+  );
 
   const fail = async (reason, statusCode) => {
     await storage.deleteObject(media.storageKey).catch(() => {});
@@ -74,7 +77,10 @@ module.exports = async (req, res) => {
   if (media.category === 'archive' || media.category === 'document') {
     const inspection = inspectArchive(tempPath, originalExtension);
     if (!inspection.safe) {
-      logger.warn({ userId: req.user.id, mediaId, reason: inspection.reason }, 'Rejected suspicious direct-upload archive');
+      logger.warn(
+        { userId: req.user.id, mediaId, reason: inspection.reason },
+        'Rejected suspicious direct-upload archive',
+      );
       return fail('ARCHIVE_UNSAFE', 415);
     }
   }

@@ -1,7 +1,5 @@
 ﻿import { useState } from 'react';
-import {
-  MessageCircle, Star, Video, Bell, Settings,
-} from 'lucide-react';
+import { MessageCircle, Star, Video, Bell, Settings } from 'lucide-react';
 import { useGlobal } from 'reactn';
 import { NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -14,7 +12,10 @@ import Config from '../../../config';
 
 const PRIMARY_ITEMS = [
   {
-    to: '/', label: 'Chats', Icon: MessageCircle, end: true,
+    to: '/',
+    label: 'Chats',
+    Icon: MessageCircle,
+    end: true,
   },
   { to: '/favorites', label: 'Favorites', Icon: Star },
   { to: '/meetings', label: 'Meetings', Icon: Video },
@@ -37,10 +38,12 @@ function NavRail() {
 
   const initials = `${(user.firstName || 'U').charAt(0)}${(user.lastName || '').charAt(0)}`.toUpperCase() || 'AU';
 
-  const itemClasses = ({ isActive }) => cn(
-    'relative flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground',
-    isActive && 'bg-primary/15 text-primary font-semibold shadow-xs hover:bg-primary/20 hover:text-primary dark:bg-primary/20 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary',
-  );
+  const itemClasses = ({ isActive }) =>
+    cn(
+      'relative flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground',
+      isActive &&
+        'bg-primary/15 text-primary font-semibold shadow-xs hover:bg-primary/20 hover:text-primary dark:bg-primary/20 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary',
+    );
 
   return (
     <nav
@@ -67,7 +70,9 @@ function NavRail() {
             <ZephWordmark
               className={cn(
                 'whitespace-nowrap text-xl font-extrabold tracking-tight text-foreground transition-all duration-300 ease-in-out',
-                isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
+                isHovered
+                  ? 'opacity-100 translate-x-0'
+                  : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
               )}
             />
           </NavLink>
@@ -75,9 +80,7 @@ function NavRail() {
 
         {/* Navigation Links */}
         <div className="flex flex-col gap-1.5 px-2.5 py-1">
-          {PRIMARY_ITEMS.map(({
-            to, label, Icon, end,
-          }) => (
+          {PRIMARY_ITEMS.map(({ to, label, Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={itemClasses} title={label}>
               <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                 <Icon className="h-[19px] w-[19px]" />
@@ -90,7 +93,9 @@ function NavRail() {
               <span
                 className={cn(
                   'whitespace-nowrap transition-all duration-300 ease-in-out',
-                  isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
+                  isHovered
+                    ? 'opacity-100 translate-x-0'
+                    : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
                 )}
               >
                 {label}
@@ -118,7 +123,9 @@ function NavRail() {
               <span
                 className={cn(
                   'whitespace-nowrap transition-all duration-300 ease-in-out',
-                  isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
+                  isHovered
+                    ? 'opacity-100 translate-x-0'
+                    : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
                 )}
               >
                 {label}
@@ -137,10 +144,12 @@ function NavRail() {
       <div className="p-2.5 overflow-hidden">
         <NavLink
           to="/profile"
-          className={({ isActive }) => cn(
-            'flex items-center gap-3 rounded-2xl border border-border bg-muted/30 p-2 transition-all duration-300 hover:bg-muted/70 hover:border-border/80',
-            isActive && 'bg-muted border-primary/40',
-          )}
+          className={({ isActive }) =>
+            cn(
+              'flex items-center gap-3 rounded-2xl border border-border bg-muted/30 p-2 transition-all duration-300 hover:bg-muted/70 hover:border-border/80',
+              isActive && 'bg-muted border-primary/40',
+            )
+          }
           title={!isHovered ? `${user.firstName || 'Admin'} ${user.lastName || 'User'}` : undefined}
         >
           <div className="relative shrink-0">
@@ -152,9 +161,7 @@ function NavRail() {
                   className="aspect-square size-full object-cover"
                 />
               )}
-              <AvatarFallback className="bg-transparent text-xs font-bold text-white">
-                {initials}
-              </AvatarFallback>
+              <AvatarFallback className="bg-transparent text-xs font-bold text-white">{initials}</AvatarFallback>
             </Avatar>
             <span
               className={cn(
@@ -166,17 +173,15 @@ function NavRail() {
           <div
             className={cn(
               'min-w-0 flex-1 whitespace-nowrap transition-all duration-300 ease-in-out',
-              isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
+              isHovered
+                ? 'opacity-100 translate-x-0'
+                : 'opacity-0 -translate-x-3 pointer-events-none w-0 overflow-hidden',
             )}
           >
             <div className="truncate text-xs font-semibold text-foreground">
-              {user.firstName || 'Admin'}
-              {' '}
-              {user.lastName || 'User'}
+              {user.firstName || 'Admin'} {user.lastName || 'User'}
             </div>
-            <div className="truncate text-[11px] text-muted-foreground">
-              {user.email || 'admin@example.com'}
-            </div>
+            <div className="truncate text-[11px] text-muted-foreground">{user.email || 'admin@example.com'}</div>
           </div>
         </NavLink>
       </div>

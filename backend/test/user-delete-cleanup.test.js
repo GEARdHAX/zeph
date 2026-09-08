@@ -37,13 +37,14 @@ const createUser = async (overrides = {}) => {
 };
 const createAdmin = (overrides = {}) => createUser({ ...overrides, level: 'root' });
 
-const deleteUser = (admin, email) => request(app)
-  .post('/api/user/delete')
-  .set('Authorization', `Bearer ${tokenFor(admin)}`)
-  .send({ email });
+const deleteUser = (admin, email) =>
+  request(app)
+    .post('/api/user/delete')
+    .set('Authorization', `Bearer ${tokenFor(admin)}`)
+    .send({ email });
 
 describe('Deleting a user cleans up their data for other participants', () => {
-  it('removes a shared 1:1 DM from the other participant\'s inbox without deleting the Room or Messages', async () => {
+  it("removes a shared 1:1 DM from the other participant's inbox without deleting the Room or Messages", async () => {
     const admin = await createAdmin();
     const victim = await createUser();
     const survivor = await createUser();
@@ -70,7 +71,7 @@ describe('Deleting a user cleans up their data for other participants', () => {
     expect(listRes.body.rooms.find((r) => r._id === room._id.toString())).toBeUndefined();
   });
 
-  it('deactivates the deleted user\'s membership in any groups they belonged to', async () => {
+  it("deactivates the deleted user's membership in any groups they belonged to", async () => {
     const admin = await createAdmin();
     const owner = await createUser();
     const victim = await createUser();

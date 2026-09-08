@@ -5,14 +5,29 @@ const makeFile = (name, size = 100) => new File([new Uint8Array(size)], name);
 
 describe('categorizeFile', () => {
   it.each([
-    ['photo.jpg', 'image'], ['photo.png', 'image'], ['photo.webp', 'image'], ['photo.gif', 'image'],
-    ['clip.mp4', 'video'], ['clip.webm', 'video'], ['clip.mov', 'video'],
-    ['song.mp3', 'audio'], ['song.wav', 'audio'], ['song.m4a', 'audio'], ['song.ogg', 'audio'],
+    ['photo.jpg', 'image'],
+    ['photo.png', 'image'],
+    ['photo.webp', 'image'],
+    ['photo.gif', 'image'],
+    ['clip.mp4', 'video'],
+    ['clip.webm', 'video'],
+    ['clip.mov', 'video'],
+    ['song.mp3', 'audio'],
+    ['song.wav', 'audio'],
+    ['song.m4a', 'audio'],
+    ['song.ogg', 'audio'],
     ['doc.pdf', 'pdf'],
-    ['report.docx', 'document'], ['sheet.xlsx', 'document'], ['data.csv', 'document'],
-    ['slides.pptx', 'document'], ['notes.txt', 'document'],
-    ['archive.zip', 'archive'], ['archive.7z', 'archive'], ['archive.rar', 'archive'],
-    ['data.json', 'text'], ['page.html', 'text'], ['script.js', 'text'],
+    ['report.docx', 'document'],
+    ['sheet.xlsx', 'document'],
+    ['data.csv', 'document'],
+    ['slides.pptx', 'document'],
+    ['notes.txt', 'document'],
+    ['archive.zip', 'archive'],
+    ['archive.7z', 'archive'],
+    ['archive.rar', 'archive'],
+    ['data.json', 'text'],
+    ['page.html', 'text'],
+    ['script.js', 'text'],
   ])('categorizes %s as %s', (name, expected) => {
     expect(categorizeFile(makeFile(name))).toBe(expected);
   });

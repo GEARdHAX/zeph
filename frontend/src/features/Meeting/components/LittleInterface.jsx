@@ -2,9 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Config from '../../../config';
 
-function LittleInterface({
-  audio, video, peer = {}, isMaximized,
-}) {
+function LittleInterface({ audio, video, peer = {}, isMaximized }) {
   const audioRef = useRef(null);
   const videoRef = useRef(null);
 
@@ -50,9 +48,7 @@ function LittleInterface({
                 className="aspect-square size-full object-cover"
               />
             )}
-            <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">
-              {initials}
-            </AvatarFallback>
+            <AvatarFallback className="bg-transparent text-[10px] font-bold text-white">{initials}</AvatarFallback>
           </Avatar>
           <span className="max-w-full truncate text-[10px] font-semibold text-foreground">
             {peer?.firstName || 'Guest'}

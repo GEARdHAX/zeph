@@ -9,7 +9,9 @@ import io from '../../reducers/io';
 import Login from './index';
 import getInfo from '../../actions/getInfo';
 
-vi.mock('../../actions/getInfo', () => ({ default: vi.fn(() => Promise.reject(new Error('not needed for this test'))) }));
+vi.mock('../../actions/getInfo', () => ({
+  default: vi.fn(() => Promise.reject(new Error('not needed for this test'))),
+}));
 
 function renderLogin() {
   const store = createStore(combineReducers({ io }), applyMiddleware(thunk));

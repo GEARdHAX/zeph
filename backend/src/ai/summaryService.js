@@ -33,9 +33,7 @@ const fetchRecentMessages = async (roomId) => {
 
 // Returns { ok, text?, reason? } — never throws; callers (route or worker)
 // decide what to do with a rejection.
-const generateAndPersistSummary = async ({
-  roomId, userId, ip, currentMessageCount, requestId, scope,
-}) => {
+const generateAndPersistSummary = async ({ roomId, userId, ip, currentMessageCount, requestId, scope }) => {
   const messages = await fetchRecentMessages(roomId);
   if (!messages.length) return { ok: false, reason: 'INSUFFICIENT_CONTEXT' };
 

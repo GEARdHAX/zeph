@@ -32,7 +32,11 @@ describe('stepUp.issueStepUpToken', () => {
   it('rejects the wrong password without issuing a token', async () => {
     const user = await createUser('correct-password-123');
     const result = await issueStepUpToken({
-      userId: user._id, sessionId: null, resource: 'account', action: 'change_password', password: 'wrong-password',
+      userId: user._id,
+      sessionId: null,
+      resource: 'account',
+      action: 'change_password',
+      password: 'wrong-password',
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('incorrect_password');
@@ -42,7 +46,11 @@ describe('stepUp.issueStepUpToken', () => {
   it('issues a token on the correct password, storing only its hash', async () => {
     const user = await createUser('correct-password-123');
     const result = await issueStepUpToken({
-      userId: user._id, sessionId: null, resource: 'account', action: 'change_password', password: 'correct-password-123',
+      userId: user._id,
+      sessionId: null,
+      resource: 'account',
+      action: 'change_password',
+      password: 'correct-password-123',
     });
     expect(result.ok).toBe(true);
     expect(typeof result.token).toBe('string');
@@ -56,7 +64,7 @@ describe('stepUp.issueStepUpToken', () => {
 
 describe('stepUp.verifyAndConsumeStepUpToken', () => {
   const issue = async (overrides = {}) => {
-    const user = overrides.user || await createUser();
+    const user = overrides.user || (await createUser());
     const result = await issueStepUpToken({
       userId: user._id,
       sessionId: overrides.sessionId || null,
@@ -70,14 +78,21 @@ describe('stepUp.verifyAndConsumeStepUpToken', () => {
   it('accepts a valid, freshly-issued token for the exact resource/action/user it was minted for', async () => {
     const { user, token } = await issue();
     const result = await verifyAndConsumeStepUpToken({
-      rawToken: token, userId: user._id, sessionId: null, resource: 'account', action: 'change_password',
+      rawToken: token,
+      userId: user._id,
+      sessionId: null,
+      resource: 'account',
+      action: 'change_password',
     });
     expect(result.ok).toBe(true);
   });
 
   it('rejects a missing token', async () => {
     const result = await verifyAndConsumeStepUpToken({
-      rawToken: null, userId: 'user-1', resource: 'account', action: 'change_password',
+      rawToken: null,
+      userId: 'user-1',
+      resource: 'account',
+      action: 'change_password',
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('missing_token');
@@ -85,7 +100,10 @@ describe('stepUp.verifyAndConsumeStepUpToken', () => {
 
   it('rejects a token that was never issued', async () => {
     const result = await verifyAndConsumeStepUpToken({
-      rawToken: 'totally-made-up-token', userId: 'user-1', resource: 'account', action: 'change_password',
+      rawToken: 'totally-made-up-token',
+      userId: 'user-1',
+      resource: 'account',
+      action: 'change_password',
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('invalid_token');
@@ -94,10 +112,16 @@ describe('stepUp.verifyAndConsumeStepUpToken', () => {
   it('cannot be replayed — a second use of the same token fails', async () => {
     const { user, token } = await issue();
     const first = await verifyAndConsumeStepUpToken({
-      rawToken: token, userId: user._id, resource: 'account', action: 'change_password',
+      rawToken: token,
+      userId: user._id,
+      resource: 'account',
+      action: 'change_password',
     });
     const second = await verifyAndConsumeStepUpToken({
-      rawToken: token, userId: user._id, resource: 'account', action: 'change_password',
+      rawToken: token,
+      userId: user._id,
+      resource: 'account',
+      action: 'change_password',
     });
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(false);
@@ -106,9 +130,13 @@ describe('stepUp.verifyAndConsumeStepUpToken', () => {
 
   it('cannot be replayed even under concurrent simultaneous use — exactly one wins', async () => {
     const { user, token } = await issue();
-    const attempt = () => verifyAndConsumeStepUpToken({
-      rawToken: token, userId: user._id, resource: 'account', action: 'change_password',
-    });
+    const attempt = () =>
+      verifyAndConsumeStepUpToken({
+        rawToken: token,
+        userId: user._id,
+        resource: 'account',
+        action: 'change_password',
+      });
     const [a, b] = await Promise.all([attempt(), attempt()]);
     const results = [a.ok, b.ok].sort();
     expect(results).toEqual([false, true]);
@@ -118,7 +146,10 @@ describe('stepUp.verifyAndConsumeStepUpToken', () => {
     const { user, token } = await issue();
     await StepUpToken.updateOne({}, { $set: { expiresAt: new Date(Date.now() - 1000) } });
     const result = await verifyAndConsumeStepUpToken({
-      rawToken: token, userId: user._id, resource: 'account', action: 'change_password',
+      rawToken: token,
+      userId: user._id,
+      resource: 'account',
+      action: 'change_password',
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('expired');
@@ -128,7 +159,10 @@ describe('stepUp.verifyAndConsumeStepUpToken', () => {
     const { token } = await issue();
     const otherUser = await createUser();
     const result = await verifyAndConsumeStepUpToken({
-      rawToken: token, userId: otherUser._id, resource: 'account', action: 'change_password',
+      rawToken: token,
+      userId: otherUser._id,
+      resource: 'account',
+      action: 'change_password',
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('user_mismatch');
@@ -137,7 +171,10 @@ describe('stepUp.verifyAndConsumeStepUpToken', () => {
   it('cannot be replayed against a DIFFERENT sensitive action than it was scoped for', async () => {
     const { user, token } = await issue({ resource: 'account', action: 'change_password' });
     const result = await verifyAndConsumeStepUpToken({
-      rawToken: token, userId: user._id, resource: 'account', action: 'delete_account',
+      rawToken: token,
+      userId: user._id,
+      resource: 'account',
+      action: 'delete_account',
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('scope_mismatch');
@@ -148,7 +185,11 @@ describe('stepUp.verifyAndConsumeStepUpToken', () => {
     const sessionB = new mongoose.Types.ObjectId();
     const { user, token } = await issue({ sessionId: sessionA });
     const result = await verifyAndConsumeStepUpToken({
-      rawToken: token, userId: user._id, sessionId: sessionB, resource: 'account', action: 'change_password',
+      rawToken: token,
+      userId: user._id,
+      sessionId: sessionB,
+      resource: 'account',
+      action: 'change_password',
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('session_mismatch');

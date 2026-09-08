@@ -43,7 +43,9 @@ describe('threatIntel circuit breaker', () => {
     breaker.recordFailure('timeout');
     expect(breaker.canAttempt()).toBe(false);
 
-    await new Promise((resolve) => { setTimeout(resolve, 60); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 60);
+    });
 
     expect(breaker.canAttempt()).toBe(true);
     expect(breaker.getState()).toBe(States.HALF_OPEN);
@@ -52,7 +54,9 @@ describe('threatIntel circuit breaker', () => {
   it('a successful HALF_OPEN trial closes the circuit', async () => {
     const breaker = buildCircuitBreaker({ failureThreshold: 1, cooldownMs: 50 });
     breaker.recordFailure('timeout');
-    await new Promise((resolve) => { setTimeout(resolve, 60); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 60);
+    });
     breaker.canAttempt(); // transitions to HALF_OPEN
     breaker.recordSuccess();
     expect(breaker.getState()).toBe(States.CLOSED);
@@ -61,7 +65,9 @@ describe('threatIntel circuit breaker', () => {
   it('a failed HALF_OPEN trial re-opens the circuit', async () => {
     const breaker = buildCircuitBreaker({ failureThreshold: 1, cooldownMs: 50 });
     breaker.recordFailure('timeout');
-    await new Promise((resolve) => { setTimeout(resolve, 60); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 60);
+    });
     breaker.canAttempt();
     breaker.recordFailure('timeout');
     expect(breaker.getState()).toBe(States.OPEN);

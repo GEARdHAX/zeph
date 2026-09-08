@@ -3,9 +3,7 @@ import { Search, Clock, UserCheck } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import search from '../../../actions/search';
@@ -72,11 +70,15 @@ function AddPeople({ onClose }) {
   // newer one is submitted, so a slow earlier response can never overwrite
   // a later search's results.
   const {
-    query, setQuery, results, loading: searching, hasSearched, search: runSearch,
-  } = useExplicitSearch(
-    (value, signal) => search(value, undefined, signal).then((res) => res.data.users || []),
-    { minLength: MIN_QUERY_LENGTH },
-  );
+    query,
+    setQuery,
+    results,
+    loading: searching,
+    hasSearched,
+    search: runSearch,
+  } = useExplicitSearch((value, signal) => search(value, undefined, signal).then((res) => res.data.users || []), {
+    minLength: MIN_QUERY_LENGTH,
+  });
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -150,18 +152,15 @@ function AddPeople({ onClose }) {
           {!searching && !hasSearched && query.trim().length >= MIN_QUERY_LENGTH && (
             <div className="py-6 text-center text-xs text-muted-foreground">Press Enter or Search to look them up.</div>
           )}
-          {!searching && results.map((user) => (
-            <ResultRow key={user._id} user={user} onOpen={setPreviewUsername} onOpenChat={openChat} />
-          ))}
+          {!searching &&
+            results.map((user) => (
+              <ResultRow key={user._id} user={user} onOpen={setPreviewUsername} onOpenChat={openChat} />
+            ))}
         </div>
       </DialogContent>
 
       {previewUsername && (
-        <ProfileView
-          username={previewUsername}
-          onClose={() => setPreviewUsername(null)}
-          onOpenChat={openChat}
-        />
+        <ProfileView username={previewUsername} onClose={() => setPreviewUsername(null)} onOpenChat={openChat} />
       )}
     </Dialog>
   );

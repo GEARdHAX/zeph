@@ -60,7 +60,12 @@ const resolveSession = async (req) => {
 const toSessionContext = (session, riskLevel) => {
   if (!session) {
     return {
-      sessionId: null, userId: null, createdAt: null, lastSeenAt: null, authMethod: 'jwt', state: deriveSessionState(null, riskLevel),
+      sessionId: null,
+      userId: null,
+      createdAt: null,
+      lastSeenAt: null,
+      authMethod: 'jwt',
+      state: deriveSessionState(null, riskLevel),
     };
   }
   return {
@@ -75,5 +80,8 @@ const toSessionContext = (session, riskLevel) => {
 };
 
 module.exports = {
-  SessionStates, resolveSession, toSessionContext, deriveSessionState,
+  SessionStates,
+  resolveSession,
+  toSessionContext,
+  deriveSessionState,
 };

@@ -1,10 +1,9 @@
 import Config from '../config';
 
-function Picture({
-  user = {}, group = false, picture, title = 'Group',
-}) {
+function Picture({ user = {}, group = false, picture, title = 'Group' }) {
   if (group) {
-    if (picture) return <img src={`${Config.url || ''}/api/images/${picture.shieldedID}/256`} alt="Picture" className="picture" />;
+    if (picture)
+      return <img src={`${Config.url || ''}/api/images/${picture.shieldedID}/256`} alt="Picture" className="picture" />;
     return <div className="img">{title.substr(0, 1).toUpperCase()}</div>;
   }
 

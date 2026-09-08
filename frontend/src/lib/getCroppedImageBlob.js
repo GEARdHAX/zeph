@@ -6,12 +6,13 @@
 const MAX_OUTPUT_DIMENSION = 2048; // matches backend's largest `sizes` variant — no point producing anything bigger
 const JPEG_QUALITY = 0.85;
 
-const loadImage = (src) => new Promise((resolve, reject) => {
-  const img = new window.Image();
-  img.onload = () => resolve(img);
-  img.onerror = () => reject(new Error('Could not decode this image.'));
-  img.src = src;
-});
+const loadImage = (src) =>
+  new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not decode this image.'));
+    img.src = src;
+  });
 
 // Cheap opacity probe: downscale onto a tiny canvas and check the alpha
 // channel, rather than scanning the full-resolution crop region pixel by
@@ -23,17 +24,7 @@ const hasTransparency = (image, cropPixels) => {
   probeCanvas.width = probeSize;
   probeCanvas.height = probeSize;
   const ctx = probeCanvas.getContext('2d');
-  ctx.drawImage(
-    image,
-    cropPixels.x,
-    cropPixels.y,
-    cropPixels.width,
-    cropPixels.height,
-    0,
-    0,
-    probeSize,
-    probeSize,
-  );
+  ctx.drawImage(image, cropPixels.x, cropPixels.y, cropPixels.width, cropPixels.height, 0, 0, probeSize, probeSize);
   const { data } = ctx.getImageData(0, 0, probeSize, probeSize);
   for (let i = 3; i < data.length; i += 4) {
     if (data[i] < 255) return true;
@@ -41,15 +32,20 @@ const hasTransparency = (image, cropPixels) => {
   return false;
 };
 
-const canvasToBlob = (canvas, type, quality) => new Promise((resolve, reject) => {
-  canvas.toBlob((blob) => {
-    if (!blob) {
-      reject(new Error('Could not process this image.'));
-      return;
-    }
-    resolve(blob);
-  }, type, quality);
-});
+const canvasToBlob = (canvas, type, quality) =>
+  new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error('Could not process this image.'));
+          return;
+        }
+        resolve(blob);
+      },
+      type,
+      quality,
+    );
+  });
 
 /**
  * @param {string} imageSrc - object URL of the source file
@@ -104,9 +100,7 @@ const getCroppedImageBlob = async (imageSrc, cropPixels, rotationDeg, sourceMime
   );
 
   const preservePng = sourceMimeType === 'image/png' && hasTransparency(rotateCanvas, cropPixels);
-  return preservePng
-    ? canvasToBlob(outputCanvas, 'image/png')
-    : canvasToBlob(outputCanvas, 'image/jpeg', JPEG_QUALITY);
+  return preservePng ? canvasToBlob(outputCanvas, 'image/png') : canvasToBlob(outputCanvas, 'image/jpeg', JPEG_QUALITY);
 };
 
 export default getCroppedImageBlob;

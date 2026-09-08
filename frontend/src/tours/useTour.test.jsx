@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setGlobal } from 'reactn';
@@ -16,17 +14,23 @@ vi.mock('./driver', () => ({
 }));
 
 function TestHarness({ tourId = 'chat' }) {
-  const {
-    start, resume, skip, reset, status, isActive,
-  } = useTour(tourId);
+  const { start, resume, skip, reset, status, isActive } = useTour(tourId);
   return (
     <div>
       <span data-testid="status">{status}</span>
       <span data-testid="active">{isActive ? 'active' : 'inactive'}</span>
-      <button type="button" onClick={() => start()}>Start</button>
-      <button type="button" onClick={() => resume()}>Resume</button>
-      <button type="button" onClick={skip}>Skip</button>
-      <button type="button" onClick={reset}>Reset</button>
+      <button type="button" onClick={() => start()}>
+        Start
+      </button>
+      <button type="button" onClick={() => resume()}>
+        Resume
+      </button>
+      <button type="button" onClick={skip}>
+        Skip
+      </button>
+      <button type="button" onClick={reset}>
+        Reset
+      </button>
     </div>
   );
 }

@@ -48,7 +48,9 @@ describe('POST /api/meeting/get — group membership authorization', () => {
       .post('/api/meeting/get')
       .set('Authorization', `Bearer ${tokenFor(attacker)}`)
       .send({
-        startedAsCall: true, callToGroup: true, group: room._id.toString(),
+        startedAsCall: true,
+        callToGroup: true,
+        group: room._id.toString(),
       });
 
     expect(res.status).toBe(403);
@@ -76,7 +78,10 @@ describe('POST /api/meeting/get — group membership authorization', () => {
       .post('/api/meeting/get')
       .set('Authorization', `Bearer ${tokenFor(member)}`)
       .send({
-        startedAsCall: true, callToGroup: true, group: room._id.toString(), callee: owner._id.toString(),
+        startedAsCall: true,
+        callToGroup: true,
+        group: room._id.toString(),
+        callee: owner._id.toString(),
       });
 
     expect(res.status).toBe(200);
@@ -92,7 +97,9 @@ describe('POST /api/meeting/get — group membership authorization', () => {
       .post('/api/meeting/get')
       .set('Authorization', `Bearer ${tokenFor(caller)}`)
       .send({
-        startedAsCall: true, callee: other._id.toString(), group: room._id.toString(),
+        startedAsCall: true,
+        callee: other._id.toString(),
+        group: room._id.toString(),
       });
 
     expect(res.status).toBe(200);

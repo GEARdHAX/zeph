@@ -35,7 +35,9 @@ const getBreaker = () => {
 // Test-only escape hatch — same pattern threatIntelService.js's own
 // resetBreakerForTests() already establishes, so breaker state doesn't
 // leak between unrelated test files sharing this module.
-const resetBreakerForTests = () => { breaker = buildCircuitBreaker({ failureThreshold: 3, cooldownMs: 60000 }); };
+const resetBreakerForTests = () => {
+  breaker = buildCircuitBreaker({ failureThreshold: 3, cooldownMs: 60000 });
+};
 
 const getSecurityEventService = () => require('../securityEventService'); // eslint-disable-line global-require — deferred, same circular-require avoidance every other Phase 3-5 integration point uses
 
@@ -110,7 +112,9 @@ const analyze = async ({ context, analysisType, scopeId }) => {
   let rawResponse;
   try {
     rawResponse = await provider.generate(prompt, {
-      model, format: 'json', signal: AbortSignal.timeout(timeoutMs),
+      model,
+      format: 'json',
+      signal: AbortSignal.timeout(timeoutMs),
     });
     cb.recordSuccess();
   } catch (err) {
@@ -183,7 +187,10 @@ const analyze = async ({ context, analysisType, scopeId }) => {
         result: 'success',
         sourceSystem: 'security_ai',
         metadata: {
-          analysisId, confidence: result.confidence, category: result.category, signals: result.signals,
+          analysisId,
+          confidence: result.confidence,
+          category: result.category,
+          signals: result.signals,
         },
       });
     }

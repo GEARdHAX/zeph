@@ -1,6 +1,10 @@
 const SecurityEvent = require('../../models/SecurityEvent');
 const { isPrivileged } = require('../../authorization/policy');
-const { SecurityEventTypes, SecurityEventSeverities, SecurityEventResults } = require('../../constants/securityEventTypes');
+const {
+  SecurityEventTypes,
+  SecurityEventSeverities,
+  SecurityEventResults,
+} = require('../../constants/securityEventTypes');
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 30;
@@ -24,9 +28,7 @@ module.exports = async (req, res) => {
   // that safely within this pass's scope.
   if (!isPrivileged(req.user)) return res.status(404).json({ error: true });
 
-  const {
-    type, severity, userId, ip, startDate, endDate, result, cursor, limit: limitParam,
-  } = req.query;
+  const { type, severity, userId, ip, startDate, endDate, result, cursor, limit: limitParam } = req.query;
 
   let limit = Number(limitParam) || DEFAULT_LIMIT;
   limit = Math.min(Math.max(limit, 1), MAX_LIMIT);
@@ -38,7 +40,8 @@ module.exports = async (req, res) => {
     query.type = type;
   }
   if (severity) {
-    if (!SecurityEventSeverities.includes(severity)) return res.status(400).json({ error: true, reason: 'INVALID_SEVERITY' });
+    if (!SecurityEventSeverities.includes(severity))
+      return res.status(400).json({ error: true, reason: 'INVALID_SEVERITY' });
     query.severity = severity;
   }
   if (result) {

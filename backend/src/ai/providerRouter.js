@@ -34,7 +34,9 @@ const getBreaker = (name) => {
 };
 
 // Test-only — reset breaker state between unrelated test files.
-const resetBreakersForTests = () => { Object.keys(breakers).forEach((k) => delete breakers[k]); };
+const resetBreakersForTests = () => {
+  Object.keys(breakers).forEach((k) => delete breakers[k]);
+};
 
 // Maps a thrown provider error to a circuitBreaker TRIPPING_REASON, or null
 // if it's not a health failure (bad output, etc.) and shouldn't trip.
@@ -137,5 +139,9 @@ const aiTextEnabled = (config = {}) => {
 };
 
 module.exports = {
-  generate, anyProviderAvailable, aiTextEnabled, resetBreakersForTests, breakers,
+  generate,
+  anyProviderAvailable,
+  aiTextEnabled,
+  resetBreakersForTests,
+  breakers,
 };

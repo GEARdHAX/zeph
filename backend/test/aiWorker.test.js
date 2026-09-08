@@ -11,7 +11,11 @@ const { processSummaryJob } = require('../src/queues/aiWorker');
 
 const makeJob = (overrides = {}) => ({
   data: {
-    roomId: 'room-1', userId: 'u1', conversationType: 'group', requestId: 'r1', ...overrides.data,
+    roomId: 'room-1',
+    userId: 'u1',
+    conversationType: 'group',
+    requestId: 'r1',
+    ...overrides.data,
   },
   timestamp: Date.now() - 100,
   attemptsMade: 0,

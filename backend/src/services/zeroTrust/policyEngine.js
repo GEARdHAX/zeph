@@ -16,7 +16,7 @@ const decide = (decision, { reason, policy, riskContext, factors = [] }) => ({
   policy,
   riskScore: riskContext?.score ?? null,
   riskLevel: riskContext?.level ?? null,
-  factors: factors.length ? factors : (riskContext?.factors || []),
+  factors: factors.length ? factors : riskContext?.factors || [],
 });
 
 // Central Zero Trust decision point (spec sections 4, 14, 15). Evaluates
@@ -36,9 +36,7 @@ const decide = (decision, { reason, policy, riskContext, factors = [] }) => ({
 //   rbacAllowed    - boolean, already decided by the caller via existing RBAC
 //   resource/action - the policy key (see policies.js)
 //   riskContext    - { score, level, factors } from riskEngine.js
-const evaluate = ({
-  user, session, sessionState, rbacAllowed, resource, action, riskContext,
-}) => {
+const evaluate = ({ user, session, sessionState, rbacAllowed, resource, action, riskContext }) => {
   // 1. Authenticated?
   if (!user) {
     return decide(Decisions.DENY, { reason: 'not_authenticated', policy: 'authentication_required', riskContext });
@@ -78,7 +76,9 @@ const evaluate = ({
 
   if (score > DENY_ABOVE) {
     return decide(Decisions.DENY, {
-      reason: 'risk_critical', policy: policyName, riskContext,
+      reason: 'risk_critical',
+      policy: policyName,
+      riskContext,
     });
   }
   if (score >= allowBelow) {

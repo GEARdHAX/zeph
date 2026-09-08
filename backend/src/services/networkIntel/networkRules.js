@@ -45,7 +45,9 @@ const evaluateFlow = async ({ sensorId, hostId, flow }) => {
   });
 
   const baseMetadata = {
-    sensorId, hostId, process: { pid: flow.pid, name: flow.processName || null },
+    sensorId,
+    hostId,
+    process: { pid: flow.pid, name: flow.processName || null },
   };
 
   // Rule 2/18 — port scan: one process touching many distinct DESTINATION
@@ -91,7 +93,11 @@ const evaluateFlow = async ({ sensorId, hostId, flow }) => {
       result: 'unknown',
       sourceSystem: 'network_sensor',
       metadata: {
-        ...baseMetadata, destinationIp: flow.destinationIp, destinationPort: flow.destinationPort, occurrences: counters.beaconTimestamps.length, threshold: beaconMinOccurrences,
+        ...baseMetadata,
+        destinationIp: flow.destinationIp,
+        destinationPort: flow.destinationPort,
+        occurrences: counters.beaconTimestamps.length,
+        threshold: beaconMinOccurrences,
       },
     });
   }
@@ -111,7 +117,11 @@ const evaluateFlow = async ({ sensorId, hostId, flow }) => {
       result: 'unknown',
       sourceSystem: 'network_sensor',
       metadata: {
-        ...baseMetadata, destinationIp: flow.destinationIp, destinationPort: flow.destinationPort, cumulativeBytes: counters.cumulativeBytes, thresholdBytes: exfilThresholdBytes,
+        ...baseMetadata,
+        destinationIp: flow.destinationIp,
+        destinationPort: flow.destinationPort,
+        cumulativeBytes: counters.cumulativeBytes,
+        thresholdBytes: exfilThresholdBytes,
       },
     });
   }
@@ -131,7 +141,10 @@ const evaluateFlow = async ({ sensorId, hostId, flow }) => {
         result: 'unknown',
         sourceSystem: 'network_sensor',
         metadata: {
-          ...baseMetadata, destinationIp: flow.destinationIp, destinationPort: flow.destinationPort, reason: 'unusual_destination',
+          ...baseMetadata,
+          destinationIp: flow.destinationIp,
+          destinationPort: flow.destinationPort,
+          reason: 'unusual_destination',
         },
       });
     }
@@ -144,9 +157,10 @@ const evaluateFlow = async ({ sensorId, hostId, flow }) => {
   // HIGH-priority lookup can still be served entirely from cache — priority
   // only affects whether a CACHE MISS is worth a fresh provider call).
   if (flow.destinationIp) {
-    const anyRuleFired = counters.distinctPorts >= scanThreshold
-      || counters.distinctHosts >= scanThreshold
-      || counters.cumulativeBytes >= exfilThresholdBytes;
+    const anyRuleFired =
+      counters.distinctPorts >= scanThreshold ||
+      counters.distinctHosts >= scanThreshold ||
+      counters.cumulativeBytes >= exfilThresholdBytes;
     try {
       const lookup = getThreatIntelLookup();
       const result = await lookup(flow.destinationIp, { type: 'IP', priority: anyRuleFired ? 'HIGH' : 'LOW' });
@@ -185,7 +199,11 @@ const evaluateDnsQuery = async ({ sensorId, hostId, dns }) => {
   const scanThreshold = store.config.networkScanThreshold; // reused — "many distinct domains" and "many distinct ports" are the same shape of signal (high-frequency enumeration), no separate DNS-specific threshold config needed for this pass
 
   const counters = await recordDnsQuery({
-    sensorId, pid: dns.pid, domain: dns.domain, nxdomain: dns.nxdomain === true, windowMs,
+    sensorId,
+    pid: dns.pid,
+    domain: dns.domain,
+    nxdomain: dns.nxdomain === true,
+    windowMs,
   });
 
   const baseMetadata = { sensorId, hostId, process: { pid: dns.pid, name: dns.processName || null } };
@@ -197,7 +215,13 @@ const evaluateDnsQuery = async ({ sensorId, hostId, dns }) => {
       target: { resource: 'network', action: 'dns_high_volume' },
       result: 'unknown',
       sourceSystem: 'network_sensor',
-      metadata: { ...baseMetadata, distinctDomains: counters.distinctDomains, threshold: scanThreshold, windowMs, reason: 'high_query_volume' },
+      metadata: {
+        ...baseMetadata,
+        distinctDomains: counters.distinctDomains,
+        threshold: scanThreshold,
+        windowMs,
+        reason: 'high_query_volume',
+      },
     });
   }
   if (counters.nxdomainCount >= scanThreshold) {
@@ -207,7 +231,13 @@ const evaluateDnsQuery = async ({ sensorId, hostId, dns }) => {
       target: { resource: 'network', action: 'dns_high_nxdomain' },
       result: 'unknown',
       sourceSystem: 'network_sensor',
-      metadata: { ...baseMetadata, nxdomainCount: counters.nxdomainCount, threshold: scanThreshold, windowMs, reason: 'high_nxdomain_volume' },
+      metadata: {
+        ...baseMetadata,
+        nxdomainCount: counters.nxdomainCount,
+        threshold: scanThreshold,
+        windowMs,
+        reason: 'high_nxdomain_volume',
+      },
     });
   }
 
@@ -230,7 +260,10 @@ const evaluateDnsQuery = async ({ sensorId, hostId, dns }) => {
         result: 'unknown',
         sourceSystem: 'network_sensor',
         metadata: {
-          ...baseMetadata, domain: dns.domain, confidence: result.confidence, source: result.source,
+          ...baseMetadata,
+          domain: dns.domain,
+          confidence: result.confidence,
+          source: result.source,
         },
       });
     }

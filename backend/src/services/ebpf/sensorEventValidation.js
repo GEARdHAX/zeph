@@ -39,7 +39,8 @@ const MAX_STRING_FIELD_LENGTH = 512;
 // section 33's explicit denylist) is silently dropped, never persisted,
 // regardless of what the sensor sends — this is the enforcement point,
 // not a formality.
-const isValidString = (value, maxLen = MAX_STRING_FIELD_LENGTH) => typeof value === 'string' && value.length > 0 && value.length <= maxLen;
+const isValidString = (value, maxLen = MAX_STRING_FIELD_LENGTH) =>
+  typeof value === 'string' && value.length > 0 && value.length <= maxLen;
 const isValidPort = (value) => Number.isInteger(value) && value >= 0 && value <= 65535;
 const isValidPid = (value) => Number.isInteger(value) && value >= 0;
 
@@ -130,7 +131,8 @@ const validateSensorEvent = (raw) => {
 
   if (!isValidString(raw.eventId, 128)) return { ok: false, reason: 'missing_event_id' };
   if (!SENSOR_ALLOWED_TYPES.has(raw.type)) return { ok: false, reason: 'unsupported_type' };
-  if (!raw.timestamp || Number.isNaN(new Date(raw.timestamp).getTime())) return { ok: false, reason: 'invalid_timestamp' };
+  if (!raw.timestamp || Number.isNaN(new Date(raw.timestamp).getTime()))
+    return { ok: false, reason: 'invalid_timestamp' };
 
   const process = sanitizeProcess(raw.process);
   const network = sanitizeNetwork(raw.network);
@@ -142,10 +144,18 @@ const validateSensorEvent = (raw) => {
   // silently store an empty observation. Same reasoning for Phase 5's
   // NETWORK_FLOW/DNS_QUERY: without the one field that makes them worth
   // anything (flow/dns respectively), they're empty telemetry.
-  if ((raw.type === SecurityEventTypes.PROCESS_EXEC || raw.type === SecurityEventTypes.PROCESS_EXIT || raw.type === SecurityEventTypes.PROCESS_ANOMALY) && !process) {
+  if (
+    (raw.type === SecurityEventTypes.PROCESS_EXEC ||
+      raw.type === SecurityEventTypes.PROCESS_EXIT ||
+      raw.type === SecurityEventTypes.PROCESS_ANOMALY) &&
+    !process
+  ) {
     return { ok: false, reason: 'missing_process_data' };
   }
-  if ((raw.type === SecurityEventTypes.NETWORK_CONNECTION || raw.type === SecurityEventTypes.NETWORK_ANOMALY) && !network) {
+  if (
+    (raw.type === SecurityEventTypes.NETWORK_CONNECTION || raw.type === SecurityEventTypes.NETWORK_ANOMALY) &&
+    !network
+  ) {
     return { ok: false, reason: 'missing_network_data' };
   }
   if (raw.type === SecurityEventTypes.NETWORK_FLOW && !flow) {
@@ -178,7 +188,10 @@ const validateSensorEvent = (raw) => {
 };
 
 module.exports = {
-  validateSensorEvent, SENSOR_ALLOWED_TYPES, MAX_EVENTS_PER_BATCH, MAX_EVENT_JSON_BYTES,
+  validateSensorEvent,
+  SENSOR_ALLOWED_TYPES,
+  MAX_EVENTS_PER_BATCH,
+  MAX_EVENT_JSON_BYTES,
 };
 
 // SANITIZE_EXPORTS: exposed for network-intel-specific unit tests

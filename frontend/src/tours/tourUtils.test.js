@@ -1,9 +1,5 @@
-import {
-  describe, it, expect, afterEach, vi,
-} from 'vitest';
-import {
-  waitForElement, prefersReducedMotion, isMobileViewport, MOBILE_BREAKPOINT_PX,
-} from './tourUtils';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { waitForElement, prefersReducedMotion, isMobileViewport, MOBILE_BREAKPOINT_PX } from './tourUtils';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -69,7 +65,9 @@ describe('prefersReducedMotion', () => {
 
   it('returns false (not throw) if matchMedia itself throws', () => {
     const original = window.matchMedia;
-    window.matchMedia = () => { throw new Error('unsupported'); };
+    window.matchMedia = () => {
+      throw new Error('unsupported');
+    };
     expect(prefersReducedMotion()).toBe(false);
     window.matchMedia = original;
   });

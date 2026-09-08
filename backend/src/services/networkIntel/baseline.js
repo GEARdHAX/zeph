@@ -42,12 +42,13 @@ const CANDIDATE_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days — long enough that
 // MATCH/UNUSUAL_DESTINATION noise suppressed for Cloudflare specifically —
 // see ebpf-sensor/README.md's deployment section for the recommended
 // values to add.
-const parseTrustedList = (raw) => new Set(
-  (raw || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean),
-);
+const parseTrustedList = (raw) =>
+  new Set(
+    (raw || '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
 
 // destinationKey lets the trusted list express either a bare IP (any port)
 // or ip:port (exact) — checked in that order, most-specific first.

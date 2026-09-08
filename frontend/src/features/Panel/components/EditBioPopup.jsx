@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -54,13 +52,8 @@ function EditBioPopup({ onClose }) {
         <DialogHeader>
           <DialogTitle>Edit bio</DialogTitle>
           <DialogDescription>
-            Formatting: **bold**, *italic*, __underline__, ~~strike~~,
-            ==highlight==, `code`, [text](https://url), @mention, #hashtag.
-            Max
-            {' '}
-            {MAX_WORDS}
-            {' '}
-            words.
+            Formatting: **bold**, *italic*, __underline__, ~~strike~~, ==highlight==, `code`, [text](https://url),
+            @mention, #hashtag. Max {MAX_WORDS} words.
           </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-3" onSubmit={onSubmit}>

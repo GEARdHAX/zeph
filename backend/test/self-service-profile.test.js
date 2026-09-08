@@ -35,9 +35,10 @@ const createUser = async (overrides = {}) => {
 };
 
 describe('POST /api/users/change-username', () => {
-  it('changes the caller\'s own username', async () => {
+  it("changes the caller's own username", async () => {
     const user = await createUser();
-    const res = await request(app).post('/api/users/change-username')
+    const res = await request(app)
+      .post('/api/users/change-username')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ username: 'brandnewhandle' });
 
@@ -49,12 +50,14 @@ describe('POST /api/users/change-username', () => {
 
   it('rejects an invalid format (too short, bad characters)', async () => {
     const user = await createUser();
-    const shortRes = await request(app).post('/api/users/change-username')
+    const shortRes = await request(app)
+      .post('/api/users/change-username')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ username: 'ab' });
     expect(shortRes.status).toBe(400);
 
-    const badCharsRes = await request(app).post('/api/users/change-username')
+    const badCharsRes = await request(app)
+      .post('/api/users/change-username')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ username: 'bad name!' });
     expect(badCharsRes.status).toBe(400);
@@ -64,7 +67,8 @@ describe('POST /api/users/change-username', () => {
     const user = await createUser();
     const other = await createUser({ username: 'existinghandle' });
 
-    const res = await request(app).post('/api/users/change-username')
+    const res = await request(app)
+      .post('/api/users/change-username')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ username: 'existinghandle' });
 
@@ -74,7 +78,8 @@ describe('POST /api/users/change-username', () => {
 
   it('allows re-submitting your own current username unchanged (idempotent)', async () => {
     const user = await createUser({ username: 'mycurrenthandle' });
-    const res = await request(app).post('/api/users/change-username')
+    const res = await request(app)
+      .post('/api/users/change-username')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ username: 'mycurrenthandle' });
     expect(res.status).toBe(200);
@@ -82,9 +87,10 @@ describe('POST /api/users/change-username', () => {
 });
 
 describe('POST /api/users/update-bio', () => {
-  it('stores the raw bio string exactly as submitted, using the app\'s own **bold**/@mention syntax', async () => {
+  it("stores the raw bio string exactly as submitted, using the app's own **bold**/@mention syntax", async () => {
     const user = await createUser();
-    const res = await request(app).post('/api/users/update-bio')
+    const res = await request(app)
+      .post('/api/users/update-bio')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ bio: '**Hello** *world* @alice #tag [site](https://example.com)' });
 
@@ -94,7 +100,8 @@ describe('POST /api/users/update-bio', () => {
 
   it('stores a literal HTML tag as inert plain text — there is no HTML sanitization step because bio is never rendered as HTML', async () => {
     const user = await createUser();
-    const res = await request(app).post('/api/users/update-bio')
+    const res = await request(app)
+      .post('/api/users/update-bio')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ bio: '<script>alert(1)</script>Hi there' });
 
@@ -108,7 +115,8 @@ describe('POST /api/users/update-bio', () => {
   it('rejects a bio over the word limit', async () => {
     const user = await createUser();
     const longBio = new Array(151).fill('word').join(' ');
-    const res = await request(app).post('/api/users/update-bio')
+    const res = await request(app)
+      .post('/api/users/update-bio')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ bio: longBio });
 
@@ -119,7 +127,8 @@ describe('POST /api/users/update-bio', () => {
   it('allows a bio right at the word limit', async () => {
     const user = await createUser();
     const bio = new Array(150).fill('word').join(' ');
-    const res = await request(app).post('/api/users/update-bio')
+    const res = await request(app)
+      .post('/api/users/update-bio')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ bio });
 
@@ -128,7 +137,8 @@ describe('POST /api/users/update-bio', () => {
 
   it('rejects a bio over the character limit even if under the word limit (e.g. one very long word)', async () => {
     const user = await createUser();
-    const res = await request(app).post('/api/users/update-bio')
+    const res = await request(app)
+      .post('/api/users/update-bio')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ bio: 'a'.repeat(1001) });
 
@@ -138,7 +148,8 @@ describe('POST /api/users/update-bio', () => {
 
   it('allows a bio right at the character limit', async () => {
     const user = await createUser();
-    const res = await request(app).post('/api/users/update-bio')
+    const res = await request(app)
+      .post('/api/users/update-bio')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ bio: 'a'.repeat(1000) });
 
@@ -149,7 +160,8 @@ describe('POST /api/users/update-bio', () => {
 describe('POST /api/users/delete-account', () => {
   it('requires the correct password', async () => {
     const user = await createUser({ password: 'correctpassword' });
-    const res = await request(app).post('/api/users/delete-account')
+    const res = await request(app)
+      .post('/api/users/delete-account')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({ password: 'wrongpassword' });
 
@@ -160,7 +172,8 @@ describe('POST /api/users/delete-account', () => {
 
   it('rejects with no password provided', async () => {
     const user = await createUser();
-    const res = await request(app).post('/api/users/delete-account')
+    const res = await request(app)
+      .post('/api/users/delete-account')
       .set('Authorization', `Bearer ${tokenFor(user)}`)
       .send({});
     expect(res.status).toBe(400);
@@ -172,7 +185,8 @@ describe('POST /api/users/delete-account', () => {
     const room = await Room.create({ people: [user._id, other._id], isGroup: false });
     const { token, session } = await require('./helpers/app').tokenForDevice(user);
 
-    const res = await request(app).post('/api/users/delete-account')
+    const res = await request(app)
+      .post('/api/users/delete-account')
       .set('Authorization', `Bearer ${token}`)
       .send({ password: 'correctpassword' });
 

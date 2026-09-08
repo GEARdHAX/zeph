@@ -18,11 +18,27 @@
 const mediasoupModule = require('../src/mediasoup/index');
 
 const {
-  cleanupSocketResources, closeProducer, closeConsumer, producerTransports, consumerTransports, producers, consumers,
+  cleanupSocketResources,
+  closeProducer,
+  closeConsumer,
+  producerTransports,
+  consumerTransports,
+  producers,
+  consumers,
 } = mediasoupModule.__testHelpers;
 
-const fakeTransport = () => ({ closed: false, close() { this.closed = true; } });
-const fakeMediaObject = () => ({ closed: false, close: jest.fn(async function close() { this.closed = true; }) });
+const fakeTransport = () => ({
+  closed: false,
+  close() {
+    this.closed = true;
+  },
+});
+const fakeMediaObject = () => ({
+  closed: false,
+  close: jest.fn(async function close() {
+    this.closed = true;
+  }),
+});
 
 afterEach(() => {
   // These are module-level singletons shared across the whole test file
@@ -63,7 +79,7 @@ describe('cleanupSocketResources', () => {
     expect(() => cleanupSocketResources('never-connected')).not.toThrow();
   });
 
-  it('does not affect a different socket\'s resources', () => {
+  it("does not affect a different socket's resources", () => {
     const keepTransport = fakeTransport();
     producerTransports['sock-keep'] = keepTransport;
     producerTransports['sock-remove'] = fakeTransport();
@@ -133,7 +149,7 @@ describe('closeConsumer — regression test for the producerID-vs-consumer.id ke
     expect('producer-a' in consumers['sock-1']).toBe(false);
   });
 
-  it('does NOT find the entry if looked up by consumer.id instead of producerID — proves the old code\'s lookup was broken', async () => {
+  it("does NOT find the entry if looked up by consumer.id instead of producerID — proves the old code's lookup was broken", async () => {
     const consumer = fakeMediaObject();
     consumer.id = 'consumer-xyz';
     consumers['sock-1'] = { 'producer-a': consumer };

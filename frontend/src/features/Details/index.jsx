@@ -34,9 +34,7 @@ function Details() {
       <TopBar back={closeDetails} />
 
       {/* Main Panel Content */}
-      <div className="flex-1 overflow-y-auto">
-        {getComponent()}
-      </div>
+      <div className="flex-1 overflow-y-auto">{getComponent()}</div>
     </div>
   );
 }

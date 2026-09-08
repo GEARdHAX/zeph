@@ -17,7 +17,12 @@ const DEFAULT_WINDOW_MS = 5 * 60 * 1000; // spec section 8's "5 minutes" — the
 // (actor.userId + timestamp, one $group pass) so this stays consistent
 // with the deterministic risk engine's own notion of "this user's recent
 // behavior," not a second, subtly different counting method.
-const extractAuthFeatures = async ({ userId, windowMs = DEFAULT_WINDOW_MS, newDevice = false, sessionAgeMs = null }) => {
+const extractAuthFeatures = async ({
+  userId,
+  windowMs = DEFAULT_WINDOW_MS,
+  newDevice = false,
+  sessionAgeMs = null,
+}) => {
   if (!userId) return null;
   const since = new Date(Date.now() - windowMs);
 
@@ -62,7 +67,9 @@ const extractHostFeatures = async ({ sensorId, hostId, windowMs = DEFAULT_WINDOW
   const [{ uniqueDestinations = [] } = {}] = await SecurityEvent.aggregate([
     {
       $match: {
-        'metadata.sensorId': sensorId, timestamp: { $gte: since }, 'metadata.destinationIp': { $exists: true, $ne: null },
+        'metadata.sensorId': sensorId,
+        timestamp: { $gte: since },
+        'metadata.destinationIp': { $exists: true, $ne: null },
       },
     },
     { $group: { _id: null, uniqueDestinations: { $addToSet: '$metadata.destinationIp' } } },

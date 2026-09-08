@@ -25,15 +25,16 @@ router.post('*', async (req, res) => {
   // consume) — same enumeration-safety reasoning as login.js's
   // LOGIN_FAILED: the reason is metadata-only telemetry, never surfaced in
   // the (already-generic) HTTP response.
-  const recordFailure = (reason) => SecurityEventService.record({
-    type: 'PASSWORD_RESET_FAILED',
-    severity: 'medium',
-    actor: user ? { userId: user._id.toString() } : {},
-    source: context,
-    target: { resource: '/api/auth/change', action: 'reset_password' },
-    result: 'failure',
-    metadata: { reason },
-  });
+  const recordFailure = (reason) =>
+    SecurityEventService.record({
+      type: 'PASSWORD_RESET_FAILED',
+      severity: 'medium',
+      actor: user ? { userId: user._id.toString() } : {},
+      source: context,
+      target: { resource: '/api/auth/change', action: 'reset_password' },
+      result: 'failure',
+      metadata: { reason },
+    });
 
   if (!email) {
     return res.status(404).json({ status: 'error', code: 'email required' });
@@ -81,10 +82,7 @@ router.post('*', async (req, res) => {
   // Atomically consume the code — a losing concurrent request (replay, or
   // two simultaneous submits of the same code) sees valid:false and falls
   // through to the same generic invalid/expired response above.
-  const consumed = await AuthCode.findOneAndUpdate(
-    { _id: authCode._id, valid: true },
-    { $set: { valid: false } },
-  );
+  const consumed = await AuthCode.findOneAndUpdate({ _id: authCode._id, valid: true }, { $set: { valid: false } });
   if (!consumed) {
     recordFailure('code_already_consumed');
     return res.status(404).json(INVALID_CODE_RESPONSE);

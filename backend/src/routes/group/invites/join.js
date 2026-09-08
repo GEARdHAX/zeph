@@ -55,7 +55,10 @@ module.exports = async (req, res) => {
       { group: room._id, user: userId },
       {
         $setOnInsert: {
-          role: 'MEMBER', joinedAt: new Date(), joinedVia: 'INVITE_LINK', invitedBy: invite.creator,
+          role: 'MEMBER',
+          joinedAt: new Date(),
+          joinedVia: 'INVITE_LINK',
+          invitedBy: invite.creator,
         },
         $set: { active: true, status: 'ACTIVE', updatedAt: new Date() },
       },
@@ -81,16 +84,24 @@ module.exports = async (req, res) => {
     // appears in their sidebar despite the join having actually succeeded.
     const recipientIds = [...room.people, userId];
     broadcastToGroup(recipientIds, 'group:member:added', {
-      groupId: room._id, userId, role: membership.role,
+      groupId: room._id,
+      userId,
+      role: membership.role,
     });
 
     const inviter = await User.findById(invite.creator).select('firstName lastName username');
-    const inviterName = inviter ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.username : null;
+    const inviterName = inviter
+      ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.username
+      : null;
     const joiner = await User.findById(userId).select('firstName lastName username');
-    const joinerName = joiner ? `${joiner.firstName || ''} ${joiner.lastName || ''}`.trim() || joiner.username : 'A member';
+    const joinerName = joiner
+      ? `${joiner.firstName || ''} ${joiner.lastName || ''}`.trim() || joiner.username
+      : 'A member';
     await postSystemMessage(
       room._id,
-      inviterName ? `${joinerName} joined via invite link, invited by ${inviterName}` : `${joinerName} joined via invite link`,
+      inviterName
+        ? `${joinerName} joined via invite link, invited by ${inviterName}`
+        : `${joinerName} joined via invite link`,
       recipientIds,
     ).catch((err) => logger.warn({ err, groupId: room._id }, 'Failed to post join system message'));
   }

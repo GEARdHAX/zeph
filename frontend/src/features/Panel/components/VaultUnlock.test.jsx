@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setGlobal } from 'reactn';
@@ -36,7 +34,10 @@ import { unlockVaultWithPasskey } from '../../../actions/vaultWebauthn';
 
 function renderVaultUnlock() {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   render(
@@ -50,7 +51,10 @@ function renderVaultUnlock() {
 
 beforeEach(async () => {
   await setGlobal({
-    vaultToken: null, vaultRooms: [], user: { id: 'user-1' }, over: null,
+    vaultToken: null,
+    vaultRooms: [],
+    user: { id: 'user-1' },
+    over: null,
   });
   getVaultStatus.mockReset();
   getVaultList.mockReset();
@@ -129,9 +133,13 @@ describe('VaultUnlock — unlock (vault already configured)', () => {
     unlockVaultPin.mockResolvedValue({ data: { vaultToken: 'vt-abc' } });
     getVaultList.mockResolvedValue({
       data: {
-        rooms: [{
-          _id: 'room-9', isGroup: false, people: [{ _id: 'user-1' }, { _id: 'user-2', firstName: 'Hidden', lastName: 'Friend' }],
-        }],
+        rooms: [
+          {
+            _id: 'room-9',
+            isGroup: false,
+            people: [{ _id: 'user-1' }, { _id: 'user-2', firstName: 'Hidden', lastName: 'Friend' }],
+          },
+        ],
       },
     });
     renderVaultUnlock();

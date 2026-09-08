@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -63,9 +61,9 @@ describe('SecurityEvents viewer', () => {
 
     await user.selectOptions(screen.getByDisplayValue('All types'), 'LOGIN_FAILED');
 
-    await waitFor(() => expect(listSecurityEvents).toHaveBeenLastCalledWith(
-      expect.objectContaining({ type: 'LOGIN_FAILED' }),
-    ));
+    await waitFor(() =>
+      expect(listSecurityEvents).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'LOGIN_FAILED' })),
+    );
   });
 
   it('enables Next only when the API returns a cursor', async () => {
@@ -115,7 +113,10 @@ describe('SecurityEvents viewer — Zero Trust decision detail (Phase 2)', () =>
     source: { ip: '1.2.3.4', deviceId: null },
     result: 'blocked',
     metadata: {
-      riskScore: 74, riskLevel: 'HIGH', policy: 'sensitive_action', reason: 'risk_above_threshold',
+      riskScore: 74,
+      riskLevel: 'HIGH',
+      policy: 'sensitive_action',
+      reason: 'risk_above_threshold',
     },
   };
 

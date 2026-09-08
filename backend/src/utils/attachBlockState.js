@@ -9,9 +9,7 @@ const Relationship = require('../models/Relationship');
 // presence.js's own block filtering. One query per call covers every person
 // in the room, not one query per person.
 const attachBlockState = async (people, callerID) => {
-  const otherIds = (people || [])
-    .map((p) => p._id)
-    .filter((id) => id && id.toString() !== callerID.toString());
+  const otherIds = (people || []).map((p) => p._id).filter((id) => id && id.toString() !== callerID.toString());
   if (!otherIds.length) return people;
 
   const relationships = await Relationship.find({
@@ -20,13 +18,14 @@ const attachBlockState = async (people, callerID) => {
       { requester: callerID, recipient: { $in: otherIds } },
       { requester: { $in: otherIds }, recipient: callerID },
     ],
-  }).select('requester recipient blockedBy').lean();
+  })
+    .select('requester recipient blockedBy')
+    .lean();
 
   const byOtherId = new Map();
   relationships.forEach((rel) => {
-    const otherId = rel.requester.toString() === callerID.toString()
-      ? rel.recipient.toString()
-      : rel.requester.toString();
+    const otherId =
+      rel.requester.toString() === callerID.toString() ? rel.recipient.toString() : rel.requester.toString();
     byOtherId.set(otherId, rel.blockedBy.toString());
   });
 

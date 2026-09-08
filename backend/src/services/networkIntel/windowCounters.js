@@ -21,13 +21,14 @@ const exfilKey = (sensorId, pid, destinationIp) => `${KEY_PREFIX}exfil:${sensorI
 // counts (fail toward "no signal," never toward "flag everything" — the
 // same conservative direction every other Redis-backed module in this
 // codebase takes on an outage).
-const recordFlow = async ({
-  sensorId, pid, destinationIp, destinationPort, bytesSent, windowMs,
-}) => {
+const recordFlow = async ({ sensorId, pid, destinationIp, destinationPort, bytesSent, windowMs }) => {
   const redis = getClient();
   if (!redis || !sensorId || !Number.isInteger(pid)) {
     return {
-      distinctPorts: 0, distinctHosts: 0, beaconTimestamps: [], cumulativeBytes: 0,
+      distinctPorts: 0,
+      distinctHosts: 0,
+      beaconTimestamps: [],
+      cumulativeBytes: 0,
     };
   }
 
@@ -58,10 +59,7 @@ const recordFlow = async ({
     }
 
     const results = await pipeline.exec();
-    const [distinctPorts, distinctHosts] = await Promise.all([
-      redis.scard(pk),
-      redis.scard(hk),
-    ]);
+    const [distinctPorts, distinctHosts] = await Promise.all([redis.scard(pk), redis.scard(hk)]);
     const beaconTimestamps = bk ? (await redis.zrange(bk, 0, -1)).map(Number) : [];
     const cumulativeBytes = ek ? Number(await redis.get(ek)) || 0 : 0;
 
@@ -71,12 +69,18 @@ const recordFlow = async ({
     if (failed) logger.warn({ err: failed[0], sensorId, pid }, 'network_intel_window_counter_partial_failure');
 
     return {
-      distinctPorts, distinctHosts, beaconTimestamps, cumulativeBytes,
+      distinctPorts,
+      distinctHosts,
+      beaconTimestamps,
+      cumulativeBytes,
     };
   } catch (err) {
     logger.warn({ err, sensorId, pid }, 'network_intel_window_counter_failed');
     return {
-      distinctPorts: 0, distinctHosts: 0, beaconTimestamps: [], cumulativeBytes: 0,
+      distinctPorts: 0,
+      distinctHosts: 0,
+      beaconTimestamps: [],
+      cumulativeBytes: 0,
     };
   }
 };

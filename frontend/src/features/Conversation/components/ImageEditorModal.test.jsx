@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ImageEditorModal from './ImageEditorModal';
@@ -12,9 +10,15 @@ vi.mock('../../../lib/getCroppedImageBlob', () => ({ default: vi.fn() }));
 // directly with a fixed crop region.
 vi.mock('react-easy-crop', () => ({
   default: ({ onCropComplete }) => {
-    onCropComplete({}, {
-      x: 0, y: 0, width: 100, height: 100,
-    });
+    onCropComplete(
+      {},
+      {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      },
+    );
     return null;
   },
 }));
@@ -70,7 +74,7 @@ describe('ImageEditorModal', () => {
     expect(getCroppedImageBlob).not.toHaveBeenCalled();
   });
 
-  it('Escape triggers onCancel via the dialog\'s built-in handling', async () => {
+  it("Escape triggers onCancel via the dialog's built-in handling", async () => {
     const user = userEvent.setup();
     const { onCancel } = renderModal();
 
@@ -79,7 +83,7 @@ describe('ImageEditorModal', () => {
     await waitFor(() => expect(onCancel).toHaveBeenCalled());
   });
 
-  it('Done processes the crop and calls onDone with a File of the returned blob\'s type', async () => {
+  it("Done processes the crop and calls onDone with a File of the returned blob's type", async () => {
     const user = userEvent.setup();
     getCroppedImageBlob.mockResolvedValue(new Blob(['x'], { type: 'image/jpeg' }));
     const { onDone } = renderModal();

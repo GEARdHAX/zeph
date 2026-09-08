@@ -37,23 +37,29 @@ const processIncidentAnalysis = async (job) => {
     return;
   }
 
-  await SecurityIncident.updateOne({ incidentId }, {
-    $set: {
-      'aiAnalysis.analysisId': analysis.result.analysisId,
-      'aiAnalysis.anomalous': analysis.result.anomalous,
-      'aiAnalysis.confidence': analysis.result.confidence,
-      'aiAnalysis.category': analysis.result.category,
-      'aiAnalysis.summary': analysis.result.explanation,
-      'aiAnalysis.model': analysis.result.model,
-      'aiAnalysis.modelTier': analysis.result.modelTier,
-      'aiAnalysis.promptVersion': analysis.result.promptVersion,
-      'aiAnalysis.schemaVersion': analysis.result.schemaVersion,
-      'aiAnalysis.analyzedAt': new Date(),
-      updatedAt: new Date(),
+  await SecurityIncident.updateOne(
+    { incidentId },
+    {
+      $set: {
+        'aiAnalysis.analysisId': analysis.result.analysisId,
+        'aiAnalysis.anomalous': analysis.result.anomalous,
+        'aiAnalysis.confidence': analysis.result.confidence,
+        'aiAnalysis.category': analysis.result.category,
+        'aiAnalysis.summary': analysis.result.explanation,
+        'aiAnalysis.model': analysis.result.model,
+        'aiAnalysis.modelTier': analysis.result.modelTier,
+        'aiAnalysis.promptVersion': analysis.result.promptVersion,
+        'aiAnalysis.schemaVersion': analysis.result.schemaVersion,
+        'aiAnalysis.analyzedAt': new Date(),
+        updatedAt: new Date(),
+      },
     },
-  });
+  );
 
-  logger.info({ incidentId, analysisId: analysis.result.analysisId, anomalous: analysis.result.anomalous }, 'security_ai_incident_analyzed');
+  logger.info(
+    { incidentId, analysisId: analysis.result.analysisId, anomalous: analysis.result.anomalous },
+    'security_ai_incident_analyzed',
+  );
 };
 
 // Only started when Redis is configured — same best-effort posture as
@@ -73,7 +79,9 @@ const startSecurityAiWorker = () => {
   // actually serve concurrently, matching spec section 66's "configure
   // concurrency... do not allow infinite retries."
   const worker = new Worker(QUEUE_NAME, processIncidentAnalysis, { connection, concurrency: 2 });
-  worker.on('failed', (job, err) => logger.error({ err, incidentId: job?.data?.incidentId }, 'security_ai_worker_job_failed'));
+  worker.on('failed', (job, err) =>
+    logger.error({ err, incidentId: job?.data?.incidentId }, 'security_ai_worker_job_failed'),
+  );
   logger.info('Security AI worker started');
   return worker;
 };

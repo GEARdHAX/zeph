@@ -1,9 +1,5 @@
-import {
-  useState, useRef, useEffect, useCallback,
-} from 'react';
-import {
-  Play, Pause, Volume2, VolumeX, AudioLines,
-} from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Play, Pause, Volume2, VolumeX, AudioLines } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -13,7 +9,9 @@ const PLAYBACK_RATES = [0.5, 1, 1.5, 2];
 const formatTime = (seconds) => {
   if (!Number.isFinite(seconds)) return '0:00';
   const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+  const secs = Math.floor(seconds % 60)
+    .toString()
+    .padStart(2, '0');
   return `${mins}:${secs}`;
 };
 
@@ -101,9 +99,7 @@ function AudioViewer({ src }) {
           {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
 
-        <span className="w-9 shrink-0 text-right text-xs tabular-nums text-white/60">
-          {formatTime(currentTime)}
-        </span>
+        <span className="w-9 shrink-0 text-right text-xs tabular-nums text-white/60">{formatTime(currentTime)}</span>
         <Slider
           value={[currentTime]}
           min={0}
@@ -113,9 +109,7 @@ function AudioViewer({ src }) {
           onValueChange={seek}
           className="flex-1"
         />
-        <span className="w-9 shrink-0 text-xs tabular-nums text-white/60">
-          {formatTime(duration)}
-        </span>
+        <span className="w-9 shrink-0 text-xs tabular-nums text-white/60">{formatTime(duration)}</span>
       </div>
 
       <div className="flex items-center justify-between gap-4">
@@ -125,14 +119,7 @@ function AudioViewer({ src }) {
           ) : (
             <Volume2 className="h-3.5 w-3.5 text-white/60" />
           )}
-          <Slider
-            value={[volume]}
-            min={0}
-            max={1}
-            step={0.05}
-            onValueChange={changeVolume}
-            className="w-20"
-          />
+          <Slider value={[volume]} min={0} max={1} step={0.05} onValueChange={changeVolume} className="w-20" />
         </div>
 
         <div className="flex items-center gap-1">
@@ -148,8 +135,7 @@ function AudioViewer({ src }) {
                 rate === value && 'bg-white/15 text-white',
               )}
             >
-              {value}
-              x
+              {value}x
             </Button>
           ))}
         </div>

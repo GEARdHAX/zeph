@@ -41,7 +41,8 @@ describe('Message send — recipient account status', () => {
     const room = await Room.create({ people: [sender._id, victim._id], isGroup: false });
     await User.deleteOne({ _id: victim._id });
 
-    const res = await request(app).post('/api/message')
+    const res = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(sender)}`)
       .send({ roomID: room._id.toString(), content: 'hi', type: 'text' });
 
@@ -56,7 +57,8 @@ describe('Message send — recipient account status', () => {
     const recipient = await createUser({ accountStatus: 'DEACTIVATED' });
     const room = await Room.create({ people: [sender._id, recipient._id], isGroup: false });
 
-    const res = await request(app).post('/api/message')
+    const res = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(sender)}`)
       .send({ roomID: room._id.toString(), content: 'hi', type: 'text' });
 
@@ -71,7 +73,8 @@ describe('Message send — recipient account status', () => {
     const recipient = await createUser();
     const room = await Room.create({ people: [sender._id, recipient._id], isGroup: false });
 
-    const res = await request(app).post('/api/message')
+    const res = await request(app)
+      .post('/api/message')
       .set('Authorization', `Bearer ${tokenFor(sender)}`)
       .send({ roomID: room._id.toString(), content: 'hi', type: 'text' });
 

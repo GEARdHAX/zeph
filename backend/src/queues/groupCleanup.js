@@ -36,29 +36,36 @@ const getQueue = () => {
 const enqueueGroupCleanup = async (groupId) => {
   const q = getQueue();
   if (!q) {
-    logger.info({ groupId }, 'Group cleanup not enqueued — Redis not configured, skipping (data stays until manually cleaned)');
+    logger.info(
+      { groupId },
+      'Group cleanup not enqueued — Redis not configured, skipping (data stays until manually cleaned)',
+    );
     return;
   }
   try {
-    await q.add('cleanup', { groupId }, {
-      delay: CLEANUP_DELAY_MS,
-      // groupId as jobId — re-deleting an already-deleted group (route
-      // itself already blocks this via the disabledAt 404 check, but belt-
-      // and-suspenders) can never double-enqueue the same cleanup.
-      jobId: groupId,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-      // Phase 7 audit finding: unlike security-ai-analysis's queue (which
-      // already bounds both), this queue had no removeOnComplete/
-      // removeOnFail at all — completed/failed job records accumulated in
-      // Redis indefinitely. Same 24h bound as security-ai-analysis; a
-      // completed/failed group-cleanup job has no ongoing value past that
-      // window (the actual cleanup effect — deleted Messages/Media/R2
-      // objects — already happened or didn't; the job record itself is
-      // just an audit trail with a short useful life).
-      removeOnComplete: { age: 24 * 60 * 60 },
-      removeOnFail: { age: 24 * 60 * 60 },
-    });
+    await q.add(
+      'cleanup',
+      { groupId },
+      {
+        delay: CLEANUP_DELAY_MS,
+        // groupId as jobId — re-deleting an already-deleted group (route
+        // itself already blocks this via the disabledAt 404 check, but belt-
+        // and-suspenders) can never double-enqueue the same cleanup.
+        jobId: groupId,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        // Phase 7 audit finding: unlike security-ai-analysis's queue (which
+        // already bounds both), this queue had no removeOnComplete/
+        // removeOnFail at all — completed/failed job records accumulated in
+        // Redis indefinitely. Same 24h bound as security-ai-analysis; a
+        // completed/failed group-cleanup job has no ongoing value past that
+        // window (the actual cleanup effect — deleted Messages/Media/R2
+        // objects — already happened or didn't; the job record itself is
+        // just an audit trail with a short useful life).
+        removeOnComplete: { age: 24 * 60 * 60 },
+        removeOnFail: { age: 24 * 60 * 60 },
+      },
+    );
     logger.info({ groupId, delayMs: CLEANUP_DELAY_MS }, 'Group cleanup job enqueued');
   } catch (err) {
     logger.warn({ err, groupId }, 'Failed to enqueue group cleanup job');

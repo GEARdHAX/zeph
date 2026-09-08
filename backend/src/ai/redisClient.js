@@ -13,7 +13,10 @@ const getClient = () => {
   if (!store.config?.redisUrl) return null;
   if (!client) {
     client = new IORedis(store.config.redisUrl, {
-      maxRetriesPerRequest: 1, connectTimeout: 3000, retryStrategy: () => null, lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+      retryStrategy: () => null,
+      lazyConnect: true,
     });
     client.on('error', (err) => logger.warn({ err }, 'Zeph AI Redis client error'));
   }

@@ -61,17 +61,15 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const tokenFor = (user) => jwt.sign(
-  { id: user._id.toString(), email: user.email, level: user.level },
-  config.secret,
-  { expiresIn: '1h' },
-);
+const tokenFor = (user) =>
+  jwt.sign({ id: user._id.toString(), email: user.email, level: user.level }, config.secret, { expiresIn: '1h' });
 
-const connectAndAuth = (user) => new Promise((resolve) => {
-  const client = ioc(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
-  client.on('connect', () => client.emit('authenticate', { token: tokenFor(user) }));
-  client.on('authenticated', () => resolve(client));
-});
+const connectAndAuth = (user) =>
+  new Promise((resolve) => {
+    const client = ioc(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
+    client.on('connect', () => client.emit('authenticate', { token: tokenFor(user) }));
+    client.on('authenticated', () => resolve(client));
+  });
 
 // Phase 7 audit finding: both events/more-messages.js and
 // events/more-images.js previously trusted a client-supplied roomID with
@@ -94,7 +92,7 @@ describe('more-messages socket event — authorization', () => {
     client.close();
   });
 
-  it('a non-member gets 403, not the room\'s messages', async () => {
+  it("a non-member gets 403, not the room's messages", async () => {
     const member = await createUser();
     const outsider = await createUser();
     const room = await Room.create({ people: [member._id], title: 'Room', isGroup: true });
@@ -139,7 +137,7 @@ describe('more-images socket event — authorization', () => {
     client.close();
   });
 
-  it('a non-member gets 403, not the room\'s images', async () => {
+  it("a non-member gets 403, not the room's images", async () => {
     const member = await createUser();
     const outsider = await createUser();
     const room = await Room.create({ people: [member._id], title: 'Room', isGroup: true });

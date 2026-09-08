@@ -75,7 +75,9 @@ function ChangePasswordPopup({ onClose }) {
             onChange={(e) => setRepeatPassword(e.target.value)}
             error={errors && errors.repeatPassword}
           />
-          <Button type="submit" disabled={busy}>{busy ? 'Changing…' : 'Change Password'}</Button>
+          <Button type="submit" disabled={busy}>
+            {busy ? 'Changing…' : 'Change Password'}
+          </Button>
           <Button type="button" variant="secondary" onClick={() => onClose()} disabled={busy}>
             Cancel
           </Button>

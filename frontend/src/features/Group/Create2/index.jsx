@@ -1,10 +1,6 @@
-import {
-  useRef, useState, lazy, Suspense,
-} from 'react';
+import { useRef, useState, lazy, Suspense } from 'react';
 import { useGlobal } from 'reactn';
-import {
-  Pencil, Users, Check, ArrowRight,
-} from 'lucide-react';
+import { Pencil, Users, Check, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
@@ -106,10 +102,7 @@ function CreateGroupStepTwo() {
           />
 
           {/* Group Picture selector */}
-          <div
-            className="group relative my-4 cursor-pointer"
-            onClick={() => fileInput?.current?.click()}
-          >
+          <div className="group relative my-4 cursor-pointer" onClick={() => fileInput?.current?.click()}>
             <GroupPicture picture={groupPicture} title={title} />
             <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100">
               <Pencil className="h-6 w-6" />

@@ -42,10 +42,21 @@ const sanitizeContext = (raw) => {
   // nothing else. A field name not in this list (even a plausible-looking
   // one) is dropped, not passed through.
   const numericFields = [
-    'failedLoginCount', 'rateLimitCount', 'permissionDeniedCount', 'sessionAgeMs',
-    'processAnomalyCount', 'networkAnomalyCount', 'portScanCount', 'hostScanCount',
-    'beaconingCount', 'exfiltrationCount', 'dnsAnomalyCount', 'maliciousIpCount',
-    'uniqueDestinationCount', 'connectionCount', 'dnsQueryCount',
+    'failedLoginCount',
+    'rateLimitCount',
+    'permissionDeniedCount',
+    'sessionAgeMs',
+    'processAnomalyCount',
+    'networkAnomalyCount',
+    'portScanCount',
+    'hostScanCount',
+    'beaconingCount',
+    'exfiltrationCount',
+    'dnsAnomalyCount',
+    'maliciousIpCount',
+    'uniqueDestinationCount',
+    'connectionCount',
+    'dnsQueryCount',
   ];
   numericFields.forEach((field) => {
     if (isSafeNumber(raw[field])) out[field] = raw[field];
@@ -66,7 +77,10 @@ const sanitizeContext = (raw) => {
   // (indicators.js's IndicatorTypes).
   if (Array.isArray(raw.threatSignals)) {
     out.threatSignals = raw.threatSignals
-      .filter((t) => t && typeof t === 'object' && ['IP', 'DOMAIN', 'URL', 'HASH'].includes(t.type) && isSafeNumber(t.confidence))
+      .filter(
+        (t) =>
+          t && typeof t === 'object' && ['IP', 'DOMAIN', 'URL', 'HASH'].includes(t.type) && isSafeNumber(t.confidence),
+      )
       .map((t) => ({ type: t.type, confidence: Math.min(100, Math.max(0, Math.round(t.confidence))) }))
       .slice(0, 10);
   }

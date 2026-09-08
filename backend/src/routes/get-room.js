@@ -35,8 +35,7 @@ module.exports = async (req, res, next) => {
       // history they already have — only a current member gets the
       // defense-in-depth GroupMember re-check below. See canReadRoomHistory.
       const isCurrentMember = room.people.some((person) => person._id.toString() === req.user.id.toString());
-      const canRead = isCurrentMember
-        || (room.isGroup && await groupPolicy.wasEverMember(room._id, req.user.id));
+      const canRead = isCurrentMember || (room.isGroup && (await groupPolicy.wasEverMember(room._id, req.user.id)));
       if (!canRead) return res.status(403).json({ error: true });
 
       // Defense in depth for groups: Room.people is a synced cache, but
@@ -52,7 +51,9 @@ module.exports = async (req, res, next) => {
       // manipulated/guessed room id for an admin's DM is indistinguishable
       // from one that doesn't exist at all.
       const boundaryViolation = await roomHasBoundaryViolation({
-        room, callerID: req.user.id, callerLevel: req.user.level,
+        room,
+        callerID: req.user.id,
+        callerLevel: req.user.level,
       });
       if (boundaryViolation) return res.status(404).json({ error: true });
 

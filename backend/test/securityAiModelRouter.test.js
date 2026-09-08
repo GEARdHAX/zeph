@@ -16,7 +16,11 @@ describe('countSignalCategories', () => {
 
   it('counts multiple distinct categories', () => {
     const count = countSignalCategories({
-      failedLoginCount: 3, processAnomalyCount: 1, portScanCount: 1, maliciousIpCount: 1, dnsAnomalyCount: 1,
+      failedLoginCount: 3,
+      processAnomalyCount: 1,
+      portScanCount: 1,
+      maliciousIpCount: 1,
+      dnsAnomalyCount: 1,
     });
     expect(count).toBe(5);
   });
@@ -26,7 +30,10 @@ describe('routeModel', () => {
   it('always routes to config.ollamaModel when no large model is configured', () => {
     const config = { ollamaModel: 'llama3.2:1b', aiSecurityLargeModel: null };
     const complexContext = {
-      failedLoginCount: 3, processAnomalyCount: 1, portScanCount: 1, maliciousIpCount: 1,
+      failedLoginCount: 3,
+      processAnomalyCount: 1,
+      portScanCount: 1,
+      maliciousIpCount: 1,
     };
     const result = routeModel(complexContext, config);
     expect(result.model).toBe('llama3.2:1b');
@@ -45,7 +52,11 @@ describe('routeModel', () => {
   it('routes complex multi-signal contexts to the large model when configured', () => {
     const config = { ollamaModel: 'llama3.2:1b', aiSecurityLargeModel: 'llama3.1:7b' };
     const complexContext = {
-      failedLoginCount: 3, processAnomalyCount: 1, portScanCount: 1, maliciousIpCount: 1, dnsAnomalyCount: 1,
+      failedLoginCount: 3,
+      processAnomalyCount: 1,
+      portScanCount: 1,
+      maliciousIpCount: 1,
+      dnsAnomalyCount: 1,
     };
     expect(countSignalCategories(complexContext)).toBeGreaterThan(COMPLEXITY_THRESHOLD);
     const result = routeModel(complexContext, config);
@@ -55,9 +66,17 @@ describe('routeModel', () => {
 
   it('never returns a model name outside config.ollamaModel/config.aiSecurityLargeModel', () => {
     const config = { ollamaModel: 'llama3.2:1b', aiSecurityLargeModel: 'llama3.1:7b' };
-    const allContexts = [{}, { failedLoginCount: 1 }, {
-      failedLoginCount: 1, processAnomalyCount: 1, portScanCount: 1, maliciousIpCount: 1, dnsAnomalyCount: 1,
-    }];
+    const allContexts = [
+      {},
+      { failedLoginCount: 1 },
+      {
+        failedLoginCount: 1,
+        processAnomalyCount: 1,
+        portScanCount: 1,
+        maliciousIpCount: 1,
+        dnsAnomalyCount: 1,
+      },
+    ];
     allContexts.forEach((ctx) => {
       const result = routeModel(ctx, config);
       expect([config.ollamaModel, config.aiSecurityLargeModel]).toContain(result.model);

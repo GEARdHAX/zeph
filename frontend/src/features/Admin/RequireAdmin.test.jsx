@@ -3,11 +3,12 @@ import { render, screen } from '@testing-library/react';
 import { setGlobal } from 'reactn';
 import RequireAdmin from './RequireAdmin';
 
-const renderWith = () => render(
-  <RequireAdmin>
-    <div>Admin Content</div>
-  </RequireAdmin>,
-);
+const renderWith = () =>
+  render(
+    <RequireAdmin>
+      <div>Admin Content</div>
+    </RequireAdmin>,
+  );
 
 describe('RequireAdmin', () => {
   it('renders NotFound (404) for a standard user, not the admin content', async () => {

@@ -76,10 +76,11 @@ describe('POST /api/room/create — DM idempotency and race safety', () => {
     const me = await createUser();
     const other = await createUser();
 
-    const fire = () => request(app)
-      .post('/api/room/create')
-      .set('Authorization', `Bearer ${tokenFor(me)}`)
-      .field('counterpart', other._id.toString());
+    const fire = () =>
+      request(app)
+        .post('/api/room/create')
+        .set('Authorization', `Bearer ${tokenFor(me)}`)
+        .field('counterpart', other._id.toString());
 
     const results = await Promise.all([fire(), fire(), fire(), fire(), fire()]);
     results.forEach((res) => expect(res.status).toBe(200));

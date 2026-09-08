@@ -71,7 +71,11 @@ function Sensors() {
         <Button
           size="sm"
           className="gap-2 rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-          onClick={() => { setShowRegister(true); setIssued(null); setError(''); }}
+          onClick={() => {
+            setShowRegister(true);
+            setIssued(null);
+            setError('');
+          }}
         >
           <Plus className="h-4 w-4" />
           Register Sensor
@@ -93,41 +97,62 @@ function Sensors() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">Loading…</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    Loading…
+                  </td>
+                </tr>
               )}
               {!loading && sensors.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No sensors registered.</td></tr>
-              )}
-              {!loading && sensors.map((s) => (
-                <tr key={s.sensorId} className="border-b border-border/40">
-                  <td className="px-4 py-2.5 font-semibold text-foreground">{s.sensorId}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{s.hostId}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_CLASSES[s.status] || STATUS_CLASSES.offline}`}>
-                      {s.status}
-                    </span>
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    No sensors registered.
                   </td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{s.version || '—'}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
-                    {s.lastHeartbeat ? new Date(s.lastHeartbeat).toLocaleString() : 'Never'}
-                  </td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{s.eventsLast24h}</td>
                 </tr>
-              ))}
+              )}
+              {!loading &&
+                sensors.map((s) => (
+                  <tr key={s.sensorId} className="border-b border-border/40">
+                    <td className="px-4 py-2.5 font-semibold text-foreground">{s.sensorId}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{s.hostId}</td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_CLASSES[s.status] || STATUS_CLASSES.offline}`}
+                      >
+                        {s.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{s.version || '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">
+                      {s.lastHeartbeat ? new Date(s.lastHeartbeat).toLocaleString() : 'Never'}
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{s.eventsLast24h}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       </div>
 
       {showRegister && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowRegister(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowRegister(false)}
+        >
           <div
             className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-bold text-foreground">Register Sensor</h2>
-              <Button variant="ghost" size="sm" className="h-7 rounded-lg text-xs" onClick={() => setShowRegister(false)}>Close</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 rounded-lg text-xs"
+                onClick={() => setShowRegister(false)}
+              >
+                Close
+              </Button>
             </div>
 
             {issued ? (
@@ -136,15 +161,31 @@ function Sensors() {
                   Save this credential now — it is shown exactly once and cannot be retrieved again.
                 </p>
                 <div className="rounded-xl bg-muted/50 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">ZEPH_SENSOR_CREDENTIAL</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    ZEPH_SENSOR_CREDENTIAL
+                  </div>
                   <div className="mt-1 break-all font-mono text-[11px] text-foreground">{issued.credential}</div>
                 </div>
-                <Button size="sm" className="w-full rounded-xl text-xs" onClick={() => { setShowRegister(false); setIssued(null); }}>Done</Button>
+                <Button
+                  size="sm"
+                  className="w-full rounded-xl text-xs"
+                  onClick={() => {
+                    setShowRegister(false);
+                    setIssued(null);
+                  }}
+                >
+                  Done
+                </Button>
               </div>
             ) : (
               <form className="space-y-3" onSubmit={onRegister}>
                 <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="sensorId">Sensor ID</label>
+                  <label
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                    htmlFor="sensorId"
+                  >
+                    Sensor ID
+                  </label>
                   <input
                     id="sensorId"
                     className="h-9 w-full rounded-xl border border-input bg-card/60 px-3 text-xs font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -154,7 +195,12 @@ function Sensors() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="hostId">Host ID</label>
+                  <label
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                    htmlFor="hostId"
+                  >
+                    Host ID
+                  </label>
                   <input
                     id="hostId"
                     className="h-9 w-full rounded-xl border border-input bg-card/60 px-3 text-xs font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"

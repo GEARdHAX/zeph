@@ -155,7 +155,11 @@ describe('POST /api/message/delete — delete for everyone', () => {
     const room = await Room.create({ people: [author._id], isGroup: false });
     const oldDate = new Date(Date.now() - config.messageDeletionWindowMs - 60 * 1000);
     const message = await Message.create({
-      room: room._id, author: author._id, content: 'old message', type: 'text', date: oldDate,
+      room: room._id,
+      author: author._id,
+      content: 'old message',
+      type: 'text',
+      date: oldDate,
     });
 
     const res = await request(app)
@@ -230,7 +234,12 @@ describe('Tombstoned content is stripped from every message-listing route', () =
     const author = await createUser();
     const room = await Room.create({ people: [author._id], isGroup: false });
     const message = await Message.create({
-      room: room._id, author: author._id, content: 'secret', type: 'text', deletedForEveryone: true, deletedAt: new Date(),
+      room: room._id,
+      author: author._id,
+      content: 'secret',
+      type: 'text',
+      deletedForEveryone: true,
+      deletedAt: new Date(),
     });
 
     const res = await request(app)
@@ -248,7 +257,12 @@ describe('Tombstoned content is stripped from every message-listing route', () =
     const author = await createUser();
     const room = await Room.create({ people: [author._id], isGroup: false });
     const older = await Message.create({
-      room: room._id, author: author._id, content: 'secret', type: 'text', deletedForEveryone: true, deletedAt: new Date(),
+      room: room._id,
+      author: author._id,
+      content: 'secret',
+      type: 'text',
+      deletedForEveryone: true,
+      deletedAt: new Date(),
     });
     const newer = await Message.create({ room: room._id, author: author._id, content: 'newer', type: 'text' });
 
@@ -267,7 +281,12 @@ describe('Tombstoned content is stripped from every message-listing route', () =
     const author = await createUser();
     const room = await Room.create({ people: [author._id], isGroup: false });
     const message = await Message.create({
-      room: room._id, author: author._id, content: 'secret', type: 'text', deletedForEveryone: true, deletedAt: new Date(),
+      room: room._id,
+      author: author._id,
+      content: 'secret',
+      type: 'text',
+      deletedForEveryone: true,
+      deletedAt: new Date(),
     });
 
     const res = await request(app)
@@ -285,7 +304,11 @@ describe('Tombstoned content is stripped from every message-listing route', () =
     const other = await createUser();
     const room = await Room.create({ people: [author._id, other._id], isGroup: false });
     const message = await Message.create({
-      room: room._id, author: author._id, content: 'hi', type: 'text', deletedFor: [other._id],
+      room: room._id,
+      author: author._id,
+      content: 'hi',
+      type: 'text',
+      deletedFor: [other._id],
     });
 
     const res = await request(app)
@@ -303,7 +326,11 @@ describe('Tombstoned content is stripped from every message-listing route', () =
     const other = await createUser();
     const room = await Room.create({ people: [author._id, other._id], isGroup: false });
     const hidden = await Message.create({
-      room: room._id, author: author._id, content: 'hi', type: 'text', deletedFor: [other._id],
+      room: room._id,
+      author: author._id,
+      content: 'hi',
+      type: 'text',
+      deletedFor: [other._id],
     });
     const newer = await Message.create({ room: room._id, author: author._id, content: 'newer', type: 'text' });
 
@@ -322,7 +349,11 @@ describe('Tombstoned content is stripped from every message-listing route', () =
     const other = await createUser();
     const room = await Room.create({ people: [author._id, other._id], isGroup: false });
     const message = await Message.create({
-      room: room._id, author: author._id, content: 'still here', type: 'text', deletedFor: [author._id],
+      room: room._id,
+      author: author._id,
+      content: 'still here',
+      type: 'text',
+      deletedFor: [author._id],
     });
 
     const res = await request(app)

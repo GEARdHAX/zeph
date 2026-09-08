@@ -9,11 +9,16 @@ const { authorizeAction, Actions, Decisions } = require('../../authorization/pol
 module.exports = async (req, res, next) => {
   let { roomID, meetingID } = req.fields;
 
-  const user = await User.findOne({ _id: req.user.id }, {
-    email: 0, password: 0, friends: 0, __v: 0, vaultPinHash: 0,
-  }).populate([
-    { path: 'picture', strictPopulate: false },
-  ]);
+  const user = await User.findOne(
+    { _id: req.user.id },
+    {
+      email: 0,
+      password: 0,
+      friends: 0,
+      __v: 0,
+      vaultPinHash: 0,
+    },
+  ).populate([{ path: 'picture', strictPopulate: false }]);
 
   Room.findOne({ _id: roomID })
     .populate({
@@ -33,7 +38,9 @@ module.exports = async (req, res, next) => {
 
       // Admin privacy boundary — see DECISIONS.md.
       const boundaryViolation = await roomHasBoundaryViolation({
-        room, callerID: req.user.id, callerLevel: req.user.level,
+        room,
+        callerID: req.user.id,
+        callerLevel: req.user.level,
       });
       if (boundaryViolation) return res.status(404).json({ error: true });
 
@@ -88,11 +95,14 @@ module.exports = async (req, res, next) => {
         const personUserID = person._id.toString();
 
         if (personUserID !== myUserID) {
-          store.io
-            .to(personUserID)
-            .emit('call', {
-              status: 200, room: { ...room.toObject(), people: sanitizedPeople }, meetingID, roomID, caller: req.user.id, counterpart: user,
-            });
+          store.io.to(personUserID).emit('call', {
+            status: 200,
+            room: { ...room.toObject(), people: sanitizedPeople },
+            meetingID,
+            roomID,
+            caller: req.user.id,
+            counterpart: user,
+          });
         }
       });
 

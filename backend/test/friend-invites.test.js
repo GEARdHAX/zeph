@@ -32,9 +32,10 @@ const createUser = async (overrides = {}) => {
   });
 };
 
-const createInvite = (inviter) => request(app)
-  .post('/api/friends/invites')
-  .set('Authorization', `Bearer ${tokenFor(inviter)}`);
+const createInvite = (inviter) =>
+  request(app)
+    .post('/api/friends/invites')
+    .set('Authorization', `Bearer ${tokenFor(inviter)}`);
 
 const tokenFromUrl = (url) => url.split('/').pop();
 
@@ -162,8 +163,12 @@ describe('Friend invite acceptance', () => {
     const token = tokenFromUrl(created.body.url);
 
     const [resA, resB] = await Promise.all([
-      request(app).post(`/api/friends/invites/${token}/accept`).set('Authorization', `Bearer ${tokenFor(a)}`),
-      request(app).post(`/api/friends/invites/${token}/accept`).set('Authorization', `Bearer ${tokenFor(b)}`),
+      request(app)
+        .post(`/api/friends/invites/${token}/accept`)
+        .set('Authorization', `Bearer ${tokenFor(a)}`),
+      request(app)
+        .post(`/api/friends/invites/${token}/accept`)
+        .set('Authorization', `Bearer ${tokenFor(b)}`),
     ]);
 
     const statuses = [resA.status, resB.status].sort();

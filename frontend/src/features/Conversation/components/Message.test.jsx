@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, vi, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -24,15 +22,26 @@ const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
 const AUTHOR = { _id: 'user-1', firstName: 'Me', lastName: 'Self' };
 
 const TEXT_MESSAGE = {
-  _id: 'm1', type: 'text', content: 'hello **world**', author: AUTHOR, date: new Date().toISOString(),
+  _id: 'm1',
+  type: 'text',
+  content: 'hello **world**',
+  author: AUTHOR,
+  date: new Date().toISOString(),
 };
 const IMAGE_MESSAGE = {
-  _id: 'm2', type: 'image', content: 'shielded-1', author: AUTHOR, date: new Date().toISOString(),
+  _id: 'm2',
+  type: 'image',
+  content: 'shielded-1',
+  author: AUTHOR,
+  date: new Date().toISOString(),
 };
 
 function renderMessage(message) {
   const rootReducer = combineReducers({
-    emoji, io, messages, rtc,
+    emoji,
+    io,
+    messages,
+    rtc,
   });
   const store = createStore(rootReducer, applyMiddleware(thunk));
   render(
@@ -63,7 +72,11 @@ describe('Message — text rendering uses the shared bio/message formatting pars
 
   it('renders a literal HTML tag as inert visible text, never as real markup (no dangerouslySetInnerHTML)', () => {
     const message = {
-      _id: 'm6', type: 'text', content: '<img src=x onerror=alert(1)>', author: AUTHOR, date: new Date().toISOString(),
+      _id: 'm6',
+      type: 'text',
+      content: '<img src=x onerror=alert(1)>',
+      author: AUTHOR,
+      date: new Date().toISOString(),
     };
     renderMessage(message);
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
@@ -75,7 +88,14 @@ describe('Message — Copy option', () => {
   it('shows a Copy option for a text message and writes both text/plain and text/html to the clipboard', async () => {
     const user = userEvent.setup();
     const writeSpy = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal('ClipboardItem', class { constructor(items) { this.items = items; } });
+    vi.stubGlobal(
+      'ClipboardItem',
+      class {
+        constructor(items) {
+          this.items = items;
+        }
+      },
+    );
     Object.defineProperty(navigator, 'clipboard', {
       value: { write: writeSpy, writeText: vi.fn() },
       configurable: true,

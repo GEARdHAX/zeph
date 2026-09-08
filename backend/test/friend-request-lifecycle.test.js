@@ -182,7 +182,10 @@ describe('POST /api/search annotates results with relationship status', () => {
     const me = await createUser({ username: 'Ivy' });
     const blocked = await createUser({ username: 'BlockedRohan', firstName: 'Rohan' });
     await Relationship.create({
-      requester: me._id, recipient: blocked._id, status: 'blocked', blockedBy: me._id,
+      requester: me._id,
+      recipient: blocked._id,
+      status: 'blocked',
+      blockedBy: me._id,
     });
 
     const res = await request(app)

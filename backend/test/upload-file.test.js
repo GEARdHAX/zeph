@@ -41,7 +41,7 @@ const createUser = async () => {
 // The media viewer needs this to route file messages to the right
 // video/audio/PDF/file sub-viewer, so this must actually be saved now.
 describe('POST /api/upload/file — mimetype persistence', () => {
-  it('persists the uploaded file\'s mimetype onto File.type', async () => {
+  it("persists the uploaded file's mimetype onto File.type", async () => {
     const user = await createUser();
     const tmpPath = path.join(os.tmpdir(), `test-upload-${Date.now()}.pdf`);
     fs.writeFileSync(tmpPath, 'fake pdf content');

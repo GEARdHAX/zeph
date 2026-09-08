@@ -53,17 +53,15 @@ const createUser = async () => {
   });
 };
 
-const tokenFor = (user) => jwt.sign(
-  { id: user._id.toString(), email: user.email, level: user.level },
-  config.secret,
-  { expiresIn: '1h' },
-);
+const tokenFor = (user) =>
+  jwt.sign({ id: user._id.toString(), email: user.email, level: user.level }, config.secret, { expiresIn: '1h' });
 
-const connectAndAuth = (user) => new Promise((resolve) => {
-  const client = ioc(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
-  client.on('connect', () => client.emit('authenticate', { token: tokenFor(user) }));
-  client.on('authenticated', () => resolve(client));
-});
+const connectAndAuth = (user) =>
+  new Promise((resolve) => {
+    const client = ioc(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
+    client.on('connect', () => client.emit('authenticate', { token: tokenFor(user) }));
+    client.on('authenticated', () => resolve(client));
+  });
 
 describe('message-delivered socket event', () => {
   it('records delivery and relays it to the other room member, not the acker', async () => {
@@ -79,7 +77,9 @@ describe('message-delivered socket event', () => {
       senderClient.on('message-delivered', (data) => resolve(data));
     });
     const recipientGotEvent = new Promise((resolve, reject) => {
-      recipientClient.on('message-delivered', () => reject(new Error('acker should not receive its own delivery event')));
+      recipientClient.on('message-delivered', () =>
+        reject(new Error('acker should not receive its own delivery event')),
+      );
       setTimeout(resolve, 300);
     });
 

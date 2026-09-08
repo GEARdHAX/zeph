@@ -1,22 +1,26 @@
-import {
-  useEffect, useState, useCallback, useMemo,
-} from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { toast } from 'react-toastify';
-import {
-  Shield, UserX, Ban, Crown, Clock, Check, X, UserPlus2, LogOut, Trash2,
-} from 'lucide-react';
+import { Shield, UserX, Ban, Crown, Clock, Check, X, UserPlus2, LogOut, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from '@/components/ui/sheet';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-  DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -27,9 +31,17 @@ import ProfileView from '../../Panel/components/ProfileView';
 import createRoom from '../../../actions/createRoom';
 import Actions from '../../../constants/Actions';
 import {
-  listGroupMembers, listJoinRequests, approveJoinRequest, denyJoinRequest,
-  removeMember, banMember, changeMemberRole, transferOwnership, updateGroupSettings,
-  leaveGroup, deleteGroup,
+  listGroupMembers,
+  listJoinRequests,
+  approveJoinRequest,
+  denyJoinRequest,
+  removeMember,
+  banMember,
+  changeMemberRole,
+  transferOwnership,
+  updateGroupSettings,
+  leaveGroup,
+  deleteGroup,
 } from '../../../actions/groupAdmin';
 import HelpHint from '../../../tours/HelpHint';
 
@@ -48,7 +60,9 @@ const ROLE_RANK = { OWNER: 3, ADMIN: 2, MEMBER: 1 };
 function MemberAvatar({ person, className = 'h-9 w-9' }) {
   const initials = `${(person.firstName || 'U').charAt(0)}${(person.lastName || '').charAt(0)}`.toUpperCase();
   return (
-    <Avatar className={`${className} border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-bold`}>
+    <Avatar
+      className={`${className} border border-border bg-gradient-to-br from-primary/80 to-rose-700 text-white font-bold`}
+    >
       {person.picture && (
         <img
           src={`${Config.url || ''}/api/images/${person.picture.shieldedID}/256`}
@@ -66,9 +80,7 @@ function MemberAvatar({ person, className = 'h-9 w-9' }) {
 // from Details/Room.jsx's member list for ADMIN/OWNER only — server
 // re-checks every action authoritatively regardless of what this panel
 // shows, so a stale/spoofed client state can't grant anything real.
-function GroupAdminPanel({
-  groupId, myRole, currentSettings, onClose, onSettingsChanged,
-}) {
+function GroupAdminPanel({ groupId, myRole, currentSettings, onClose, onSettingsChanged }) {
   const [members, setMembers] = useState(null);
   const [requests, setRequests] = useState(null);
   const [busyUserId, setBusyUserId] = useState(null);
@@ -99,12 +111,16 @@ function GroupAdminPanel({
   const canModerate = myRole === 'OWNER' || myRole === 'ADMIN';
 
   const loadMembers = useCallback(() => {
-    listGroupMembers(groupId).then((res) => setMembers(res.data.members)).catch(() => toast.error('Could not load members.'));
+    listGroupMembers(groupId)
+      .then((res) => setMembers(res.data.members))
+      .catch(() => toast.error('Could not load members.'));
   }, [groupId]);
 
   const loadRequests = useCallback(() => {
     if (!canModerate) return;
-    listJoinRequests(groupId).then((res) => setRequests(res.data.requests)).catch(() => toast.error('Could not load join requests.'));
+    listJoinRequests(groupId)
+      .then((res) => setRequests(res.data.requests))
+      .catch(() => toast.error('Could not load join requests.'));
   }, [groupId, canModerate]);
 
   useEffect(() => {
@@ -141,9 +157,9 @@ function GroupAdminPanel({
     };
     const onRoleUpdated = (payload) => {
       if (payload.groupId !== groupId) return;
-      setMembers((prev) => (prev
-        ? prev.map((m) => (m.user._id === payload.userId ? { ...m, role: payload.role } : m))
-        : prev));
+      setMembers((prev) =>
+        prev ? prev.map((m) => (m.user._id === payload.userId ? { ...m, role: payload.role } : m)) : prev,
+      );
     };
     const onOwnershipTransferred = () => loadMembers();
     const onJoinRequestCreated = (payload) => {
@@ -192,24 +208,27 @@ function GroupAdminPanel({
     }
   };
 
-  const onApprove = (userId) => withBusy(userId, async () => {
-    await approveJoinRequest(groupId, userId);
-    toast.success('Join request approved.');
-    setRequests((prev) => (prev ? prev.filter((r) => r.user._id !== userId) : prev));
-    loadMembers();
-  });
+  const onApprove = (userId) =>
+    withBusy(userId, async () => {
+      await approveJoinRequest(groupId, userId);
+      toast.success('Join request approved.');
+      setRequests((prev) => (prev ? prev.filter((r) => r.user._id !== userId) : prev));
+      loadMembers();
+    });
 
-  const onDeny = (userId) => withBusy(userId, async () => {
-    await denyJoinRequest(groupId, userId);
-    toast.success('Join request denied.');
-    setRequests((prev) => (prev ? prev.filter((r) => r.user._id !== userId) : prev));
-  });
+  const onDeny = (userId) =>
+    withBusy(userId, async () => {
+      await denyJoinRequest(groupId, userId);
+      toast.success('Join request denied.');
+      setRequests((prev) => (prev ? prev.filter((r) => r.user._id !== userId) : prev));
+    });
 
-  const onRoleChange = (userId, role) => withBusy(userId, async () => {
-    await changeMemberRole(groupId, userId, role);
-    toast.success(role === 'ADMIN' ? 'User was promoted to admin.' : 'User was demoted to member.');
-    setMembers((prev) => (prev ? prev.map((m) => (m.user._id === userId ? { ...m, role } : m)) : prev));
-  });
+  const onRoleChange = (userId, role) =>
+    withBusy(userId, async () => {
+      await changeMemberRole(groupId, userId, role);
+      toast.success(role === 'ADMIN' ? 'User was promoted to admin.' : 'User was demoted to member.');
+      setMembers((prev) => (prev ? prev.map((m) => (m.user._id === userId ? { ...m, role } : m)) : prev));
+    });
 
   const onConfirmedAction = async () => {
     const { type, person } = confirmAction;
@@ -276,7 +295,9 @@ function GroupAdminPanel({
       toast.success('Slow mode updated.');
       onSettingsChanged?.({ slowModeSeconds: seconds });
     } catch (err) {
-      toast.error(err.response?.data?.reason === 'INVALID_SLOW_MODE' ? 'Invalid slow-mode value.' : 'Could not update slow mode.');
+      toast.error(
+        err.response?.data?.reason === 'INVALID_SLOW_MODE' ? 'Invalid slow-mode value.' : 'Could not update slow mode.',
+      );
     }
   };
 
@@ -330,7 +351,10 @@ function GroupAdminPanel({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="z-[99999] w-[--radix-dropdown-menu-trigger-width]">
-                    <DropdownMenuRadioGroup value={isCustomSlowMode ? 'custom' : String(currentSlowMode)} onValueChange={onSlowModeChange}>
+                    <DropdownMenuRadioGroup
+                      value={isCustomSlowMode ? 'custom' : String(currentSlowMode)}
+                      onValueChange={onSlowModeChange}
+                    >
                       {SLOW_MODE_OPTIONS.map((opt) => (
                         <DropdownMenuRadioItem key={opt.value} value={String(opt.value)}>
                           {opt.label}
@@ -351,14 +375,19 @@ function GroupAdminPanel({
                 </div>
                 <div className="flex flex-col gap-1">
                   {requests.map((r) => (
-                    <div key={r._id} className="flex items-center justify-between gap-2 rounded-xl p-2 hover:bg-muted/60">
-                      <button type="button" onClick={() => setPreviewUsername(r.user.username)} className="flex min-w-0 items-center gap-2.5 text-left cursor-pointer hover:opacity-80 transition-opacity">
+                    <div
+                      key={r._id}
+                      className="flex items-center justify-between gap-2 rounded-xl p-2 hover:bg-muted/60"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setPreviewUsername(r.user.username)}
+                        className="flex min-w-0 items-center gap-2.5 text-left cursor-pointer hover:opacity-80 transition-opacity"
+                      >
                         <MemberAvatar person={r.user} className="h-8 w-8" />
                         <div className="min-w-0">
                           <div className="truncate text-xs font-semibold text-foreground">
-                            {r.user.firstName}
-                            {' '}
-                            {r.user.lastName}
+                            {r.user.firstName} {r.user.lastName}
                           </div>
                           <div className="truncate text-[10px] text-muted-foreground">{`@${r.user.username}`}</div>
                         </div>
@@ -400,15 +429,20 @@ function GroupAdminPanel({
                 {(members || []).map((m) => {
                   const canActOnTarget = canModerate && ROLE_RANK[myRole] > ROLE_RANK[m.role];
                   return (
-                    <div key={m._id} className="flex items-center justify-between gap-2 rounded-xl p-2 hover:bg-muted/60">
-                      <button type="button" onClick={() => setPreviewUsername(m.user.username)} className="flex min-w-0 items-center gap-2.5 text-left cursor-pointer hover:opacity-80 transition-opacity">
+                    <div
+                      key={m._id}
+                      className="flex items-center justify-between gap-2 rounded-xl p-2 hover:bg-muted/60"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setPreviewUsername(m.user.username)}
+                        className="flex min-w-0 items-center gap-2.5 text-left cursor-pointer hover:opacity-80 transition-opacity"
+                      >
                         <MemberAvatar person={m.user} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate text-xs font-semibold text-foreground">
-                              {m.user.firstName}
-                              {' '}
-                              {m.user.lastName}
+                              {m.user.firstName} {m.user.lastName}
                             </span>
                             {m.role !== 'MEMBER' && (
                               <Badge variant="secondary" className="shrink-0 gap-1 px-1.5 py-0 text-[10px]">
@@ -458,7 +492,10 @@ function GroupAdminPanel({
                               <UserX className="h-4 w-4" />
                               Remove
                             </DropdownMenuItem>
-                            <DropdownMenuItem variant="destructive" onClick={() => setConfirmAction({ type: 'ban', person: m })}>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setConfirmAction({ type: 'ban', person: m })}
+                            >
                               <Ban className="h-4 w-4" />
                               Ban
                             </DropdownMenuItem>
@@ -492,8 +529,8 @@ function GroupAdminPanel({
           <DialogHeader>
             <DialogTitle>You&apos;re the owner of this group</DialogTitle>
             <DialogDescription>
-              A group can&apos;t be left ownerless. Transfer ownership to another member first, or delete the
-              group entirely.
+              A group can&apos;t be left ownerless. Transfer ownership to another member first, or delete the group
+              entirely.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col gap-2 sm:flex-col">
@@ -547,7 +584,9 @@ function GroupAdminPanel({
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="secondary" onClick={() => setShowCustomSlowMode(false)}>Cancel</Button>
+              <Button type="button" variant="secondary" onClick={() => setShowCustomSlowMode(false)}>
+                Cancel
+              </Button>
               <Button type="submit">Apply</Button>
             </DialogFooter>
           </form>
@@ -568,8 +607,10 @@ function GroupAdminPanel({
               <DialogDescription>
                 {confirmAction.type === 'ban' && 'They will not be able to rejoin.'}
                 {confirmAction.type === 'remove' && 'They can rejoin later with a new invite or join request.'}
-                {confirmAction.type === 'transfer' && "They become the new OWNER. You become an ADMIN. This can't be undone by you alone."}
-                {confirmAction.type === 'leave' && 'You will lose access to this group. You can rejoin later if invited.'}
+                {confirmAction.type === 'transfer' &&
+                  "They become the new OWNER. You become an ADMIN. This can't be undone by you alone."}
+                {confirmAction.type === 'leave' &&
+                  'You will lose access to this group. You can rejoin later if invited.'}
                 {confirmAction.type === 'delete' && 'This cannot be undone. All members will lose access.'}
               </DialogDescription>
             </DialogHeader>
@@ -590,11 +631,7 @@ function GroupAdminPanel({
       )}
 
       {previewUsername && (
-        <ProfileView
-          username={previewUsername}
-          onClose={() => setPreviewUsername(null)}
-          onOpenChat={openChat}
-        />
+        <ProfileView username={previewUsername} onClose={() => setPreviewUsername(null)} onOpenChat={openChat} />
       )}
     </>
   );

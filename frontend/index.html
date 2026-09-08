@@ -32,15 +32,15 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: #0A0A0A;
+        background-color: #0a0a0a;
       }
 
       @media (prefers-color-scheme: light) {
         #initial-loader {
-          background-color: #FAFAFA;
+          background-color: #fafafa;
         }
         #initial-loader .zeph-init-wordmark {
-          color: #0A0A0A;
+          color: #0a0a0a;
         }
       }
 
@@ -66,7 +66,7 @@
         font-family: 'Google Sans Flex', sans-serif;
         font-size: var(--zeph-size);
         font-weight: 700;
-        color: #FFFFFF;
+        color: #ffffff;
         letter-spacing: 0.02em;
         min-width: 10px;
         display: inline-block;
@@ -78,12 +78,14 @@
       .zeph-init-dot {
         width: calc(var(--zeph-size) * 0.5714);
         height: calc(var(--zeph-size) * 0.5714);
-        background: #E63946;
+        background: #e63946;
         border-radius: 50%;
         flex-shrink: 0;
         position: relative;
         transform: translateY(0);
-        transition: transform 0.08s ease, opacity 0.12s ease;
+        transition:
+          transform 0.08s ease,
+          opacity 0.12s ease;
         box-shadow: 0 0 20px rgba(230, 57, 70, 0.2);
         opacity: 1;
       }
@@ -101,7 +103,8 @@
       }
 
       @keyframes zeph-init-blinkDot {
-        0%, 100% {
+        0%,
+        100% {
           opacity: 1;
           transform: scale(1);
         }
@@ -145,7 +148,7 @@
 
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    
+
     <!-- Pre-React Initial Loading Screen -->
     <div id="initial-loader" aria-label="Loading zeph">
       <div class="zeph-init-container">
@@ -247,13 +250,17 @@
         mainLoop();
 
         // Immediately remove loader on React ready event
-        window.addEventListener('zeph:ready', function () {
-          isRunning = false;
-          const loader = document.getElementById('initial-loader');
-          if (loader) {
-            loader.remove();
-          }
-        }, { once: true });
+        window.addEventListener(
+          'zeph:ready',
+          function () {
+            isRunning = false;
+            const loader = document.getElementById('initial-loader');
+            if (loader) {
+              loader.remove();
+            }
+          },
+          { once: true },
+        );
       })();
     </script>
 

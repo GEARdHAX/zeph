@@ -22,7 +22,10 @@ const getClient = () => {
   if (!store.config?.redisUrl) return null;
   if (!client) {
     client = new IORedis(store.config.redisUrl, {
-      maxRetriesPerRequest: 1, connectTimeout: 3000, retryStrategy: () => null, lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+      retryStrategy: () => null,
+      lazyConnect: true,
     });
     client.on('error', (err) => logger.warn({ err }, 'User profile cache Redis error'));
   }
@@ -46,7 +49,8 @@ const getCachedProfile = async (usernameNormalized, fetchFn) => {
 
   const fresh = await fetchFn();
   if (fresh) {
-    redis.set(cacheKey(usernameNormalized), JSON.stringify(fresh), 'EX', TTL_SECONDS)
+    redis
+      .set(cacheKey(usernameNormalized), JSON.stringify(fresh), 'EX', TTL_SECONDS)
       .catch((err) => logger.warn({ err, usernameNormalized }, 'Failed to write user profile cache'));
   }
   return fresh;
@@ -59,7 +63,9 @@ const invalidateProfileCache = async (usernameNormalized) => {
   if (!usernameNormalized) return;
   const redis = getClient();
   if (!redis) return;
-  await redis.del(cacheKey(usernameNormalized.toLowerCase())).catch((err) => logger.warn({ err, usernameNormalized }, 'Failed to invalidate user profile cache'));
+  await redis
+    .del(cacheKey(usernameNormalized.toLowerCase()))
+    .catch((err) => logger.warn({ err, usernameNormalized }, 'Failed to invalidate user profile cache'));
 };
 
 // Test-only escape hatch — same reasoning as queues/connection.js's

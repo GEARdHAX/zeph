@@ -10,9 +10,7 @@ import useTour from './useTour';
 // rule useTour itself exists to enforce).
 //
 // Usage: <HelpHint tourId="groups" stepIndex={2} label="What is slow mode?" ctx={{ myRole }} />
-function HelpHint({
-  tourId, stepIndex = 0, label = 'Help', ctx, className = '',
-}) {
+function HelpHint({ tourId, stepIndex = 0, label = 'Help', ctx, className = '' }) {
   const { startAt } = useTour(tourId);
 
   return (

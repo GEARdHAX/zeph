@@ -2,9 +2,7 @@ import { useSelector } from 'react-redux';
 import { useGlobal } from 'reactn';
 import Interface from './Interface';
 
-function Streams({
-  streams = [], children, isMaximized, isGrid,
-}) {
+function Streams({ streams = [], children, isMaximized, isGrid }) {
   const consumers = useSelector((state) => state.rtc.consumers) || [];
   const producers = useSelector((state) => state.rtc.producers) || [];
   const peers = useSelector((state) => state.rtc.peers) || {};
@@ -26,8 +24,9 @@ function Streams({
       if (stream.isVideo) return (actualPeer.video = stream);
       actualPeer.audio = stream;
     });
-    const isScreen = (actualPeer.video || actualPeer.screen)
-      && producers.filter((p) => p.producerID === actualPeer.video?.producerID && p.isScreen).length > 0;
+    const isScreen =
+      (actualPeer.video || actualPeer.screen) &&
+      producers.filter((p) => p.producerID === actualPeer.video?.producerID && p.isScreen).length > 0;
     actualPeers.push({ ...actualPeer, isScreen });
   });
 
@@ -137,9 +136,7 @@ function Streams({
           <p className="text-xs text-muted-foreground">The call will start once the other person joins</p>
         </div>
       )}
-      {actualPeers.length > 0 && (
-        <div className="relative z-10 flex h-full w-full flex-col gap-3 sm:gap-4">{rows}</div>
-      )}
+      {actualPeers.length > 0 && <div className="relative z-10 flex h-full w-full flex-col gap-3 sm:gap-4">{rows}</div>}
       {children}
     </div>
   );

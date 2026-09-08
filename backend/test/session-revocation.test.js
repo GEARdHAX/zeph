@@ -50,20 +50,16 @@ describe('Device sessions: revocation', () => {
     const user = await createUser();
     const { token, session } = await tokenForDevice(user);
 
-    const before = await request(app)
-      .get('/api/sessions')
-      .set('Authorization', `Bearer ${token}`);
+    const before = await request(app).get('/api/sessions').set('Authorization', `Bearer ${token}`);
     expect(before.status).toBe(200);
 
     await Session.updateOne({ _id: session._id }, { $set: { revokedAt: new Date() } });
 
-    const after = await request(app)
-      .get('/api/sessions')
-      .set('Authorization', `Bearer ${token}`);
+    const after = await request(app).get('/api/sessions').set('Authorization', `Bearer ${token}`);
     expect(after.status).toBe(401);
   });
 
-  it('a user cannot revoke another user\'s session (IDOR check)', async () => {
+  it("a user cannot revoke another user's session (IDOR check)", async () => {
     const owner = await createUser();
     const attacker = await createUser();
     const { session: ownerSession } = await tokenForDevice(owner);
@@ -90,16 +86,12 @@ describe('Device sessions: revocation', () => {
       .field('id', sessionA._id.toString());
     expect(revokeRes.status).toBe(200);
 
-    const listRes = await request(app)
-      .get('/api/sessions')
-      .set('Authorization', `Bearer ${tokenB}`);
+    const listRes = await request(app).get('/api/sessions').set('Authorization', `Bearer ${tokenB}`);
     expect(listRes.status).toBe(200);
     expect(listRes.body.sessions).toHaveLength(1);
     expect(listRes.body.sessions[0].isCurrent).toBe(true);
 
-    const revokedTokenRes = await request(app)
-      .get('/api/sessions')
-      .set('Authorization', `Bearer ${tokenA}`);
+    const revokedTokenRes = await request(app).get('/api/sessions').set('Authorization', `Bearer ${tokenA}`);
     expect(revokedTokenRes.status).toBe(401);
   });
 });
@@ -109,17 +101,13 @@ describe('POST /api/logout', () => {
     const user = await createUser();
     const { token, session } = await tokenForDevice(user);
 
-    const logoutRes = await request(app)
-      .post('/api/logout')
-      .set('Authorization', `Bearer ${token}`);
+    const logoutRes = await request(app).post('/api/logout').set('Authorization', `Bearer ${token}`);
     expect(logoutRes.status).toBe(200);
 
     const stored = await Session.findById(session._id);
     expect(stored.revokedAt).not.toBeNull();
 
-    const afterLogout = await request(app)
-      .get('/api/sessions')
-      .set('Authorization', `Bearer ${token}`);
+    const afterLogout = await request(app).get('/api/sessions').set('Authorization', `Bearer ${token}`);
     expect(afterLogout.status).toBe(401);
   });
 });

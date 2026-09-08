@@ -1,17 +1,18 @@
-import {
-  useState, useEffect, useRef, lazy, Suspense,
-} from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useGlobal } from 'reactn';
-import {
-  Users, Image as ImageIcon, Link2, Shield, LogOut,
-} from 'lucide-react';
+import { Users, Image as ImageIcon, Link2, Shield, LogOut } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
@@ -122,7 +123,9 @@ function Room() {
       setGroupInfo(null);
       return;
     }
-    getGroup(room._id).then((res) => setGroupInfo(res.data.group)).catch(() => setGroupInfo(null));
+    getGroup(room._id)
+      .then((res) => setGroupInfo(res.data.group))
+      .catch(() => setGroupInfo(null));
   }, [room.isGroup, room._id]);
 
   // The member list rendered below reads straight from Redux room.people,
@@ -142,7 +145,9 @@ function Room() {
 
     const refetchRoom = (payload) => {
       if (payload?.groupId !== groupId) return;
-      getRoom(groupId).then((res) => dispatch({ type: Actions.SET_ROOM, room: res.data.room })).catch(() => {});
+      getRoom(groupId)
+        .then((res) => dispatch({ type: Actions.SET_ROOM, room: res.data.room }))
+        .catch(() => {});
     };
 
     io.on('group:member:added', refetchRoom);
@@ -195,9 +200,10 @@ function Room() {
     });
   }
 
-  const initials = (room.isGroup
-    ? (room.title || 'G').charAt(0)
-    : `${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`
+  const initials = (
+    room.isGroup
+      ? (room.title || 'G').charAt(0)
+      : `${(other.firstName || 'U').charAt(0)}${(other.lastName || '').charAt(0)}`
   ).toUpperCase();
 
   const title = room.isGroup ? room.title : `${other.firstName} ${other.lastName}`;
@@ -259,17 +265,18 @@ function Room() {
                   className="aspect-square size-full object-cover"
                 />
               )}
-              <AvatarFallback className="bg-transparent text-xs font-bold text-white">
-                {pInitials}
-              </AvatarFallback>
+              <AvatarFallback className="bg-transparent text-xs font-bold text-white">{pInitials}</AvatarFallback>
             </Avatar>
-            <span className={cn('absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card', STATUS_COLOR[getStatus(person._id)])} />
+            <span
+              className={cn(
+                'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card',
+                STATUS_COLOR[getStatus(person._id)],
+              )}
+            />
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-semibold text-foreground">
-              {person.firstName}
-              {' '}
-              {person.lastName}
+              {person.firstName} {person.lastName}
             </div>
             <div className="truncate text-[10px] text-muted-foreground">{`@${person.username}`}</div>
           </div>
@@ -300,15 +307,11 @@ function Room() {
                 className="aspect-square size-full object-cover"
               />
             )}
-            <AvatarFallback className="bg-transparent text-2xl font-bold text-white">
-              {initials}
-            </AvatarFallback>
+            <AvatarFallback className="bg-transparent text-2xl font-bold text-white">{initials}</AvatarFallback>
           </Avatar>
         </button>
 
-        <h3 className="text-sm font-bold text-foreground truncate max-w-[220px]">
-          {title}
-        </h3>
+        <h3 className="text-sm font-bold text-foreground truncate max-w-[220px]">{title}</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {room.isGroup ? `${people.length} members in this group` : `@${other.username || 'user'}`}
         </p>
@@ -382,18 +385,10 @@ function Room() {
           )}
 
           {tab === 'media' && (
-            <div
-              className="flex flex-col overflow-y-auto"
-              ref={scrollContainer}
-              onScroll={onScroll}
-            >
+            <div className="flex flex-col overflow-y-auto" ref={scrollContainer} onScroll={onScroll}>
               {open && (
                 <Suspense fallback={<LazyFallback />}>
-                  <MediaViewerShell
-                    messages={roomImages}
-                    initialMessage={open}
-                    onClose={() => setOpen(null)}
-                  />
+                  <MediaViewerShell messages={roomImages} initialMessage={open} onClose={() => setOpen(null)} />
                 </Suspense>
               )}
               {images}
@@ -408,11 +403,7 @@ function Room() {
       </div>
 
       {previewUsername && (
-        <ProfileView
-          username={previewUsername}
-          onClose={() => setPreviewUsername(null)}
-          onOpenChat={openChat}
-        />
+        <ProfileView username={previewUsername} onClose={() => setPreviewUsername(null)} onOpenChat={openChat} />
       )}
 
       {showInviteGroup && (
@@ -438,15 +429,25 @@ function Room() {
         <DialogContent className="rounded-2xl border border-border bg-card">
           <DialogHeader>
             <DialogTitle>Leave this group?</DialogTitle>
-            <DialogDescription>
-              You will lose access to this group. You can rejoin later if invited.
-            </DialogDescription>
+            <DialogDescription>You will lose access to this group. You can rejoin later if invited.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setConfirmLeave(false)} disabled={leaving}>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setConfirmLeave(false)}
+              disabled={leaving}
+            >
               Cancel
             </Button>
-            <Button type="button" variant="destructive" className="rounded-xl shadow-xs" onClick={onLeaveGroup} disabled={leaving}>
+            <Button
+              type="button"
+              variant="destructive"
+              className="rounded-xl shadow-xs"
+              onClick={onLeaveGroup}
+              disabled={leaving}
+            >
               Leave Group
             </Button>
           </DialogFooter>

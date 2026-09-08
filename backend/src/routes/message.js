@@ -10,9 +10,7 @@ const groupPolicy = require('../authorization/groupPolicy');
 const logger = require('../logger');
 
 module.exports = async (req, res, next) => {
-  const {
-    roomID, content, type, fileID, mediaID, clientID,
-  } = req.fields;
+  const { roomID, content, type, fileID, mediaID, clientID } = req.fields;
   const authorID = req.user.id;
 
   let room;
@@ -44,9 +42,7 @@ module.exports = async (req, res, next) => {
     const slowModeSeconds = room.settings && room.settings.slowModeSeconds;
     const isModerator = membership.role === groupPolicy.Roles.OWNER || membership.role === groupPolicy.Roles.ADMIN;
     if (slowModeSeconds && !isModerator) {
-      const lastMessage = await Message.findOne({ room: room._id, author: authorID })
-        .sort({ _id: -1 })
-        .select('date');
+      const lastMessage = await Message.findOne({ room: room._id, author: authorID }).sort({ _id: -1 }).select('date');
       if (lastMessage && Date.now() - new Date(lastMessage.date).getTime() < slowModeSeconds * 1000) {
         return res.status(429).json({ error: true, reason: 'SLOW_MODE' });
       }
@@ -62,7 +58,9 @@ module.exports = async (req, res, next) => {
   // (join-room/get-room/list-rooms), since a room id could be sent to
   // directly without ever going through those. See DECISIONS.md.
   const boundaryViolation = await roomHasBoundaryViolation({
-    room, callerID: authorID, callerLevel: req.user.level,
+    room,
+    callerID: authorID,
+    callerLevel: req.user.level,
   });
   if (boundaryViolation) {
     return res.status(404).json({ error: true });
@@ -173,7 +171,10 @@ module.exports = async (req, res, next) => {
                   { conversation: roomID, user: personUserID, deletedAt: { $ne: null } },
                   { $set: { deletedAt: null } },
                 ).catch((err) => {
-                  logger.warn({ err, roomID, userId: personUserID }, 'Failed to clear conversation deletedAt on new message');
+                  logger.warn(
+                    { err, roomID, userId: personUserID },
+                    'Failed to clear conversation deletedAt on new message',
+                  );
                 });
 
                 if (personUserID !== myUserID) {

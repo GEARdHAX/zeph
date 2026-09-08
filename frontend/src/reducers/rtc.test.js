@@ -12,7 +12,9 @@ describe('rtc reducer — RTC_PRODUCERS append vs replace', () => {
   it('replaces instead of appending when replace:true (callManager.rejoin() after a reconnect)', () => {
     const state = reducer(undefined, { type: Actions.RTC_PRODUCERS, producers: [{ producerID: 'stale-1' }] });
     const next = reducer(state, {
-      type: Actions.RTC_PRODUCERS, producers: [{ producerID: 'fresh-1' }], replace: true,
+      type: Actions.RTC_PRODUCERS,
+      producers: [{ producerID: 'fresh-1' }],
+      replace: true,
     });
     expect(next.producers.map((p) => p.producerID)).toEqual(['fresh-1']);
   });

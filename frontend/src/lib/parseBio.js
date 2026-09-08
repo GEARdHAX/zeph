@@ -91,12 +91,13 @@ const PATTERNS = [
     // stopping at the first — otherwise a url like "foo(1)" truncates at
     // its own internal paren and leaves a dangling ")" as separate text.
     regex: /\[([^\]\n]+)\]\((\S+)\)/,
-    build: (m) => (isSafeUrl(m[2])
-      ? { type: 'link', text: m[1], href: m[2].trim() }
-      // Unsafe protocol (javascript:, data:, vbscript:, etc.) — degrade to
-      // plain text of the whole [text](url) span rather than a dead/unsafe
-      // link, matching the "malformed -> plain text" rule.
-      : { type: 'text', text: m[0] }),
+    build: (m) =>
+      isSafeUrl(m[2])
+        ? { type: 'link', text: m[1], href: m[2].trim() }
+        : // Unsafe protocol (javascript:, data:, vbscript:, etc.) — degrade to
+          // plain text of the whole [text](url) span rather than a dead/unsafe
+          // link, matching the "malformed -> plain text" rule.
+          { type: 'text', text: m[0] },
   },
   {
     type: 'bareLink',
@@ -148,7 +149,10 @@ const PATTERNS = [
 const findNextMatch = (text, fromIndex) => {
   let best = null;
   for (const pattern of PATTERNS) {
-    const re = new RegExp(pattern.regex.source, pattern.regex.flags.includes('g') ? pattern.regex.flags : `${pattern.regex.flags}g`);
+    const re = new RegExp(
+      pattern.regex.source,
+      pattern.regex.flags.includes('g') ? pattern.regex.flags : `${pattern.regex.flags}g`,
+    );
     re.lastIndex = fromIndex;
     const m = re.exec(text);
     if (m && (!best || m.index < best.match.index)) {
@@ -193,7 +197,11 @@ export const tokenizeInline = (text) => {
 const parseBio = (raw) => tokenizeInline(raw || '');
 
 const HTML_ESCAPES = {
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
 };
 const escapeHtml = (text) => text.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 
@@ -206,22 +214,36 @@ const escapeHtml = (text) => text.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 // (a bio/message containing a literal "<script>" must copy as the escaped
 // entity, not as live markup, even though nothing in THIS app ever parses
 // it back).
-export const tokensToHtml = (tokens) => tokens.map((token) => {
-  switch (token.type) {
-    case 'bold': return `<strong>${tokensToHtml(token.children)}</strong>`;
-    case 'italic': return `<em>${tokensToHtml(token.children)}</em>`;
-    case 'underline': return `<u>${tokensToHtml(token.children)}</u>`;
-    case 'strike': return `<s>${tokensToHtml(token.children)}</s>`;
-    case 'highlight': return `<mark>${tokensToHtml(token.children)}</mark>`;
-    case 'code': return `<code>${escapeHtml(token.text)}</code>`;
-    case 'link': return `<a href="${escapeHtml(token.href)}">${escapeHtml(token.text)}</a>`;
-    case 'mention': return `<b>@${escapeHtml(token.username)}</b>`;
-    case 'hashtag': return `<b>#${escapeHtml(token.tag)}</b>`;
-    case 'break': return '<br>';
-    case 'text':
-    default: return escapeHtml(token.text);
-  }
-}).join('');
+export const tokensToHtml = (tokens) =>
+  tokens
+    .map((token) => {
+      switch (token.type) {
+        case 'bold':
+          return `<strong>${tokensToHtml(token.children)}</strong>`;
+        case 'italic':
+          return `<em>${tokensToHtml(token.children)}</em>`;
+        case 'underline':
+          return `<u>${tokensToHtml(token.children)}</u>`;
+        case 'strike':
+          return `<s>${tokensToHtml(token.children)}</s>`;
+        case 'highlight':
+          return `<mark>${tokensToHtml(token.children)}</mark>`;
+        case 'code':
+          return `<code>${escapeHtml(token.text)}</code>`;
+        case 'link':
+          return `<a href="${escapeHtml(token.href)}">${escapeHtml(token.text)}</a>`;
+        case 'mention':
+          return `<b>@${escapeHtml(token.username)}</b>`;
+        case 'hashtag':
+          return `<b>#${escapeHtml(token.tag)}</b>`;
+        case 'break':
+          return '<br>';
+        case 'text':
+        default:
+          return escapeHtml(token.text);
+      }
+    })
+    .join('');
 
 export { escapeRegex, isSafeUrl };
 export default parseBio;

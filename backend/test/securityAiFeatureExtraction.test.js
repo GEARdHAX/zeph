@@ -5,7 +5,10 @@ const { extractAuthFeatures, extractHostFeatures } = require('../src/services/se
 // 300ms — comfortably covers 3 sequential fire-and-forget
 // SecurityEventService.record() Mongo writes settling; 100ms occasionally
 // wasn't enough for 3 real inserts in a row and produced a flaky count.
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 300); });
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 300);
+  });
 
 beforeAll(async () => {
   await db.connect();
@@ -27,13 +30,22 @@ describe('extractAuthFeatures', () => {
   it('counts recent LOGIN_FAILED events for the given user only', async () => {
     const userId = 'user-1';
     SecurityEventService.record({
-      type: 'LOGIN_FAILED', severity: 'medium', actor: { userId }, result: 'failure',
+      type: 'LOGIN_FAILED',
+      severity: 'medium',
+      actor: { userId },
+      result: 'failure',
     });
     SecurityEventService.record({
-      type: 'LOGIN_FAILED', severity: 'medium', actor: { userId }, result: 'failure',
+      type: 'LOGIN_FAILED',
+      severity: 'medium',
+      actor: { userId },
+      result: 'failure',
     });
     SecurityEventService.record({
-      type: 'LOGIN_FAILED', severity: 'medium', actor: { userId: 'someone-else' }, result: 'failure',
+      type: 'LOGIN_FAILED',
+      severity: 'medium',
+      actor: { userId: 'someone-else' },
+      result: 'failure',
     });
     await flush();
 
@@ -47,10 +59,16 @@ describe('extractAuthFeatures', () => {
   it('counts PERMISSION_DENIED and UNAUTHORIZED_ACCESS together as permissionDeniedCount', async () => {
     const userId = 'user-2';
     SecurityEventService.record({
-      type: 'PERMISSION_DENIED', severity: 'medium', actor: { userId }, result: 'blocked',
+      type: 'PERMISSION_DENIED',
+      severity: 'medium',
+      actor: { userId },
+      result: 'blocked',
     });
     SecurityEventService.record({
-      type: 'UNAUTHORIZED_ACCESS', severity: 'medium', actor: { userId }, result: 'blocked',
+      type: 'UNAUTHORIZED_ACCESS',
+      severity: 'medium',
+      actor: { userId },
+      result: 'blocked',
     });
     await flush();
 
@@ -61,12 +79,17 @@ describe('extractAuthFeatures', () => {
   it('does not count events outside the time window', async () => {
     const userId = 'user-3';
     SecurityEventService.record({
-      type: 'LOGIN_FAILED', severity: 'medium', actor: { userId }, result: 'failure',
+      type: 'LOGIN_FAILED',
+      severity: 'medium',
+      actor: { userId },
+      result: 'failure',
     });
     await flush();
 
     const features = await extractAuthFeatures({ userId, windowMs: 1 }); // 1ms window — the just-recorded event is already outside it
-    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
     expect(features.failedLoginCount).toBeGreaterThanOrEqual(0); // sanity: never throws; exact count depends on timing but must not include events from a much later window
   });
 
@@ -85,13 +108,25 @@ describe('extractHostFeatures', () => {
   it('counts PROCESS_ANOMALY/NETWORK_ANOMALY/scan events for the given sensor only', async () => {
     const sensorId = 'sensor-1';
     SecurityEventService.record({
-      type: 'PROCESS_ANOMALY', severity: 'medium', sourceSystem: 'ebpf', result: 'unknown', metadata: { sensorId },
+      type: 'PROCESS_ANOMALY',
+      severity: 'medium',
+      sourceSystem: 'ebpf',
+      result: 'unknown',
+      metadata: { sensorId },
     });
     SecurityEventService.record({
-      type: 'PORT_SCAN_ANOMALY', severity: 'high', sourceSystem: 'network_sensor', result: 'unknown', metadata: { sensorId },
+      type: 'PORT_SCAN_ANOMALY',
+      severity: 'high',
+      sourceSystem: 'network_sensor',
+      result: 'unknown',
+      metadata: { sensorId },
     });
     SecurityEventService.record({
-      type: 'PROCESS_ANOMALY', severity: 'medium', sourceSystem: 'ebpf', result: 'unknown', metadata: { sensorId: 'other-sensor' },
+      type: 'PROCESS_ANOMALY',
+      severity: 'medium',
+      sourceSystem: 'ebpf',
+      result: 'unknown',
+      metadata: { sensorId: 'other-sensor' },
     });
     await flush();
 
@@ -105,13 +140,25 @@ describe('extractHostFeatures', () => {
   it('computes uniqueDestinationCount from distinct metadata.destinationIp values', async () => {
     const sensorId = 'sensor-2';
     SecurityEventService.record({
-      type: 'THREAT_INTEL_NETWORK_MATCH', severity: 'high', sourceSystem: 'network_sensor', result: 'unknown', metadata: { sensorId, destinationIp: '203.0.113.5' },
+      type: 'THREAT_INTEL_NETWORK_MATCH',
+      severity: 'high',
+      sourceSystem: 'network_sensor',
+      result: 'unknown',
+      metadata: { sensorId, destinationIp: '203.0.113.5' },
     });
     SecurityEventService.record({
-      type: 'THREAT_INTEL_NETWORK_MATCH', severity: 'high', sourceSystem: 'network_sensor', result: 'unknown', metadata: { sensorId, destinationIp: '203.0.113.5' },
+      type: 'THREAT_INTEL_NETWORK_MATCH',
+      severity: 'high',
+      sourceSystem: 'network_sensor',
+      result: 'unknown',
+      metadata: { sensorId, destinationIp: '203.0.113.5' },
     });
     SecurityEventService.record({
-      type: 'THREAT_INTEL_NETWORK_MATCH', severity: 'high', sourceSystem: 'network_sensor', result: 'unknown', metadata: { sensorId, destinationIp: '203.0.113.6' },
+      type: 'THREAT_INTEL_NETWORK_MATCH',
+      severity: 'high',
+      sourceSystem: 'network_sensor',
+      result: 'unknown',
+      metadata: { sensorId, destinationIp: '203.0.113.6' },
     });
     await flush();
 

@@ -49,7 +49,13 @@ afterEach(() => {
 describe('providerRouter.generate — primary (Gemini) healthy', () => {
   it('uses Gemini and does not touch Groq', async () => {
     let groqCalled = false;
-    stubFetch({ gemini: geminiOk('gemini says hi'), groq: async () => { groqCalled = true; return groqOk('x')(); } });
+    stubFetch({
+      gemini: geminiOk('gemini says hi'),
+      groq: async () => {
+        groqCalled = true;
+        return groqOk('x')();
+      },
+    });
 
     const result = await providerRouter.generate('hi');
     expect(result.text).toBe('gemini says hi');
@@ -73,7 +79,12 @@ describe('providerRouter.generate — Gemini health failure -> Groq fallback', (
   });
 
   it('falls back on a Gemini network error', async () => {
-    stubFetch({ gemini: async () => { throw new Error('fetch failed'); }, groq: groqOk('recovered') });
+    stubFetch({
+      gemini: async () => {
+        throw new Error('fetch failed');
+      },
+      groq: groqOk('recovered'),
+    });
     const result = await providerRouter.generate('hi');
     expect(result.providerUsed).toBe('groq');
   });
@@ -82,17 +93,26 @@ describe('providerRouter.generate — Gemini health failure -> Groq fallback', (
 describe('providerRouter.generate — NON-health failure does not trigger fallback', () => {
   it('a Gemini 400 (bad request) throws without trying Groq', async () => {
     let groqCalled = false;
-    stubFetch({ gemini: httpFail(400), groq: async () => { groqCalled = true; return groqOk('x')(); } });
+    stubFetch({
+      gemini: httpFail(400),
+      groq: async () => {
+        groqCalled = true;
+        return groqOk('x')();
+      },
+    });
     await expect(providerRouter.generate('hi')).rejects.toThrow();
     expect(groqCalled).toBe(false);
   });
 });
 
 describe('providerRouter — circuit breaker', () => {
-  it('opens Gemini\'s circuit after 3 consecutive health failures, then skips straight to Groq', async () => {
+  it("opens Gemini's circuit after 3 consecutive health failures, then skips straight to Groq", async () => {
     let geminiCalls = 0;
     stubFetch({
-      gemini: async () => { geminiCalls += 1; return httpFail(500)(); },
+      gemini: async () => {
+        geminiCalls += 1;
+        return httpFail(500)();
+      },
       groq: groqOk('groq'),
     });
 
@@ -122,13 +142,23 @@ describe('providerRouter — no fallback available', () => {
   it('with AI_PROVIDER=groq (no fallback target), a Groq failure just throws', async () => {
     store.config.aiProvider = 'groq';
     store.config.geminiApiKey = null;
-    stubFetch({ gemini: async () => { throw new Error('should not be called'); }, groq: httpFail(500) });
+    stubFetch({
+      gemini: async () => {
+        throw new Error('should not be called');
+      },
+      groq: httpFail(500),
+    });
     await expect(providerRouter.generate('hi')).rejects.toThrow();
   });
 
   it('with gemini primary but NO groq key, a Gemini failure throws (nothing to fall back to)', async () => {
     store.config.groqApiKey = null;
-    stubFetch({ gemini: httpFail(500), groq: async () => { throw new Error('no groq key'); } });
+    stubFetch({
+      gemini: httpFail(500),
+      groq: async () => {
+        throw new Error('no groq key');
+      },
+    });
     await expect(providerRouter.generate('hi')).rejects.toThrow();
   });
 });

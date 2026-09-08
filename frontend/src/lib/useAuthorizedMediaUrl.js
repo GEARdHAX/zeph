@@ -38,7 +38,8 @@ const useAuthorizedMediaUrl = (url, { authorized = true } = {}) => {
     setError(false);
     setResolvedUrl(null);
 
-    axios.get(url, { responseType: 'blob' })
+    axios
+      .get(url, { responseType: 'blob' })
       .then((res) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(res.data);
