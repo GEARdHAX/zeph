@@ -20,9 +20,7 @@ const connect = async () => {
   // (unique username, idempotency keys, TTLs, …) so a test file that relies
   // on them still gets them — the old mongod-per-file setup got this for
   // free via automatic first-use index builds on a fresh connection.
-  await Promise.all(
-    Object.values(mongoose.connection.models).map((model) => model.syncIndexes().catch(() => {})),
-  );
+  await Promise.all(Object.values(mongoose.connection.models).map((model) => model.syncIndexes().catch(() => {})));
 };
 
 const closeDatabase = async () => {
