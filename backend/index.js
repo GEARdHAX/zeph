@@ -1,6 +1,14 @@
 require('colors');
 require('dotenv').config();
 
+// Node <20 doesn't expose the WebCrypto API as a global; @simplewebauthn/
+// server needs globalThis.crypto for challenge generation. Harmless on
+// Node >=20 (the assignment is a no-op when it's already there).
+if (!globalThis.crypto) {
+  // eslint-disable-next-line global-require
+  globalThis.crypto = require('node:crypto').webcrypto;
+}
+
 const logger = require('./src/logger');
 const pinoHttp = require('pino-http');
 const helmet = require('helmet');
