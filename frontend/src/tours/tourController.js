@@ -45,7 +45,6 @@ const resolveAvailableSteps = async (steps, { signal, timeoutMs = STEP_TARGET_TI
 // stepping on each other's callback references, while still only ever
 // having one real Driver.js instance alive at a time (enforced in driver.js).
 export const createTourController = (tourId, { userId, stepTargetTimeoutMs } = {}) => {
-  let currentDefinition = null;
   let currentInstance = null;
   let abortController = null;
   const listeners = new Set();
@@ -70,7 +69,6 @@ export const createTourController = (tourId, { userId, stepTargetTimeoutMs } = {
       abortController = null;
     }
     currentInstance = null;
-    currentDefinition = null;
   };
 
   // startIndex: resume point in the ORIGINAL (unfiltered) step array. A
@@ -93,7 +91,6 @@ export const createTourController = (tourId, { userId, stepTargetTimeoutMs } = {
       return;
     }
     if (signal.aborted) return;
-    currentDefinition = definition;
 
     const remainingSteps = definition.steps.slice(startIndex);
     const available = await resolveAvailableSteps(remainingSteps, { signal, timeoutMs: stepTargetTimeoutMs });

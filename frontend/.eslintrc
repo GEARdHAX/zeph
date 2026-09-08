@@ -9,7 +9,8 @@
     "airbnb/hooks",
     "eslint:recommended",
     "plugin:react/recommended",
-    "plugin:react/jsx-runtime"
+    "plugin:react/jsx-runtime",
+    "prettier"
   ],
   "parser": "@babel/eslint-parser",
   "parserOptions": {

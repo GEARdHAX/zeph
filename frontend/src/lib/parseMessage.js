@@ -1,3 +1,7 @@
+// This is a line-scanning parser — `continue` to advance to the next line is
+// the clearest control flow here; rewriting each as nested if/else would only
+// obscure it.
+/* eslint-disable no-continue */
 import { tokenizeInline } from './parseBio';
 
 /**
