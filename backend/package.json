@@ -8,7 +8,8 @@
     "start": "node index",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
-    "test": "jest --runInBand",
+    "test": "jest",
+    "test:serial": "jest --runInBand",
     "bench": "node scripts/bench.js",
     "bench:reconnect": "node scripts/bench-reconnect.js"
   },
