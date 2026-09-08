@@ -557,6 +557,22 @@ function Message({ message, previous, next, onOpen, roomID, aiEnabled }) {
               )}
             </div>
 
+            {translating && (
+              <div
+                data-testid="translating-indicator"
+                className={cn(
+                  'mt-1 flex items-center gap-2 rounded-xl border border-primary/20 bg-muted/60 px-3 py-1.5 text-[11px] text-muted-foreground animate-in fade-in duration-200',
+                  isMine && 'self-end',
+                )}
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                </span>
+                <span className="font-medium text-foreground">Zeph AI is translating…</span>
+              </div>
+            )}
+
             {translation && (
               <div
                 className={cn(

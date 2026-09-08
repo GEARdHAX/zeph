@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { Button } from '@/components/ui/button';
+import { ZephGeneratingLoader } from '@/components/ui/ZephGeneratingLoader';
 import message from '../../../actions/message';
 import uploadImage from '../../../actions/uploadImage';
 import uploadMedia from '../../../actions/uploadMedia';
@@ -463,6 +464,19 @@ function BottomBar({ aiEnabled }) {
       data-tour="message-composer"
       className="relative flex w-full items-end gap-1.5 sm:gap-2 border-t border-border/60 bg-card px-2.5 sm:px-4 py-2 sm:py-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-2.5 text-card-foreground"
     >
+      {(drafting || rewriting) && (
+        <div
+          data-testid="bottombar-ai-loader"
+          className="absolute -top-4 left-1/2 -translate-x-1/2 -translate-y-full w-auto max-w-[92vw] sm:max-w-md flex flex-col items-center justify-center px-8 py-6 gap-4 rounded-3xl border border-primary/25 bg-card/95 shadow-2xl backdrop-blur-2xl z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+        >
+          <ZephGeneratingLoader
+            size={120}
+            text={drafting ? 'Drafting' : 'Rewriting'}
+            subtext={drafting ? 'Zeph AI is analyzing conversation history…' : 'Zeph AI is refining your message…'}
+          />
+        </div>
+      )}
+
       {uploadProgress.length > 0 && (
         <div className="absolute -top-1.5 left-3.5 right-3.5 flex -translate-y-full flex-col gap-1.5 rounded-xl border border-border/60 bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm">
           {uploadProgress.map((item) => (

@@ -12,7 +12,7 @@
     "format:write": "prettier --write .",
     "lint:check": "eslint .",
     "lint:fix": "eslint --fix .",
-    "test": "vitest run",
+    "test": "vitest run --root .",
     "bench:bundle": "node scripts/bench-bundle.js"
   },
   "eslintConfig": {

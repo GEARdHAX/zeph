@@ -4,10 +4,11 @@ import { Mic, Square, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ZephGeneratingLoader } from '@/components/ui/ZephGeneratingLoader';
 import uploadMedia from '../../../actions/uploadMedia';
 import summarizeMeeting from '../../../actions/summarizeMeeting';
 import getMeetingSummary from '../../../actions/getMeetingSummary';
-import { getAiErrorMessage } from '../../../lib/aiErrorMessage';
+import { getAiErrorMessage, MESSAGES } from '../../../lib/aiErrorMessage';
 
 // Zeph AI — Meeting AI (Phase 14). Explicit, opt-in recording: nothing is
 // captured until the user clicks Record, and the recording is local audio
@@ -78,7 +79,7 @@ function MeetingRecorder({ meetingId }) {
       }
       if (res.data.status === 'FAILED') {
         setProcessing(false);
-        setError('Could not generate a summary for this meeting.');
+        setError(MESSAGES[res.data.failureReason] || 'Could not generate a summary for this meeting.');
         return;
       }
       pollTimeoutRef.current = setTimeout(pollForSummary, POLL_INTERVAL_MS);
@@ -141,23 +142,32 @@ function MeetingRecorder({ meetingId }) {
       </Button>
 
       <Dialog
-        open={!!summary || !!error}
+        open={processing || !!summary || !!error}
         onOpenChange={(next) => {
-          if (!next) {
+          if (!next && !processing) {
             setSummary(null);
             setError(null);
           }
         }}
       >
-        <DialogContent className="rounded-2xl border border-border bg-card">
+        <DialogContent className="rounded-2xl border border-border bg-card sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
               Meeting Summary
             </DialogTitle>
             {summary && <DialogDescription>AI-generated — may be inaccurate.</DialogDescription>}
+            {processing && <DialogDescription>AI transcription and summarization in progress</DialogDescription>}
           </DialogHeader>
-          {error ? (
+          {processing ? (
+            <div className="py-6 flex items-center justify-center">
+              <ZephGeneratingLoader
+                size={160}
+                text="Summarizing"
+                subtext="Transcribing audio & synthesizing meeting notes..."
+              />
+            </div>
+          ) : error ? (
             <p className="text-xs leading-relaxed text-destructive">{error}</p>
           ) : (
             <p className="text-xs leading-relaxed text-muted-foreground">{summary}</p>

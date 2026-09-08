@@ -41,6 +41,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { ZephGeneratingLoader } from '@/components/ui/ZephGeneratingLoader';
 import toggleFavorite from '../../../actions/toggleFavorite';
 import getMeetingRoom from '../../../actions/getMeetingRoom';
 import postCall from '../../../actions/postCall';
@@ -635,8 +636,23 @@ function TopBar({ back, loading, aiEnabled }) {
         </div>
       </div>
 
+      {(summarizing || extractingTopics) && (
+        <div
+          data-testid="topbar-ai-loader"
+          className="fixed top-16 left-1/2 -translate-x-1/2 w-auto max-w-[92vw] sm:max-w-md flex flex-col items-center justify-center px-8 py-6 gap-4 rounded-3xl border border-primary/25 bg-card/95 shadow-2xl backdrop-blur-2xl z-50 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <ZephGeneratingLoader
+            size={120}
+            text={summarizing ? 'Summarizing' : 'Extracting'}
+            subtext={
+              summarizing ? 'Zeph AI is analyzing conversation history…' : 'Zeph AI is finding discussion topics…'
+            }
+          />
+        </div>
+      )}
+
       <Dialog open={!!summary} onOpenChange={(next) => !next && setSummary(null)}>
-        <DialogContent className="rounded-2xl border border-border bg-card">
+        <DialogContent className="w-auto sm:max-w-md rounded-2xl border border-border bg-card p-6 gap-4">
           <DialogHeader>
             <DialogTitle>Conversation Summary</DialogTitle>
             <DialogDescription>AI-generated — may be inaccurate.</DialogDescription>
@@ -646,7 +662,7 @@ function TopBar({ back, loading, aiEnabled }) {
       </Dialog>
 
       <Dialog open={!!topics} onOpenChange={(next) => !next && setTopics(null)}>
-        <DialogContent className="rounded-2xl border border-border bg-card">
+        <DialogContent className="w-auto sm:max-w-md rounded-2xl border border-border bg-card p-6 gap-4">
           <DialogHeader>
             <DialogTitle>Conversation Topics</DialogTitle>
             <DialogDescription>AI-generated — may be inaccurate.</DialogDescription>

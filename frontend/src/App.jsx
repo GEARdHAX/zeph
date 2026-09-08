@@ -55,6 +55,13 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (import.meta.env.DEV) {
+      window.showZephLoader = (label = 'Generating...') => zephLoader.show(label);
+      window.hideZephLoader = () => zephLoader.hide();
+    }
+  }, [zephLoader]);
+
+  useEffect(() => {
     if (!io || !getGlobal().user || !token) return;
     let focusCount = 0;
     const interval = setInterval(() => {

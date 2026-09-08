@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { ZephSpinner } from './zeph-spinner';
+import { ZephGeneratingLoader } from './ZephGeneratingLoader';
 
-const ZephLoadingOverlay = ({ isOpen, label }) => {
+function ZephLoadingOverlay({ isOpen, label, variant }) {
   // NOTE: isOpen/label API is what App.jsx (the sole mount point, via
   // useZephLoader()) actually calls this with — z-[100000] deliberately
   // clears GroupAdminPanel's z-[99999], the highest other z-index in the
@@ -37,18 +38,41 @@ const ZephLoadingOverlay = ({ isOpen, label }) => {
 
   if (!isOpen) return null;
 
+  const isAiTask =
+    variant === 'generating' ||
+    (typeof label === 'string' && /^(generat|summariz|transcrib|draft|rewrit)/i.test(label));
+
   return (
     <div
       ref={overlayRef}
       tabIndex={-1}
       aria-live="polite"
-      className="fixed inset-0 z-[100000] flex items-center justify-center bg-background/70 backdrop-blur-md outline-none"
+      className="fixed inset-0 z-[100000] flex items-center justify-center bg-background/80 backdrop-blur-md outline-none"
       onClick={(e) => e.preventDefault()}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <ZephSpinner size={56} label={label} />
+      {isAiTask ? (
+        <ZephGeneratingLoader
+          size={180}
+          text={
+            /summariz/i.test(label)
+              ? 'Summarizing'
+              : /transcrib/i.test(label)
+                ? 'Transcribing'
+                : /draft/i.test(label)
+                  ? 'Drafting'
+                  : /rewrit/i.test(label)
+                    ? 'Rewriting'
+                    : 'Generating'
+          }
+          subtext={typeof label === 'string' ? label : undefined}
+          aria-label={label || 'Generating'}
+        />
+      ) : (
+        <ZephSpinner size={56} label={label} />
+      )}
     </div>
   );
-};
+}
 
 export { ZephLoadingOverlay };

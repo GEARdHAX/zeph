@@ -56,4 +56,13 @@ describe('ZephLoadingOverlay', () => {
     await user.click(screen.getByRole('status'));
     expect(behindClick).not.toHaveBeenCalled();
   });
+
+  it('renders ZephGeneratingLoader when AI generation label or variant is passed', () => {
+    const { rerender } = render(<ZephLoadingOverlay isOpen label="Generating summary..." />);
+    expect(screen.getByRole('status', { name: 'Generating summary...' })).toBeInTheDocument();
+    expect(screen.getByText('Generating summary...')).toBeInTheDocument();
+
+    rerender(<ZephLoadingOverlay isOpen variant="generating" label="Custom Task" />);
+    expect(screen.getByRole('status', { name: 'Custom Task' })).toBeInTheDocument();
+  });
 });
