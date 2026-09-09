@@ -76,19 +76,30 @@ module.exports = async (req, res) => {
     });
   }
 
+  const existingDoc = await MeetingTranscript.findOne({ meeting: meetingId });
+
+  // Duplicate-generation guard (replaces the old jobId-based dedup, which
+  // silently swallowed retries — see meetingAiQueue.js). A doc genuinely
+  // in-flight (updated within the last 3 min) means "already working";
+  // anything older is a stuck job we let the caller restart.
+  if (
+    existingDoc &&
+    ['TRANSCRIBING', 'SUMMARIZING'].includes(existingDoc.status) &&
+    Date.now() - new Date(existingDoc.updatedAt).getTime() < 3 * 60 * 1000
+  ) {
+    return res.status(202).json({ status: 'PROCESSING', message: 'Already generating a summary.', requestId });
+  }
+
   if (mediaId) {
     const media = await Media.findOne({ _id: mediaId, uploaderId: req.user.id, category: 'audio' });
     if (!media) return res.status(404).json({ error: true, reason: 'MEDIA_NOT_FOUND', requestId });
-  } else {
-    const existing = await MeetingTranscript.findOne({ meeting: meetingId });
-    if (!existing || !existing.transcript) {
-      return res.status(400).json({
-        error: true,
-        reason: 'NO_TRANSCRIPT_YET',
-        message: 'No recording has been uploaded for this meeting yet.',
-        requestId,
-      });
-    }
+  } else if (!existingDoc || !existingDoc.transcript) {
+    return res.status(400).json({
+      error: true,
+      reason: 'NO_TRANSCRIPT_YET',
+      message: 'No recording has been uploaded for this meeting yet.',
+      requestId,
+    });
   }
 
   if (getQueue()) {

@@ -40,14 +40,17 @@ describe('AI queue job ids never contain ":"', () => {
     expect(lastJobId()).not.toContain(':');
   });
 
-  it('meeting summary job id', async () => {
+  it('meeting summary job id — unique per enqueue, no ":"', async () => {
     await enqueueMeetingSummaryJob({
       meetingId: 'meet-1',
       mediaId: 'm1',
       userId: 'u1',
       requestId: 'r1',
     });
-    expect(lastJobId()).toBe('meeting-meet-1');
+    // A timestamp suffix is deliberate — a fixed `meeting-{id}` id let
+    // BullMQ silently drop retries (see meetingAiQueue.js). Duplicate
+    // prevention moved to the route's transcript-status check.
+    expect(lastJobId()).toMatch(/^meeting-meet-1-\d+$/);
     expect(lastJobId()).not.toContain(':');
   });
 

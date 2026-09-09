@@ -17,11 +17,13 @@ const getQueue = () => {
   return queue;
 };
 
-// jobId = `meeting-{meetingId}` — BullMQ refuses a second job with the same
-// id while one is active/waiting, so a duplicate "generate summary" click
-// while transcription/summarization is already running enqueues nothing new
-// (Phase 14: "Prevent duplicate summary generation"). BullMQ custom job ids
-// cannot contain ':', hence the '-' separator.
+// jobId includes a timestamp so a retry is NEVER silently swallowed by
+// BullMQ's "id already exists" dedup. The old `meeting-{meetingId}` id was a
+// trap: a completed/failed job stays in the queue for `removeOnComplete.age`
+// (24h), so any later retry click added nothing, the route still returned
+// 202, and the frontend polled a summary that would never come. Duplicate-
+// generation is prevented instead by the route (routes/meeting/summarize.js)
+// checking the MeetingTranscript status before enqueueing.
 const enqueueMeetingSummaryJob = async ({ meetingId, mediaId, userId, requestId }) => {
   const q = getQueue();
   if (!q) return { enqueued: false };
@@ -35,12 +37,12 @@ const enqueueMeetingSummaryJob = async ({ meetingId, mediaId, userId, requestId 
         requestId,
       },
       {
-        jobId: `meeting-${meetingId}`,
+        jobId: `meeting-${meetingId}-${Date.now()}`,
         attempts: 2,
         backoff: { type: 'exponential', delay: 5000 },
         timeout: 120000, // transcription of up to a 25MB audio file can genuinely take a while
-        removeOnComplete: { age: 24 * 60 * 60 },
-        removeOnFail: { age: 24 * 60 * 60 },
+        removeOnComplete: { age: 60 * 60 },
+        removeOnFail: { age: 60 * 60 },
       },
     );
     return { enqueued: true };

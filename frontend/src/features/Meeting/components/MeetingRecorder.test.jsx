@@ -154,6 +154,28 @@ describe('MeetingRecorder — asynchronous (BullMQ) path with polling', () => {
       expect(screen.getByText('Could not generate a summary for this meeting.')).toBeInTheDocument();
     });
   });
+
+  it('offers "Try again" on a transient SUMMARY_FAILED and re-requests without a mediaId', async () => {
+    await setGlobal({ audioStream: FAKE_STREAM });
+    uploadMedia.mockResolvedValueOnce({ data: { media: { _id: 'media-1' } } });
+    summarizeMeeting
+      .mockResolvedValueOnce({ status: 202, data: { status: 'PROCESSING' } })
+      .mockResolvedValueOnce({ status: 200, data: { summary: 'Second attempt worked.' } });
+    getMeetingSummary.mockResolvedValueOnce({ data: { status: 'FAILED', failureReason: 'SUMMARY_FAILED' } });
+
+    const user = userEvent.setup();
+    render(<MeetingRecorder meetingId="meeting-1" />);
+
+    await user.click(screen.getByRole('button', { name: 'Record meeting for an AI summary' }));
+    await user.click(screen.getByRole('button', { name: 'Stop recording & summarize' }));
+
+    const retryBtn = await screen.findByRole('button', { name: 'Try again' });
+    await user.click(retryBtn);
+
+    await waitFor(() => expect(screen.getByText('Second attempt worked.')).toBeInTheDocument());
+    // the retry call carries no mediaId (transcript already exists server-side)
+    expect(summarizeMeeting).toHaveBeenLastCalledWith('meeting-1', null, expect.anything());
+  });
 });
 
 describe('MeetingRecorder — upload failure', () => {

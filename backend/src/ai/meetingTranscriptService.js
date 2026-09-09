@@ -22,6 +22,18 @@ const { checkMeetingSummaryEligibility } = require('./eligibility');
 const { boundText } = require('./contextBuilder');
 const { runGoverned } = require('./gateway');
 
+// Summary-generation failures the caller (worker / sync route) can retry —
+// the transcript stays usable, so the doc goes back to 'TRANSCRIBED' and a
+// later attempt can pick it up. Everything else is terminal: the doc goes
+// to 'FAILED' with the reason, so the frontend poll STOPS instead of
+// spinning forever on a non-terminal status.
+const RETRYABLE_SUMMARY_REASONS = new Set([
+  'RATE_LIMITED',
+  'QUOTA_EXCEEDED',
+  'PROVIDER_UNAVAILABLE',
+  'GENERATION_IN_PROGRESS',
+]);
+
 const countWords = (text) => (text || '').trim().split(/\s+/).filter(Boolean).length;
 
 // The provider to use for transcription: the configured primary if it can
@@ -112,10 +124,22 @@ const transcribeMeetingAudio = async ({ meetingId, mediaId, userId }) => {
 // Returns { ok, reason?, minX? } (eligibility shape) or { ok:true, summary }.
 const generateMeetingSummary = async ({ meetingId, userId, requestId }) => {
   const meeting = await Meeting.findById(meetingId);
-  if (!meeting) return { ok: false, reason: 'MEETING_NOT_FOUND' };
+  if (!meeting) {
+    await MeetingTranscript.updateOne(
+      { meeting: meetingId },
+      { status: 'FAILED', failureReason: 'MEETING_NOT_FOUND', updatedAt: new Date() },
+    ).catch(() => {});
+    return { ok: false, reason: 'MEETING_NOT_FOUND' };
+  }
 
   const transcriptDoc = await MeetingTranscript.findOne({ meeting: meetingId });
   if (!transcriptDoc || !transcriptDoc.transcript) {
+    if (transcriptDoc) {
+      await MeetingTranscript.updateOne(
+        { meeting: meetingId },
+        { status: 'FAILED', failureReason: 'INSUFFICIENT_TRANSCRIPT', updatedAt: new Date() },
+      );
+    }
     return {
       ok: false,
       reason: 'INSUFFICIENT_TRANSCRIPT',
@@ -165,7 +189,19 @@ const generateMeetingSummary = async ({ meetingId, userId, requestId }) => {
   });
 
   if (!result.ok) {
-    await MeetingTranscript.updateOne({ meeting: meetingId }, { status: 'TRANSCRIBED', updatedAt: new Date() }); // revert — still has a usable transcript, just no summary yet
+    if (RETRYABLE_SUMMARY_REASONS.has(result.reason)) {
+      // Transient — revert to TRANSCRIBED so a retry can pick it up. The
+      // frontend poll treats TRANSCRIBED as "still working"; the worker
+      // removes the (transient) job so a fresh /summarize retries cleanly.
+      await MeetingTranscript.updateOne({ meeting: meetingId }, { status: 'TRANSCRIBED', updatedAt: new Date() });
+    } else {
+      // Terminal (INVALID_OUTPUT, AI_DISABLED, an unrecognized provider
+      // error): mark FAILED so the poll STOPS instead of spinning forever.
+      await MeetingTranscript.updateOne(
+        { meeting: meetingId },
+        { status: 'FAILED', failureReason: result.reason || 'SUMMARY_FAILED', updatedAt: new Date() },
+      );
+    }
     return result;
   }
 

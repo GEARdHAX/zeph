@@ -21,15 +21,24 @@ import { getAiErrorMessage, MESSAGES } from '../../../lib/aiErrorMessage';
 // and polls for the async result if BullMQ is handling it.
 const POLL_INTERVAL_MS = 4000;
 
+// The BullMQ path (transcribe → eligibility → summarize) is normally well
+// under a minute; 3 minutes is a generous ceiling that still guarantees the
+// dialog can never spin forever if the job dies silently, the transcript
+// gets stuck on a non-terminal status, or a stale dedup lock keeps every
+// retry from starting.
+const POLL_DEADLINE_MS = 3 * 60 * 1000;
+
 function MeetingRecorder({ meetingId }) {
   const [audioStream] = useGlobal('audioStream');
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
+  const [canRetry, setCanRetry] = useState(false);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const pollTimeoutRef = useRef(null);
+  const pollDeadlineRef = useRef(0);
   const abortRef = useRef(null);
   const mountedRef = useRef(true);
 
@@ -72,14 +81,28 @@ function MeetingRecorder({ meetingId }) {
     if (!mountedRef.current) return;
     try {
       const res = await getMeetingSummary(meetingId);
-      if (res.data.status === 'SUMMARIZED') {
+      const { status } = res.data;
+      if (status === 'SUMMARIZED') {
         setProcessing(false);
         setSummary(res.data.summary);
         return;
       }
-      if (res.data.status === 'FAILED') {
+      if (status === 'FAILED') {
         setProcessing(false);
         setError(MESSAGES[res.data.failureReason] || 'Could not generate a summary for this meeting.');
+        // A transcript exists but summarizing failed transiently — a retry
+        // is worth offering. Eligibility verdicts are permanent, so not those.
+        setCanRetry(res.data.failureReason === 'SUMMARY_FAILED' || res.data.failureReason === 'INVALID_OUTPUT');
+        return;
+      }
+      // Non-terminal (TRANSCRIBING / TRANSCRIBED / SUMMARIZING). Keep
+      // polling — but never past the deadline: a job can die silently or a
+      // stale dedup lock can block every retry, and the dialog must not
+      // spin forever.
+      if (Date.now() > pollDeadlineRef.current) {
+        setProcessing(false);
+        setError('This is taking longer than expected. You can try again.');
+        setCanRetry(true);
         return;
       }
       pollTimeoutRef.current = setTimeout(pollForSummary, POLL_INTERVAL_MS);
@@ -87,6 +110,37 @@ function MeetingRecorder({ meetingId }) {
       if (!mountedRef.current) return;
       setProcessing(false);
       setError(getAiErrorMessage(e));
+    }
+  };
+
+  const startPolling = () => {
+    pollDeadlineRef.current = Date.now() + POLL_DEADLINE_MS;
+    pollForSummary();
+  };
+
+  const retry = async () => {
+    setError(null);
+    setCanRetry(false);
+    setProcessing(true);
+    try {
+      // No mediaId — the transcript already exists server-side; this just
+      // re-runs summary generation.
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const res = await summarizeMeeting(meetingId, null, controller.signal);
+      if (res.status === 202) {
+        startPolling();
+        return;
+      }
+      setProcessing(false);
+      setSummary(res.data.summary);
+    } catch (e) {
+      if (e.code === 'ERR_CANCELED') return;
+      if (!mountedRef.current) return;
+      setProcessing(false);
+      setError(getAiErrorMessage(e));
+      setCanRetry(true);
     }
   };
 
@@ -107,7 +161,7 @@ function MeetingRecorder({ meetingId }) {
       const summarizeRes = await summarizeMeeting(meetingId, mediaId, controller.signal);
 
       if (summarizeRes.status === 202) {
-        pollForSummary();
+        startPolling();
         return;
       }
       setProcessing(false);
@@ -147,6 +201,7 @@ function MeetingRecorder({ meetingId }) {
           if (!next && !processing) {
             setSummary(null);
             setError(null);
+            setCanRetry(false);
           }
         }}
       >
@@ -168,9 +223,16 @@ function MeetingRecorder({ meetingId }) {
               />
             </div>
           ) : error ? (
-            <p className="text-xs leading-relaxed text-destructive">{error}</p>
+            <div className="flex flex-col gap-3">
+              <p className="text-xs leading-relaxed text-destructive">{error}</p>
+              {canRetry && (
+                <Button type="button" size="sm" onClick={retry} className="self-start">
+                  Try again
+                </Button>
+              )}
+            </div>
           ) : (
-            <p className="text-xs leading-relaxed text-muted-foreground">{summary}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">{summary}</p>
           )}
         </DialogContent>
       </Dialog>

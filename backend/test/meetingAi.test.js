@@ -222,6 +222,36 @@ describe('POST /api/meeting/:id/summarize — eligibility (no Redis -> synchrono
     expect(transcriptDoc.summary).toBe('The team discussed the roadmap and agreed on next steps.');
   });
 
+  it('marks the transcript FAILED (not TRANSCRIBED) when summary generation fails terminally', async () => {
+    // Regression: a terminal summary failure used to revert the doc to
+    // TRANSCRIBED — a non-terminal status the frontend poll spins on
+    // forever. It must go to FAILED so the poll stops.
+    const user = await createUser();
+    const other = await createUser();
+    const meeting = await createMeeting({ caller: user._id, users: [user._id, other._id] });
+    const media = await createMedia(user._id);
+
+    store.config.aiProvider = 'groq';
+    store.config.groqApiKey = 'test-key';
+    global.fetch = async (url) => {
+      if (url.includes('/audio/transcriptions')) {
+        return { ok: true, status: 200, text: async () => 'word '.repeat(200) };
+      }
+      // Empty completion -> gateway output validation fails -> INVALID_OUTPUT (terminal)
+      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '' } }] }) };
+    };
+
+    const res = await request(app)
+      .post(`/api/meeting/${meeting._id}/summarize`)
+      .set('Authorization', `Bearer ${tokenFor(user)}`)
+      .send({ mediaId: media._id.toString() });
+
+    expect(res.status).toBe(502);
+    const doc = await MeetingTranscript.findOne({ meeting: meeting._id });
+    expect(doc.status).toBe('FAILED');
+    expect(doc.transcript).toBeTruthy(); // transcript still kept for a retry
+  });
+
   it('deletes the raw audio Media/object after successful transcription (privacy)', async () => {
     enableGroqChatAndTranscribe('a summary', 'word '.repeat(200));
     const user = await createUser();
