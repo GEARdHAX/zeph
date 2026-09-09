@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Video, Mic, VideoOff, MicOff, X } from 'lucide-react';
-import { useGlobal } from 'reactn';
+import { useGlobal, getGlobal } from 'reactn';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 
@@ -10,6 +10,12 @@ function Join({ onJoin, onClose }) {
   const [audio, setAudioStream] = useGlobal('audioStream');
   const [video, setVideoStream] = useGlobal('videoStream');
   const localVideoRef = useRef(null);
+  // Set true only when the user actually starts the call — the unmount
+  // cleanup below must NOT stop the preview tracks in that case (join()
+  // hands them straight to mediasoup). Any OTHER unmount (route change,
+  // parent teardown, the call being cancelled elsewhere) means the preview
+  // devices would otherwise stay lit with no UI to turn them off.
+  const joinedRef = useRef(false);
 
   const getAudio = () =>
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
@@ -24,7 +30,24 @@ function Join({ onJoin, onClose }) {
   useEffect(() => {
     if (isVideo) getVideo();
     if (isAudio) getAudio();
+    return () => {
+      if (joinedRef.current) return; // the call is starting — join() owns these tracks now
+      [getGlobal().audioStream, getGlobal().videoStream].forEach((stream) => {
+        if (!stream) return;
+        try {
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (e) {
+          /* already stopped */
+        }
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleJoin = () => {
+    joinedRef.current = true;
+    onJoin();
+  };
 
   const onChangeAudio = (checked) => {
     if (checked) getAudio();
@@ -133,7 +156,7 @@ function Join({ onJoin, onClose }) {
         <Button
           type="button"
           className="flex-1 rounded-xl py-2.5 font-semibold shadow-md active:scale-98 transition-transform cursor-pointer"
-          onClick={onJoin}
+          onClick={handleJoin}
         >
           Join Call
         </Button>

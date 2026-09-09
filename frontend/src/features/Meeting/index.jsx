@@ -124,11 +124,28 @@ function Meeting() {
     setMeeting(roomID);
   }, []);
 
+  // Each wraps getUserMedia/getDisplayMedia with a user-visible error —
+  // a denied permission or a busy device otherwise rejected silently,
+  // leaving the toggle stuck "off" with no explanation. Rethrow so the
+  // .then(produce…) chain doesn't run against an undefined stream.
   const getAudio = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    return stream;
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      toast.error('Could not access your microphone. Check the browser permission and try again.');
+      throw e;
+    }
   };
-  const getVideo = () => navigator.mediaDevices.getUserMedia({ video: true });
+  const getVideo = async () => {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video: true });
+    } catch (e) {
+      toast.error('Could not access your camera. Check the browser permission and try again.');
+      throw e;
+    }
+  };
+  // No toast on failure here — the common rejection is the user simply
+  // cancelling the browser's screen-picker.
   const getScreen = async () => {
     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     setScreenStream(stream);
@@ -342,7 +359,11 @@ function Meeting() {
               active={video}
               title={video ? 'Turn off camera' : 'Turn on camera'}
               onClick={() =>
-                video ? callManager.stopVideo() : getVideo().then((stream) => callManager.produceVideo(stream))
+                video
+                  ? callManager.stopVideo()
+                  : getVideo()
+                      .then((stream) => callManager.produceVideo(stream))
+                      .catch(() => {})
               }
             />
             <ControlButton
@@ -350,7 +371,11 @@ function Meeting() {
               active={audio}
               title={audio ? 'Mute microphone' : 'Unmute microphone'}
               onClick={() =>
-                audio ? callManager.stopAudio() : getAudio().then((stream) => callManager.produceAudio(stream))
+                audio
+                  ? callManager.stopAudio()
+                  : getAudio()
+                      .then((stream) => callManager.produceAudio(stream))
+                      .catch(() => {})
               }
             />
             <ControlButton
@@ -358,7 +383,11 @@ function Meeting() {
               active={isScreen}
               title={isScreen ? 'Stop sharing screen' : 'Share screen'}
               onClick={() =>
-                isScreen ? callManager.stopScreen() : getScreen().then((stream) => callManager.produceScreen(stream))
+                isScreen
+                  ? callManager.stopScreen()
+                  : getScreen()
+                      .then((stream) => callManager.produceScreen(stream))
+                      .catch(() => {})
               }
             />
 

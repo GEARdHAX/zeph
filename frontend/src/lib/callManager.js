@@ -28,6 +28,36 @@ let rejoinInFlight = false;
 
 const getIO = () => store.getState().io.io;
 
+// STRICT camera/mic release: stop every getUserMedia()/getDisplayMedia()
+// track this tab could be holding — the join-screen preview streams
+// (audioStream/videoStream), whatever is live (localStream/screenStream)
+// — and null the globals so nothing re-references a stopped track. The
+// browser's camera/mic "in use" indicator only clears once the LAST live
+// track from a device is stopped, so this must be exhaustive. Safe to call
+// from any teardown or failure path, any number of times.
+async function releaseAllMedia() {
+  const g = getGlobal();
+  const seen = new Set();
+  [g.localStream, g.audioStream, g.videoStream, g.screenStream].forEach((stream) => {
+    if (!stream || seen.has(stream)) return;
+    seen.add(stream);
+    try {
+      stream.getTracks().forEach((track) => track.stop());
+    } catch (e) {
+      /* already stopped */
+    }
+  });
+  await setGlobal({
+    localStream: null,
+    audioStream: null,
+    videoStream: null,
+    screenStream: null,
+    audio: false,
+    video: false,
+    screen: false,
+  });
+}
+
 const consume = async (recvTransport, producer) => {
   const io = getIO();
   const { rtpCapabilities } = device;
@@ -225,6 +255,7 @@ const join = async (targetRoomID) => {
 const rejoin = async () => {
   if (rejoinInFlight || !roomID || !device) return;
   rejoinInFlight = true;
+  let rejoinFailed = false;
   const targetRoomID = roomID;
 
   try {
@@ -300,15 +331,26 @@ const rejoin = async () => {
     if (videoStream) await produceVideo(videoStream);
   } catch (err) {
     console.log('rejoin failed', err);
+    // Reconnecting the mediasoup session failed and there is no retry above
+    // it — the call is genuinely dead. End it properly (STRICT: leave() is
+    // what releases the camera/mic; otherwise the tab holds the devices
+    // with no call and no UI to hang up until a full page refresh).
+    rejoinFailed = true;
   } finally {
     rejoinInFlight = false;
     store.dispatch({ type: Actions.RTC_RECONNECTING, reconnecting: false });
   }
+  if (rejoinFailed) await leave();
 };
 
 async function produceAudio(stream) {
   const useStream = stream || getGlobal().audioStream;
-  await setGlobal({ audio: true });
+  // Store the stream in the global BEFORE producing — otherwise a mic
+  // toggled on mid-call (Meeting/index.jsx passes a fresh getUserMedia
+  // stream here) is never tracked anywhere, so stopAudio()/leave()/
+  // releaseAllMedia() can't stop it and the browser mic indicator stays
+  // lit after hang-up.
+  await setGlobal({ audio: true, audioStream: useStream });
   try {
     const track = useStream.getAudioTracks()[0];
     audioProducer = await sendTransport.produce({ track });
@@ -320,10 +362,9 @@ async function produceAudio(stream) {
 
 async function produceVideo(stream) {
   const useStream = stream || getGlobal().videoStream;
-  await setGlobal({ video: true });
+  await setGlobal({ video: true, videoStream: useStream, localStream: useStream });
   try {
     const track = useStream.getVideoTracks()[0];
-    await setGlobal({ localStream: useStream });
     videoProducer = await sendTransport.produce({ track, appData: { isScreen: false } });
   } catch (err) {
     console.log('getusermedia produce failed', err);
@@ -403,29 +444,13 @@ async function stopScreen() {
 // invoked it.
 async function leave() {
   const io = getIO();
-  const { localStream, audioStream, videoStream, screenStream } = getGlobal();
   const endingRoomID = roomID;
   const { counterpart } = store.getState().rtc;
 
-  // Every getUserMedia()/getDisplayMedia() stream this session could have
-  // acquired — the join-screen preview (Join.jsx sets audioStream/
-  // videoStream before the call even starts) and whatever's currently
-  // live (localStream, screenStream). The browser's camera/mic "in use"
-  // indicator stays lit for as long as ANY track from ANY of these is
-  // still live, regardless of whether the mediasoup producer using it was
-  // closed — stopping only localStream's video track (the previous
-  // behavior) left the mic on unconditionally (audio was never stopped at
-  // all) and left a stale videoStream/audioStream reference behind for a
-  // camera-off call or a screen-share call.
-  const streamsToStop = [localStream, audioStream, videoStream, screenStream];
-  streamsToStop.forEach((stream) => {
-    if (!stream) return;
-    try {
-      stream.getTracks().forEach((track) => track.stop());
-    } catch (e) {
-      /* already stopped */
-    }
-  });
+  // STRICT: release every camera/mic track this tab holds (see
+  // releaseAllMedia). Done first so the device indicator clears the instant
+  // the user hangs up, before the slower server round-trip below.
+  await releaseAllMedia();
 
   try {
     if (sendTransport) sendTransport.close();
@@ -489,5 +514,6 @@ export default {
   stopVideo,
   stopScreen,
   leave,
+  releaseAllMedia,
   getDevice,
 };
