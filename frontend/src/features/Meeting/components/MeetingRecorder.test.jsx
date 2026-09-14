@@ -138,6 +138,28 @@ describe('MeetingRecorder — asynchronous (BullMQ) path with polling', () => {
     });
   }, 15000);
 
+  it('the dialog X closes it even while a summary is generating (regression: used to be stuck)', async () => {
+    await setGlobal({ audioStream: FAKE_STREAM });
+    uploadMedia.mockResolvedValueOnce({ data: { media: { _id: 'media-1' } } });
+    summarizeMeeting.mockResolvedValueOnce({ status: 202, data: { status: 'PROCESSING' } });
+    // Never resolves to SUMMARIZED/FAILED — simulates a stuck job; the only
+    // way out must be the user closing the dialog themselves.
+    getMeetingSummary.mockResolvedValue({ data: { status: 'SUMMARIZING' } });
+
+    const user = userEvent.setup();
+    render(<MeetingRecorder meetingId="meeting-1" />);
+
+    await user.click(screen.getByRole('button', { name: 'Record meeting for an AI summary' }));
+    await user.click(screen.getByRole('button', { name: 'Stop recording & summarize' }));
+
+    await screen.findByText('AI transcription and summarization in progress');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(screen.queryByText('AI transcription and summarization in progress')).not.toBeInTheDocument();
+    // Recording button is usable again — not stuck disabled.
+    expect(screen.getByRole('button', { name: 'Record meeting for an AI summary' })).toBeEnabled();
+  });
+
   it('shows an error when polling reports FAILED', async () => {
     await setGlobal({ audioStream: FAKE_STREAM });
     uploadMedia.mockResolvedValueOnce({ data: { media: { _id: 'media-1' } } });

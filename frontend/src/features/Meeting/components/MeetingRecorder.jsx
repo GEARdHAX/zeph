@@ -118,6 +118,19 @@ function MeetingRecorder({ meetingId }) {
     pollForSummary();
   };
 
+  // User-initiated dismissal while generation is still in flight — stop
+  // polling and abort the in-flight request, then reset to idle. Generation
+  // itself keeps running server-side (there's no cancel-job endpoint, and
+  // there's no need for one: leaving the dialog just stops watching it).
+  const cancelAndClose = () => {
+    clearTimeout(pollTimeoutRef.current);
+    abortRef.current?.abort();
+    setProcessing(false);
+    setSummary(null);
+    setError(null);
+    setCanRetry(false);
+  };
+
   const retry = async () => {
     setError(null);
     setCanRetry(false);
@@ -198,7 +211,14 @@ function MeetingRecorder({ meetingId }) {
       <Dialog
         open={processing || !!summary || !!error}
         onOpenChange={(next) => {
-          if (!next && !processing) {
+          if (next) return;
+          // Closing (the X button, Escape, or an overlay click) must always
+          // work, including mid-generation — previously guarded on
+          // `!processing`, which meant the X rendered but silently did
+          // nothing while a summary was generating, with no other way out
+          // before the poll deadline.
+          if (processing) cancelAndClose();
+          else {
             setSummary(null);
             setError(null);
             setCanRetry(false);
