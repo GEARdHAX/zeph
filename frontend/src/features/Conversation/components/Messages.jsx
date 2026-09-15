@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Message from './Message';
 import getMoreMessages from '../../../actions/getMoreMessages';
+import getMessagesAround from '../../../actions/getMessagesAround';
 import Actions from '../../../constants/Actions';
 import Picture from '../../../components/Picture';
 import Config from '../../../config';
@@ -69,6 +70,8 @@ function Messages({ aiEnabled }) {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const typing = useSelector((state) => state.messages.typing);
+  const [pendingJump, setPendingJump] = useGlobal('pendingMessageJump');
+  const [highlightedID, setHighlightedID] = useState(null);
 
   const dispatch = useDispatch();
   const chat = useRef(null);
@@ -79,6 +82,10 @@ function Messages({ aiEnabled }) {
   // this both cases looked identical to that effect and loading history
   // yanked the view down to the bottom instead of preserving position.
   const restoreScrollRef = useRef(null);
+  // Set right before a search-jump replaces the whole message list, so the
+  // effect below can scroll straight to the target instead of running its
+  // normal scroll-to-bottom/restore-position logic.
+  const jumpTargetRef = useRef(null);
 
   let other = {
     firstName: 'A',
@@ -101,7 +108,13 @@ function Messages({ aiEnabled }) {
     const showDaySeparator = !previous || !moment(message.date).isSame(moment(previous.date), 'day');
 
     return (
-      <div key={message._id || message.clientID}>
+      <div
+        key={message._id || message.clientID}
+        data-message-id={message._id}
+        className={
+          highlightedID === message._id ? 'rounded-xl bg-primary/10 transition-colors duration-1000' : undefined
+        }
+      >
         {showDaySeparator && <DaySeparator date={message.date} />}
         <Message
           message={message}
@@ -144,6 +157,17 @@ function Messages({ aiEnabled }) {
 
   useEffect(() => {
     if (!chat.current) return;
+    if (jumpTargetRef.current) {
+      const targetID = jumpTargetRef.current;
+      jumpTargetRef.current = null;
+      const el = chat.current.querySelector(`[data-message-id="${targetID}"]`);
+      if (el) {
+        el.scrollIntoView({ block: 'center' });
+        setHighlightedID(targetID);
+        setTimeout(() => setHighlightedID((current) => (current === targetID ? null : current)), 1600);
+      }
+      return;
+    }
     if (restoreScrollRef.current) {
       // History was prepended — hold the same content in view instead of
       // jumping to the bottom (or leaving scrollTop at 0, which is what a
@@ -166,6 +190,23 @@ function Messages({ aiEnabled }) {
     setHasMore(true);
     restoreScrollRef.current = null;
   }, [room._id]);
+
+  // "Jump to this message" (MessageSearchPopup.jsx sets the pendingMessageJump
+  // global on a search-result click). Replaces the whole message list with a
+  // window centered on the target — same shape as the room's initial load —
+  // rather than paging through messages/more one screen at a time.
+  useEffect(() => {
+    if (!pendingJump || !room._id) return;
+    const { messageID } = pendingJump;
+    setPendingJump(null);
+    getMessagesAround({ roomID: room._id, messageID })
+      .then((res) => {
+        jumpTargetRef.current = messageID;
+        setHasMore(res.data.hasMoreBefore !== false);
+        dispatch({ type: Actions.SET_MESSAGES, messages: res.data.messages });
+      })
+      .catch(() => {});
+  }, [pendingJump, room._id, dispatch, setPendingJump]);
 
   useEffect(() => {
     if (typing && chat.current) {

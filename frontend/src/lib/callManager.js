@@ -1,8 +1,14 @@
 import * as mediasoup from 'mediasoup-client';
 import { getGlobal, setGlobal } from 'reactn';
+import { toast } from 'react-toastify';
 import store from '../store';
 import Actions from '../constants/Actions';
 import postClose from '../actions/postClose';
+import uploadMedia from '../actions/uploadMedia';
+import uploadMeetingRecording from '../actions/uploadMeetingRecording';
+import summarizeMeeting from '../actions/summarizeMeeting';
+import getMeetingSummary from '../actions/getMeetingSummary';
+import { getAiErrorMessage } from './aiErrorMessage';
 
 // Owns the mediasoup call session (Device, transports, producers) as
 // module-level state instead of component-local state — this is what makes
@@ -464,6 +470,12 @@ async function leave() {
     /* best-effort notify */
   }
 
+  // A pending MeetingRecorder recording, if any, can only be summarized
+  // once the ack above confirms the server has processed this leave (see
+  // finalizeMeetingRecording's comment). Fire-and-forget — must not block
+  // the rest of teardown/navigation on an upload+AI round trip.
+  if (endingRoomID) finalizeMeetingRecording(endingRoomID).catch(() => {});
+
   if (unsubscribeFromProducers) {
     unsubscribeFromProducers();
     unsubscribeFromProducers = null;
@@ -500,6 +512,119 @@ async function leave() {
   });
 
   store.dispatch({ type: Actions.RTC_LEAVE });
+}
+
+// Uploads + summarizes a recording captured by MeetingRecorder.jsx, ONLY
+// once the meeting has genuinely ended — calling /summarize any earlier
+// always 422s (MEETING_NOT_ENDED). leave() calls this after its own
+// io.request('leave', ...) resolves, which the server only acks once
+// leaveRoom() has run (backend/src/mediasoup/index.js) — so this is the
+// earliest point endedAt is guaranteed to be set FOR THIS PARTICIPANT'S
+// leave. In a group call where others remain, the meeting hasn't actually
+// ended yet; the backend still correctly rejects with MEETING_NOT_ENDED in
+// that case, which is expected and not shown as an error — the recording
+// stays pending in the global for a later participant's hangup to retry
+// (best-effort; not guaranteed if nobody else records/triggers it).
+// Picks the filename extension the backend needs to see for each recorded
+// mimeType. Ogg goes through the general upload pipeline (mediaPolicy.js
+// recognizes '.ogg' as an unambiguous audio extension); a fallback
+// WebM/MP4/AAC recording goes through upload-recording.js instead (see that
+// file's comment for why), which only needs a real container extension.
+const extensionForMimeType = (mimeType) => {
+  if (!mimeType) return '.webm';
+  if (mimeType.includes('ogg')) return '.ogg';
+  if (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('aac')) return '.m4a';
+  return '.webm';
+};
+
+const finalizeMeetingRecording = async (endedMeetingID) => {
+  const { pendingMeetingRecording } = getGlobal();
+  if (!pendingMeetingRecording || pendingMeetingRecording.meetingId !== endedMeetingID) return;
+
+  const { blob, mimeType, isMeetingAudioFallback } = pendingMeetingRecording;
+  const toastId = toast.loading('Generating your meeting summary…');
+  try {
+    const extension = extensionForMimeType(mimeType);
+    const file = new File([blob], `meeting-${endedMeetingID}${extension}`, { type: mimeType || 'audio/webm' });
+    const uploadRes = isMeetingAudioFallback
+      ? await uploadMeetingRecording(endedMeetingID, file)
+      : await uploadMedia(file);
+    const mediaId = uploadRes.data.media._id;
+    const res = await summarizeMeeting(endedMeetingID, mediaId);
+
+    if (res.status === 202) {
+      await pollMeetingSummary(endedMeetingID, toastId);
+      return;
+    }
+    await setGlobal({ pendingMeetingRecording: null });
+    // There's no post-call screen to send the user to (see the comment on
+    // this function) — the summary text goes straight in the toast, or
+    // it's effectively lost.
+    toast.update(toastId, {
+      render: `Meeting summary: ${res.data.summary}`,
+      type: 'success',
+      isLoading: false,
+      autoClose: 10000,
+    });
+  } catch (err) {
+    // MEETING_NOT_ENDED means other participants are still on the call —
+    // not a real failure, leave the recording pending and say nothing.
+    if (err?.response?.data?.reason === 'MEETING_NOT_ENDED') {
+      toast.dismiss(toastId);
+      return;
+    }
+    await setGlobal({ pendingMeetingRecording: null });
+    toast.update(toastId, {
+      render: getAiErrorMessage(err),
+      type: 'error',
+      isLoading: false,
+      autoClose: 6000,
+    });
+  }
+};
+
+const MEETING_SUMMARY_POLL_MS = 4000;
+const MEETING_SUMMARY_POLL_DEADLINE_MS = 3 * 60 * 1000;
+
+async function pollMeetingSummary(meetingID, toastId, deadline = Date.now() + MEETING_SUMMARY_POLL_DEADLINE_MS) {
+  try {
+    const res = await getMeetingSummary(meetingID);
+    const { status } = res.data;
+    if (status === 'SUMMARIZED') {
+      await setGlobal({ pendingMeetingRecording: null });
+      toast.update(toastId, {
+        render: `Meeting summary: ${res.data.summary}`,
+        type: 'success',
+        isLoading: false,
+        autoClose: 10000,
+      });
+      return;
+    }
+    if (status === 'FAILED') {
+      await setGlobal({ pendingMeetingRecording: null });
+      toast.update(toastId, {
+        render: 'Could not generate a summary for this meeting.',
+        type: 'error',
+        isLoading: false,
+        autoClose: 6000,
+      });
+      return;
+    }
+    if (Date.now() > deadline) {
+      await setGlobal({ pendingMeetingRecording: null });
+      toast.update(toastId, {
+        render: 'Meeting summary is taking longer than expected.',
+        type: 'error',
+        isLoading: false,
+        autoClose: 6000,
+      });
+      return;
+    }
+    setTimeout(() => pollMeetingSummary(meetingID, toastId, deadline), MEETING_SUMMARY_POLL_MS);
+  } catch (err) {
+    await setGlobal({ pendingMeetingRecording: null });
+    toast.update(toastId, { render: getAiErrorMessage(err), type: 'error', isLoading: false, autoClose: 6000 });
+  }
 }
 
 const getDevice = () => device;

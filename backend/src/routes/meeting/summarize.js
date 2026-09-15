@@ -1,7 +1,6 @@
 const Meeting = require('../../models/Meeting');
 const MeetingTranscript = require('../../models/MeetingTranscript');
 const Media = require('../../models/Media');
-const groupPolicy = require('../../authorization/groupPolicy');
 const store = require('../../store');
 const { aiTextEnabled } = require('../../ai/providerRouter');
 const { REJECTION_REASONS, buildPolicy } = require('../../ai/policy');
@@ -16,23 +15,17 @@ const { resolveRequestId, aiFailureResponse } = require('../../ai/telemetry');
 // omit mediaId on subsequent calls once a transcript already exists (e.g.
 // retrying summary generation after a transient provider failure).
 //
-// Authorization mirrors mediasoup/index.js's authorizeMeetingJoin exactly
-// (caller/callee/recorded participant/current group member) — kept as an
-// independent, small check here rather than importing mediasoup/index.js,
-// which would pull in native mediasoup binding initialization this route
-// has no reason to depend on (Meeting AI must work even when
-// MEDIASOUP_ENABLED=false, since mediasoup is disabled in this app's own
-// production deployment — see docs/PHASE8-CAPACITY-REPORT.md).
-const authorizeMeetingAccess = async (meeting, userId) => {
+// Meeting-summary-persistence pass: DELIBERATELY narrower than mediasoup/
+// index.js's authorizeMeetingJoin — no "current group member" fallback.
+// Requesting/generating a summary is participant-history-scoped, same as
+// viewing one (routes/meeting/get-summary.js) — see that file's comment
+// for the full reasoning. Meeting.users ($addToSet on join, never pruned)
+// is the participant history; caller/callee cover 1:1 calls.
+const authorizeSummaryAccess = (meeting, userId) => {
   const userIdStr = userId.toString();
   if (meeting.caller && meeting.caller.toString() === userIdStr) return true;
   if (meeting.callee && meeting.callee.toString() === userIdStr) return true;
-  if ((meeting.users || []).some((u) => u.toString() === userIdStr)) return true;
-  if (meeting.group) {
-    const membership = await groupPolicy.getMembershipWithFallback(meeting.group, userIdStr);
-    if (membership) return true;
-  }
-  return false;
+  return (meeting.users || []).some((u) => u.toString() === userIdStr);
 };
 
 module.exports = async (req, res) => {
@@ -56,8 +49,9 @@ module.exports = async (req, res) => {
   const meeting = await Meeting.findById(meetingId).catch(() => null);
   if (!meeting) return res.status(404).json({ error: true, requestId });
 
-  const authorized = await authorizeMeetingAccess(meeting, req.user.id);
-  if (!authorized) return res.status(403).json({ error: true, requestId });
+  if (!authorizeSummaryAccess(meeting, req.user.id)) {
+    return res.status(403).json({ error: true, reason: 'NOT_A_PARTICIPANT', requestId });
+  }
 
   // Eligibility that doesn't need a transcript (meeting ended? long enough?
   // enough participants?) runs HERE, synchronously, before anything is

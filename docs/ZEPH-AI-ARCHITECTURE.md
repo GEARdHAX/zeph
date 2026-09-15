@@ -507,9 +507,11 @@ Stop → Blob → uploadMedia() (existing pipeline, category: audio)
       ↓
 POST /api/meeting/:id/summarize { mediaId }
       ↓
-Authorization (caller/callee/recorded participant/current group member —
-same check meeting join uses, reimplemented standalone so this route
-works even with MEDIASOUP_ENABLED=false)
+Authorization: caller/callee, or a recorded participant (Meeting.users —
+append-only join history, survives leaving). Deliberately NARROWER than
+mediasoup's live-call-join check: a current group member who never
+actually joined THIS meeting is denied — see "Meeting-scoped summaries
+& authorization" below.
       ↓
 BullMQ (queues/meetingAiQueue.js/meetingAiWorker.js) or synchronous fallback
       ↓
@@ -547,14 +549,67 @@ from `Meeting` itself so it has its own access boundary. Nothing in this
 pipeline retains audio bytes longer than the single transcription call
 requires.
 
+### Meeting-scoped summaries & authorization
+
+**Meeting summaries are meeting-scoped, not user-scoped.** A single
+canonical summary is generated per meeting (`MeetingTranscript` has a
+`unique` index on `meeting`) and is accessible to every user who was
+actually recorded as a participant in that meeting (`Meeting.users`,
+append-only — a join is never undone on leave), including participants
+who subsequently left. It is generated once and reused across every
+authorized viewer, never regenerated per-user, to avoid duplicate AI
+inference/cost.
+
+Authorization for both generating (`POST .../summarize`) and reading
+(`GET .../summary`) a summary checks `caller`/`callee`/`Meeting.users`
+ONLY — unlike joining a *live* call (`mediasoup/index.js`'s
+`authorizeMeetingJoin`), a current group member who never actually
+attended a specific past meeting is denied access to that meeting's
+summary/transcript, even though they could have joined it live had they
+shown up.
+
 ### Duplicate-generation prevention
 
-`queues/meetingAiQueue.js` uses `jobId: meeting:{meetingId}` — BullMQ
-refuses a second job for the same meeting while one is active/waiting, and
-`generateMeetingSummary` itself checks for an existing `SUMMARIZED`
-transcript before calling the provider again (verified in
-`test/meetingAi.test.js`'s "reuses an already-summarized transcript"
-case).
+Three layers, from "avoid the work" to "guarantee correctness even if the
+first two fail":
+
+1. **Route-level staleness check** (`routes/meeting/summarize.js`): if a
+   `MeetingTranscript` doc is already `TRANSCRIBING`/`SUMMARIZING` and was
+   updated in the last 3 minutes, a new request short-circuits to
+   `202 PROCESSING` without touching the queue at all. (BullMQ `jobId`s
+   are now timestamped/unique per enqueue — a FIXED `jobId: meeting-
+   {meetingId}` was tried first but caused a worse bug: BullMQ silently
+   drops any `q.add()` whose id matches a still-retained completed/failed
+   job, so a retry after a failure enqueued NOTHING while the route kept
+   returning 202 forever. This staleness check is what replaced it.)
+2. **Redis dedup lock** (`ai/dedup.js`, `dedupeKey: meeting-summary:
+   {meetingId}`): if two requests both get past step 1 (a genuine race —
+   e.g. two participants click within the same event loop tick) and both
+   enqueue a job, only one worker's `runGoverned` call actually reaches
+   the AI provider; the other gets `GENERATION_IN_PROGRESS` and no-ops
+   back to `TRANSCRIBED` (available for the next real request to retry).
+3. **Database uniqueness** (`MeetingTranscript.meeting: { unique: true }`)
+   is the final, unconditional guarantee: even if steps 1 and 2 somehow
+   both failed to prevent a race, two concurrent successful summary
+   writes cannot both persist — Mongo's unique index rejects the second
+   insert. `generateMeetingSummary` also short-circuits early if it finds
+   `status: 'SUMMARIZED'` already set (cache-before-generate), so a
+   provider call never happens for a meeting that already has a summary
+   (verified in `test/meetingAi.test.js`'s "reuses an already-summarized
+   transcript" case).
+
+### /meetings list summary affordance
+
+`POST /api/meeting/list` attaches lightweight `summary: { available, status
+}` metadata per meeting (one extra query for the whole page, never N+1) —
+never the summary TEXT itself, so listing meetings stays cheap regardless
+of how long any individual summary is. The frontend (`Panel/components/
+Meeting.jsx`) shows a `Summary` button only when `status === 'SUMMARIZED'`,
+a `Generating…` indicator while `TRANSCRIBING`/`TRANSCRIBED`/`SUMMARIZING`,
+`Summary unavailable` on `FAILED`, and nothing at all when no
+`MeetingTranscript` exists yet. Clicking `Summary` fetches the actual
+content on demand via the existing `GET .../summary`
+(`MeetingSummaryPopup.jsx`) — the list itself never triggers generation.
 
 ### Provider requirement
 

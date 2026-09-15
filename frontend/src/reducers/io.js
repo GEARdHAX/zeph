@@ -118,6 +118,16 @@ const reducer = (state = initialState, action) => {
         ...state,
         rooms: state.rooms.filter((r) => r._id !== action.conversationId),
       };
+    // Mute is unlike hide/delete above — the conversation stays fully
+    // visible (unread badge, sidebar preview, message history all
+    // untouched), only its isMuted flag changes, so this patches in place
+    // instead of filtering it out of the list.
+    case Actions.CONVERSATION_MUTED:
+      return {
+        ...state,
+        room: state.room && state.room._id === action.conversationId ? { ...state.room, isMuted: action.muted } : state.room,
+        rooms: state.rooms.map((r) => (r._id === action.conversationId ? { ...r, isMuted: action.muted } : r)),
+      };
     // A conversation partner changed/removed their own profile picture —
     // patch every room's `people` entry for that user in place (sidebar
     // list + the currently-open room, if any) instead of refetching

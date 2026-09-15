@@ -25,9 +25,10 @@ module.exports = async (req, res, next) => {
   // conversation only shows messages from this point forward for THIS
   // user. See ConversationUserState's model comment and DECISIONS.md.
   const conversationState = await ConversationUserState.findOne({ conversation: id, user: req.user.id }).select(
-    'deletedBefore',
+    'deletedBefore isMuted',
   );
   const deletedBefore = conversationState && conversationState.deletedBefore;
+  const isMuted = !!(conversationState && conversationState.isMuted);
 
   const findMessagesAndEmit = (room, accessRevoked, joinInfo) => {
     Message.find({ room: room._id })
@@ -91,6 +92,7 @@ module.exports = async (req, res, next) => {
                 ownerId: room.ownerId,
                 description: room.description,
                 privacy: room.privacy,
+                isMuted,
                 ...(accessRevoked ? { accessRevoked } : {}),
                 ...(joinInfo ? { myJoinInfo: joinInfo } : {}),
                 messages: messages

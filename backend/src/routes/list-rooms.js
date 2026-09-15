@@ -89,11 +89,11 @@ module.exports = async (req, res, next) => {
       const states = await ConversationUserState.find({
         user: req.user.id,
         conversation: { $in: rooms.map((r) => r._id) },
-        deletedBefore: { $ne: null },
       })
-        .select('conversation deletedBefore')
+        .select('conversation deletedBefore isMuted')
         .lean();
       const cutoffByRoomId = new Map(states.map((s) => [s.conversation.toString(), s.deletedBefore]));
+      const mutedRoomIds = new Set(states.filter((s) => s.isMuted).map((s) => s.conversation.toString()));
 
       // Built as plain objects, NOT reassigned onto each room's `people`
       // path — a live Mongoose document's `people` schema path is typed as
@@ -114,6 +114,7 @@ module.exports = async (req, res, next) => {
           return {
             ...room.toObject(),
             ...(lastMessageHiddenByCutoff ? { lastMessage: null, lastAuthor: null } : {}),
+            isMuted: mutedRoomIds.has(room._id.toString()),
             people: await attachBlockState(sanitizedPeople, req.user.id),
           };
         }),

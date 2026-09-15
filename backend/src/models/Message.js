@@ -66,6 +66,17 @@ MessageSchema.index(
   { unique: true, partialFilterExpression: { clientID: { $type: 'string' } } },
 );
 
+// DM/group message search (routes/messages/search.js). Mongo's native text
+// index — no Atlas Search, no external search service — self-hosted Mongo
+// already ships this, and it's more than fast enough at this scale ($text
+// uses the index, not a collection scan). partialFilterExpression skips
+// tombstoned/system rows (empty or null content) so the index stays smaller
+// and a search can never surface "deleted message" as a match.
+MessageSchema.index(
+  { content: 'text' },
+  { partialFilterExpression: { content: { $type: 'string' } }, default_language: 'none' },
+);
+
 // Strips the real content once a message is tombstoned, applied wherever a
 // Message document is serialized to JSON (res.json(), Socket.IO's own
 // JSON-serializing emit) — a single choke point instead of every route

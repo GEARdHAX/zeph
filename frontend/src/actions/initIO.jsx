@@ -311,22 +311,24 @@ const initIO = (token) => (dispatch) => {
   });
 
   io.on('message-in', (data) => {
-    const { room, message } = data;
+    const { room, message, muted } = data;
 
     const currentRoom = store.getState().io.room;
     const roomIsOpen = !!currentRoom && currentRoom._id === room._id;
 
-    const audio = document.createElement('audio');
-    audio.style.display = 'none';
-    audio.src = messageSound;
-    audio.autoplay = true;
-    audio.onended = () => audio.remove();
     // System messages ("X was removed by Y") are moderation events, not
     // someone's chat message — no sound, no "new message" toast (the
     // removed/banned user already gets their own distinct RemovedFromGroupToast
-    // elsewhere). Still counts as unread and still updates the sidebar below.
+    // elsewhere). A muted conversation suppresses both the same way — still
+    // counts as unread and still updates the sidebar below, exactly like the
+    // system-message case, just silent/toast-free instead of visibly absent.
     const isSystemMessage = message.type === 'system';
-    if (!isSystemMessage) {
+    if (!isSystemMessage && !muted) {
+      const audio = document.createElement('audio');
+      audio.style.display = 'none';
+      audio.src = messageSound;
+      audio.autoplay = true;
+      audio.onended = () => audio.remove();
       document.body.appendChild(audio);
     }
 
@@ -335,8 +337,8 @@ const initIO = (token) => (dispatch) => {
       // Only toast for a conversation the user isn't already looking at —
       // a toast for the open room would just duplicate what's already on
       // screen. Suppressed while a call is active so an incoming toast
-      // doesn't cover the call UI.
-      if (!getGlobal().inCall && !isSystemMessage) {
+      // doesn't cover the call UI, and suppressed for a muted conversation.
+      if (!getGlobal().inCall && !isSystemMessage && !muted) {
         toast(<NewMessageToast room={room} message={message} />, { toastId: message._id });
       }
     }
@@ -420,6 +422,12 @@ const initIO = (token) => (dispatch) => {
   // just a faster UI update, not the actual enforcement (that's server-side).
   io.on('conversation-hidden', (data) => {
     store.dispatch({ type: Actions.CONVERSATION_HIDDEN, conversationId: data.conversationId });
+  });
+
+  // Mute toggled from another of this user's own devices/tabs — same
+  // own-personal-room-only emit shape as conversation-hidden above.
+  io.on('conversation-muted', (data) => {
+    store.dispatch({ type: Actions.CONVERSATION_MUTED, conversationId: data.conversationId, muted: data.muted });
   });
 
   // A conversation partner changed/removed their profile picture (see

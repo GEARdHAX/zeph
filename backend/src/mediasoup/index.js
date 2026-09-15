@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const logger = require('../logger');
 const { broadcastPresence } = require('../presence');
 const groupPolicy = require('../authorization/groupPolicy');
+const callHistoryService = require('../services/callHistoryService');
 
 let worker;
 let mediasoupRouter;
@@ -355,6 +356,17 @@ const initSocket = (socket) => {
     store.onlineUsers.set(socket, { id: socket.decoded_token.id, status: 'busy', level: socket.decoded_token.level });
     broadcastPresence().catch((err) => logger.error({ err }, 'Failed to broadcast presence'));
 
+    // Call Timeline / Call History — this is the backend-confirmed point of
+    // connection (spec §4): authorization already passed above AND
+    // socket.join() has already succeeded, not merely "the frontend
+    // attempted to join." data.roomID is only a real Meeting._id for an
+    // actual meeting/call room, never the 'general' fallback lobby.
+    if (data.roomID) {
+      callHistoryService
+        .recordConnected({ meetingId: data.roomID, userId: socket.decoded_token.id, socketId: socket.id })
+        .catch((err) => logger.error({ err, meetingId: data.roomID, socketId: socket.id }, 'Failed to record call CONNECTED'));
+    }
+
     callback({
       producers: peers,
       consumers: { content: store.consumerUserIDs[data.roomID], timestamp: Date.now() },
@@ -376,10 +388,18 @@ const initSocket = (socket) => {
   // Meeting.peers) never got pruned either. Reuses the exact same
   // leaveRoom() cleanup 'leave' already used, keyed off whatever room this
   // socket was last known to be in (store.roomIDs, set on join).
-  socket.on('disconnect', async () => {
+  socket.on('disconnect', async (socketIODisconnectReason) => {
     const roomID = store.roomIDs[socket.id];
     if (roomID) {
-      await leaveRoom(socket, roomID).catch((err) =>
+      // Socket.IO's own disconnect reason ('client namespace disconnect' /
+      // 'server namespace disconnect' / 'ping timeout' / 'transport close'
+      // / 'transport error' etc.) is the most specific signal available for
+      // spec §5's disconnectReason enum — 'server namespace disconnect' is
+      // this process calling socket.disconnect() itself (an explicit
+      // server-side kick), everything else here is some flavor of the
+      // connection dropping without the client cleanly emitting 'leave'.
+      const reason = socketIODisconnectReason === 'server namespace disconnect' ? 'server' : 'network';
+      await leaveRoom(socket, roomID, reason).catch((err) =>
         logger.error({ err, socketId: socket.id }, 'Failed to clean up mediasoup state on disconnect'),
       );
     } else {
@@ -433,8 +453,11 @@ const cleanupSocketResources = (socketId) => {
 
 // Shared by the explicit 'leave' event and the new 'disconnect' handler
 // above — same cleanup either way, so a client that leaves cleanly and one
-// that just drops the connection are handled identically.
-const leaveRoom = async (socket, roomID) => {
+// that just drops the connection are handled identically. `reason` is the
+// ONLY thing that differs between call sites (spec §5's disconnectReason) —
+// everything else about closing a call session is identical regardless of
+// why it closed.
+const leaveRoom = async (socket, roomID, reason = 'left') => {
   await socket.leave(roomID || 'general');
   await store.peers.asyncRemove({ socketID: socket.id }, { multi: true });
   store.io.to(roomID || 'general').emit('leave', { socketID: socket.id });
@@ -456,6 +479,22 @@ const leaveRoom = async (socket, roomID) => {
   const stillHasParticipants = (store.consumerUserIDs[roomID] || []).length > 0;
   const meetingUpdate = { lastLeave: Date.now(), $pull: { peers: socket.id } };
   if (!stillHasParticipants) meetingUpdate.endedAt = new Date();
+
+  // Call Timeline / Call History — closes whichever CallSession belongs to
+  // THIS socket (spec §16: a user's other tab/device, if any, has its own
+  // socketId and its own session, untouched here). `reason` distinguishes
+  // an explicit leave from a network/tab-close disconnect (the two call
+  // sites below pass different values); 'meeting_ended' overrides 'left'
+  // specifically — the LAST participant's explicit leave IS what ends the
+  // meeting, worth recording as more than a generic "left." A network drop
+  // that happens to be the last participant stays 'network' — the more
+  // specific and useful fact about THIS disconnect.
+  if (roomID) {
+    const effectiveReason = !stillHasParticipants && reason === 'left' ? 'meeting_ended' : reason;
+    callHistoryService
+      .recordDisconnected({ socketId: socket.id, reason: effectiveReason })
+      .catch((err) => logger.error({ err, meetingId: roomID, socketId: socket.id }, 'Failed to record call DISCONNECTED'));
+  }
 
   await Meeting.findOneAndUpdate({ _id: roomID }, meetingUpdate)
     .then((meeting) => {

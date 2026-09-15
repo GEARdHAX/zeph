@@ -86,6 +86,12 @@ const init = async () => {
     // useZephLoader.js.
     zephLoading: false,
     messages: [],
+    // Set by MessageSearchPopup.jsx when a search result is clicked —
+    // { messageID }. Messages.jsx watches this to fetch a history window
+    // centered on that message (getMessagesAround) and scroll it into view,
+    // then clears it. A global (not a prop) because the popup and
+    // Messages.jsx are unrelated siblings under Conversation/index.jsx.
+    pendingMessageJump: null,
     streams: [],
     inCall: false,
     video: true,
@@ -93,6 +99,10 @@ const init = async () => {
     audioStream: null,
     videoStream: null,
     screenStream: null,
+    // A recorded-but-not-yet-summarized meeting (MeetingRecorder.jsx's
+    // recording, finalized by callManager.js's leave() once the meeting has
+    // actually ended). { meetingId, blob } or null.
+    pendingMeetingRecording: null,
     callStatus: null,
     counterpart: null,
     callDirection: null,

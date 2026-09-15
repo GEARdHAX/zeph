@@ -4,12 +4,23 @@ import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
 import { toast } from 'react-toastify';
-import { Video, Users, Trash2 } from 'lucide-react';
+import { Video, Users, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Actions from '../../../constants/Actions';
 import postCall from '../../../actions/postCall';
 import deleteMeeting from '../../../actions/deleteMeeting';
+import MeetingSummaryPopup from './MeetingSummaryPopup';
+import CallTimelinePopup from './CallTimelinePopup';
+
+// Meeting-summary-persistence pass (spec section 5/6) — meeting.summary
+// comes from /meeting/list's lightweight metadata (never the summary text
+// itself, see MeetingSummaryPopup.jsx). No `summary` field at all means no
+// transcript doc exists yet for this meeting — the button is omitted
+// entirely rather than shown disabled, since there's nothing to check on
+// or generate from here (generation only ever starts from
+// MeetingRecorder.jsx's record flow, never this list).
+const IN_PROGRESS_STATUSES = new Set(['TRANSCRIBING', 'TRANSCRIBED', 'SUMMARIZING']);
 
 function Meetings({ meeting, onDeleted }) {
   const setMeeting = useGlobal('meetingID')[1];
@@ -20,6 +31,8 @@ function Meetings({ meeting, onDeleted }) {
   const setCallDirection = useGlobal('callDirection')[1];
   const user = useGlobal('user')[0] || {};
   const [deleting, setDeleting] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -94,10 +107,21 @@ function Meetings({ meeting, onDeleted }) {
   };
 
   return (
-    <div
-      className="flex items-center gap-3.5 px-4 py-3.5 mx-2 my-1 rounded-2xl cursor-pointer border border-transparent hover:border-border/60 hover:bg-muted/50 transition-all duration-200"
-      onClick={handleClick}
-    >
+    // MeetingSummaryPopup renders OUTSIDE this clickable card (a sibling,
+    // not a child) — Radix Dialog portals its actual DOM to document.body,
+    // but React's synthetic events bubble through the REACT tree, not the
+    // real DOM tree. A dialog nested INSIDE this div meant any click inside
+    // it (the X button, clicking the overlay, Escape-triggered close) still
+    // bubbled up to this div's onClick={handleClick} and re-triggered
+    // joining/initializing the meeting — the Summary button itself already
+    // needed e.stopPropagation() to open the popup safely, but every close
+    // path inside the popup would need the same fix one at a time. Moving
+    // it outside the clickable tree entirely removes the whole bug class.
+    <>
+      <div
+        className="flex items-center gap-3.5 px-4 py-3.5 mx-2 my-1 rounded-2xl cursor-pointer border border-transparent hover:border-border/60 hover:bg-muted/50 transition-all duration-200"
+        onClick={handleClick}
+      >
       <div className="relative shrink-0">
         <div
           className={cn(
@@ -133,7 +157,54 @@ function Meetings({ meeting, onDeleted }) {
           {text}
         </div>
         <div className="text-[10px] text-muted-foreground/60 truncate font-mono mt-0.5">{`ID: ${meeting._id}`}</div>
+        {/* Call Timeline / Call History (spec §19) — kept as a single
+            unobtrusive line, not a new button, to avoid cluttering the
+            card; clicking it opens the detailed on-demand timeline. Only
+            rendered when this user actually has at least one CallSession
+            for this meeting (participation comes from /meeting/list's
+            lightweight per-meeting rollup, never fetched separately here). */}
+        {meeting.participation && (
+          <button
+            type="button"
+            className="mt-0.5 w-fit text-left text-[10px] text-muted-foreground/80 underline decoration-dotted underline-offset-2 hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowTimeline(true);
+            }}
+          >
+            {meeting.participation.sessionCount > 1
+              ? `Joined ${meeting.participation.sessionCount} times · ${Math.max(1, Math.round(meeting.participation.totalDurationSeconds / 60))} min`
+              : `Your participation: ${Math.max(1, Math.round(meeting.participation.totalDurationSeconds / 60))} min`}
+          </button>
+        )}
       </div>
+
+      {meeting.summary?.status === 'SUMMARIZED' && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 shrink-0 gap-1.5 rounded-full px-2.5 text-[11px] font-semibold"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowSummary(true);
+          }}
+        >
+          <Sparkles className="h-3 w-3 text-primary" />
+          Summary
+        </Button>
+      )}
+      {meeting.summary && IN_PROGRESS_STATUSES.has(meeting.summary.status) && (
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Generating…
+        </span>
+      )}
+      {meeting.summary?.status === 'FAILED' && (
+        <span className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium text-muted-foreground/70">
+          Summary unavailable
+        </span>
+      )}
 
       {!hasActivePeers && (
         <Button
@@ -148,7 +219,11 @@ function Meetings({ meeting, onDeleted }) {
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       )}
-    </div>
+      </div>
+
+      {showSummary && <MeetingSummaryPopup meetingId={meeting._id} onClose={() => setShowSummary(false)} />}
+      {showTimeline && <CallTimelinePopup meetingId={meeting._id} onClose={() => setShowTimeline(false)} />}
+    </>
   );
 }
 

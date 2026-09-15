@@ -12,6 +12,14 @@ const ConversationUserStateSchema = new Schema({
   user: { type: Schema.ObjectId, ref: 'users', required: true },
   isHidden: { type: Boolean, default: false },
   hiddenAt: { type: Date, default: null },
+  // Mute: suppresses sound + toast for new messages in this conversation
+  // (see message.js's message-in emit and initIO.jsx's handler) — does NOT
+  // hide the conversation, does NOT stop the unread badge/sidebar preview
+  // from updating, same distinction WhatsApp/Telegram draw between "mute"
+  // and "archive"/"hide". Reuses this collection (not GroupMember.mutedUntil,
+  // a dead, DM-incompatible field — see DECISIONS.md) since mute must work
+  // identically for DMs and groups, which only ConversationUserState covers.
+  isMuted: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
   // Cursor marking WHEN this user last deleted this conversation. Messages
   // with `date <= deletedBefore` are hidden from this user's view even
@@ -25,5 +33,6 @@ const ConversationUserStateSchema = new Schema({
 ConversationUserStateSchema.index({ conversation: 1, user: 1 }, { unique: true });
 ConversationUserStateSchema.index({ user: 1, isHidden: 1 });
 ConversationUserStateSchema.index({ user: 1, deletedAt: 1 });
+ConversationUserStateSchema.index({ user: 1, isMuted: 1 });
 
 module.exports = mongoose.model('conversationUserStates', ConversationUserStateSchema);

@@ -11,6 +11,7 @@ const User = require('../src/models/User');
 const Meeting = require('../src/models/Meeting');
 const Media = require('../src/models/Media');
 const MeetingTranscript = require('../src/models/MeetingTranscript');
+const Room = require('../src/models/Room');
 
 let app;
 
@@ -25,10 +26,20 @@ afterAll(async () => {
 });
 
 // Reset BEFORE each test too — the real .env's AI_PROVIDER (now 'groq' on a
-// machine with a key) would otherwise leak into the first test.
+// machine with a key) would otherwise leak into the first test. Also pin
+// the meeting-summary eligibility thresholds to their documented defaults
+// (300s/2 participants/100 words) — these tests assume those exact values
+// (e.g. "2 minutes is too short"), but store.config here is the REAL config
+// object read from the developer's own .env (test/helpers/app.js only
+// overrides redisUrl), so a locally-lowered
+// AI_POLICY_MEETING_SUMMARY_MIN_DURATION_SECONDS would otherwise silently
+// break every duration-boundary assertion in this file.
 beforeEach(() => {
   store.config.aiProvider = 'none';
   store.config.groqApiKey = null;
+  store.config.aiPolicyMeetingSummaryMinDurationSeconds = 300;
+  store.config.aiPolicyMeetingSummaryMinParticipants = 2;
+  store.config.aiPolicyMeetingSummaryMinTranscriptWords = 100;
 });
 
 afterEach(async () => {
@@ -313,6 +324,98 @@ describe('GET /api/meeting/:id/summary', () => {
   });
 });
 
+describe('Meeting-scoped summary access — participant history, not presence or group membership', () => {
+  it("a participant who already LEFT the meeting can still read its summary (Meeting.users is append-only)", async () => {
+    const userA = await createUser();
+    const userB = await createUser();
+    const meeting = await createMeeting({ caller: userA._id, users: [userA._id, userB._id] });
+    await MeetingTranscript.create({
+      meeting: meeting._id,
+      transcript: 'word '.repeat(200),
+      summary: 'done summary',
+      status: 'SUMMARIZED',
+    });
+
+    // userB "left" — nothing in this codebase removes a user from
+    // Meeting.users on leave (mediasoup/index.js's leaveRoom only $pulls
+    // `peers`, the live-socket list); this simulates that by construction.
+    const res = await request(app)
+      .get(`/api/meeting/${meeting._id}/summary`)
+      .set('Authorization', `Bearer ${tokenFor(userB)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toBe('done summary');
+  });
+
+  it('a participant who joined for only 1 second (still just one entry in Meeting.users) can read the summary', async () => {
+    const userA = await createUser();
+    const userC = await createUser();
+    // Meeting.users has no join/leave timestamps — a 1-second visit and a
+    // full-meeting attendance are indistinguishable in the data model,
+    // which is exactly the point: presence duration is irrelevant to
+    // summary-access authorization, only "did they ever join" is.
+    const meeting = await createMeeting({ caller: userA._id, users: [userA._id, userC._id] });
+    await MeetingTranscript.create({
+      meeting: meeting._id,
+      transcript: 'word '.repeat(200),
+      summary: 'done summary',
+      status: 'SUMMARIZED',
+    });
+
+    const res = await request(app)
+      .get(`/api/meeting/${meeting._id}/summary`)
+      .set('Authorization', `Bearer ${tokenFor(userC)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toBe('done summary');
+  });
+
+  it('a CURRENT group member who never joined this specific meeting is denied (security fix — was previously authorized)', async () => {
+    const userA = await createUser();
+    const userD = await createUser();
+    // userD is a real, current member of the group the meeting belongs to
+    // — the OLD authorization (any current group member) would have let
+    // them through. The FIX scopes access to Meeting.users only.
+    enableGroqChatAndTranscribe('summary', 'word '.repeat(200)); // POST checks aiTextEnabled before authorization
+    const room = await Room.create({ people: [userA._id, userD._id], title: 'Group', isGroup: true });
+    const meeting = await createMeeting({ caller: userA._id, users: [userA._id], group: room._id });
+    await MeetingTranscript.create({
+      meeting: meeting._id,
+      transcript: 'word '.repeat(200),
+      summary: 'done summary',
+      status: 'SUMMARIZED',
+    });
+
+    const getRes = await request(app)
+      .get(`/api/meeting/${meeting._id}/summary`)
+      .set('Authorization', `Bearer ${tokenFor(userD)}`);
+    expect(getRes.status).toBe(403);
+
+    const postRes = await request(app)
+      .post(`/api/meeting/${meeting._id}/summarize`)
+      .set('Authorization', `Bearer ${tokenFor(userD)}`)
+      .send({});
+    expect(postRes.status).toBe(403);
+  });
+
+  it('a non-participant, non-member outsider is denied entirely', async () => {
+    const userA = await createUser();
+    const outsider = await createUser();
+    const meeting = await createMeeting({ caller: userA._id, users: [userA._id] });
+    await MeetingTranscript.create({
+      meeting: meeting._id,
+      transcript: 'word '.repeat(200),
+      summary: 'done summary',
+      status: 'SUMMARIZED',
+    });
+
+    const res = await request(app)
+      .get(`/api/meeting/${meeting._id}/summary`)
+      .set('Authorization', `Bearer ${tokenFor(outsider)}`);
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('POST /api/meeting/:id/summarize — eligibility runs before any processing', () => {
   // Regression: the BullMQ path used to return 202 and enqueue a job
   // WITHOUT any transcript-independent eligibility check — the worker only
@@ -369,5 +472,134 @@ describe('POST /api/meeting/:id/summarize — duplicate generation prevention', 
     expect(res.status).toBe(200);
     expect(res.body.cached).toBe(true);
     expect(res.body.summary).toBe('first summary');
+  });
+
+  it('two different authorized participants requesting simultaneously still leave exactly one MeetingTranscript with one summary', async () => {
+    // This test runs against the suite's standard harness, which has no
+    // Redis configured (helpers/app.js sets redisUrl: null) — so it does
+    // NOT exercise ai/dedup.js's Redis lock (that path only runs when
+    // Redis IS configured; see docs/ZEPH-AI-ARCHITECTURE.md's "Duplicate-
+    // generation prevention" section for the full 3-layer explanation).
+    // What this DOES verify, honestly: however many times the provider
+    // gets called under a race, the DATABASE never ends up with more than
+    // one canonical MeetingTranscript document for the meeting, and its
+    // final summary is a real generated value, not corrupted/partial state.
+    let providerCalls = 0;
+    const userA = await createUser();
+    const userB = await createUser();
+    const meeting = await createMeeting({ caller: userA._id, users: [userA._id, userB._id] });
+    // Pre-seed a transcript (as if userA already recorded+transcribed) so
+    // both requests go straight to the summarize step, maximizing the race
+    // window on generateMeetingSummary itself rather than on transcription.
+    await MeetingTranscript.create({
+      meeting: meeting._id,
+      transcript: 'word '.repeat(200),
+      status: 'TRANSCRIBED',
+    });
+
+    store.config.aiProvider = 'groq';
+    store.config.groqApiKey = 'test-key';
+    global.fetch = async () => {
+      providerCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: 'the one true summary' } }] }),
+      };
+    };
+
+    const [resA, resB] = await Promise.all([
+      request(app)
+        .post(`/api/meeting/${meeting._id}/summarize`)
+        .set('Authorization', `Bearer ${tokenFor(userA)}`)
+        .send({}),
+      request(app)
+        .post(`/api/meeting/${meeting._id}/summarize`)
+        .set('Authorization', `Bearer ${tokenFor(userB)}`)
+        .send({}),
+    ]);
+
+    // Both requests succeed (each is individually authorized) — the
+    // invariant under test is the STORED STATE, not the HTTP responses.
+    expect([resA.status, resB.status]).toEqual([200, 200]);
+
+    const docs = await MeetingTranscript.find({ meeting: meeting._id });
+    expect(docs).toHaveLength(1); // exactly one canonical document — never two
+    expect(docs[0].status).toBe('SUMMARIZED');
+    expect(docs[0].summary).toBe('the one true summary'); // not corrupted by the race
+  });
+});
+
+describe('POST /api/meeting/list — summary availability metadata (never the summary text)', () => {
+  it('omits `summary` entirely when no MeetingTranscript exists yet', async () => {
+    const user = await createUser();
+    const meeting = await createMeeting({ caller: user._id, users: [user._id] });
+
+    const res = await request(app)
+      .post('/api/meeting/list')
+      .set('Authorization', `Bearer ${tokenFor(user)}`);
+
+    const listed = res.body.meetings.find((m) => m._id === meeting._id.toString());
+    expect(listed).toBeDefined();
+    expect(listed.summary).toBeUndefined();
+  });
+
+  it('reports available:true, status:SUMMARIZED once summarized — WITHOUT the summary text', async () => {
+    const user = await createUser();
+    const meeting = await createMeeting({ caller: user._id, users: [user._id] });
+    await MeetingTranscript.create({
+      meeting: meeting._id,
+      transcript: 'word '.repeat(200),
+      summary: 'a fairly long generated summary that should never appear in the list response',
+      status: 'SUMMARIZED',
+    });
+
+    const res = await request(app)
+      .post('/api/meeting/list')
+      .set('Authorization', `Bearer ${tokenFor(user)}`);
+
+    const listed = res.body.meetings.find((m) => m._id === meeting._id.toString());
+    expect(listed.summary).toEqual({ available: true, status: 'SUMMARIZED' });
+    // The list endpoint must stay cheap — spec section 5's explicit
+    // "avoid unnecessarily sending large summary content for every card".
+    expect(JSON.stringify(listed)).not.toContain('a fairly long generated summary');
+  });
+
+  it('reports available:false for in-progress and failed states', async () => {
+    const user = await createUser();
+    const meetingA = await createMeeting({ caller: user._id, users: [user._id] });
+    const meetingB = await createMeeting({ caller: user._id, users: [user._id] });
+    await MeetingTranscript.create({ meeting: meetingA._id, transcript: 'x', status: 'SUMMARIZING' });
+    await MeetingTranscript.create({
+      meeting: meetingB._id,
+      transcript: 'x',
+      status: 'FAILED',
+      failureReason: 'MEETING_TOO_SHORT',
+    });
+
+    const res = await request(app)
+      .post('/api/meeting/list')
+      .set('Authorization', `Bearer ${tokenFor(user)}`);
+
+    const listedA = res.body.meetings.find((m) => m._id === meetingA._id.toString());
+    const listedB = res.body.meetings.find((m) => m._id === meetingB._id.toString());
+    expect(listedA.summary).toEqual({ available: false, status: 'SUMMARIZING' });
+    expect(listedB.summary).toEqual({ available: false, status: 'FAILED' });
+  });
+
+  it('does not enqueue or generate anything — purely a read of existing state', async () => {
+    const user = await createUser();
+    await createMeeting({ caller: user._id, users: [user._id] });
+    store.config.aiProvider = 'groq';
+    store.config.groqApiKey = 'test-key';
+    global.fetch = async () => {
+      throw new Error('the meetings list must never call an AI provider');
+    };
+
+    const res = await request(app)
+      .post('/api/meeting/list')
+      .set('Authorization', `Bearer ${tokenFor(user)}`);
+
+    expect(res.status).toBe(200); // reaching here without throwing proves fetch was never called
   });
 });

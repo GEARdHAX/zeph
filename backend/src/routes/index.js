@@ -31,6 +31,7 @@ const aiAnalyzeLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix
 // message split by the client, etc.) while still bounding a scripted
 // flood.
 const messageSendLimit = inviteRateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'message:send' });
+const messageSearchLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'message:search' });
 // Passwordless login is unauthenticated and does a username lookup + a
 // WebAuthn verify per call — bound both the enumeration surface and the
 // verify cost. 20/min per IP is far above any human sign-in cadence.
@@ -143,6 +144,13 @@ router.post('/message/delete', passport.authenticate('jwt', { session: false }, 
 router.post('/messages/more', passport.authenticate('jwt', { session: false }, null), require('./more-messages'));
 router.post('/messages/sync', passport.authenticate('jwt', { session: false }, null), require('./sync-messages'));
 router.post(
+  '/messages/search',
+  passport.authenticate('jwt', { session: false }, null),
+  messageSearchLimit,
+  require('./messages/search'),
+);
+router.post('/messages/around', passport.authenticate('jwt', { session: false }, null), require('./messages/around'));
+router.post(
   '/group/create',
   passport.authenticate('jwt', { session: false }, null),
   ztCreateGroup,
@@ -212,6 +220,11 @@ router.post(
   require('./conversation-restore'),
 );
 router.post(
+  '/conversation/mute',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./conversation-mute'),
+);
+router.post(
   '/conversations/removed',
   passport.authenticate('jwt', { session: false }, null),
   require('./removed-list'),
@@ -270,6 +283,20 @@ router.get(
   passport.authenticate('jwt', { session: false }, null),
   require('./meeting/get-summary'),
 );
+router.post(
+  '/meeting/:id/upload-recording',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./meeting/upload-recording'),
+);
+router.get(
+  '/meeting/:id/participants',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./meeting/participants'),
+);
+// Call Timeline / Call History — the current user's OWN history (userId
+// derived from the JWT only, spec §12). Deliberately no
+// /users/:userId/call-history route.
+router.get('/calls/history', passport.authenticate('jwt', { session: false }, null), require('./calls/history'));
 
 router.post('/auth/change', require('./auth/change'));
 router.post('/auth/code', require('./auth/code'));

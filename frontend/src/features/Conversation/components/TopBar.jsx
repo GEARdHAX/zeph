@@ -8,6 +8,7 @@ import {
   Info,
   Sparkles,
   Search,
+  Bell,
   BellOff,
   Lock,
   Trash2,
@@ -54,6 +55,8 @@ import setupVaultPin from '../../../actions/setupVaultPin';
 import getVaultStatus from '../../../actions/getVaultStatus';
 import blockUser from '../../../actions/blockUser';
 import unblockUser from '../../../actions/unblockUser';
+import muteConversation from '../../../actions/muteConversation';
+import MessageSearchPopup from './MessageSearchPopup';
 import Actions from '../../../constants/Actions';
 import Config from '../../../config';
 
@@ -107,6 +110,7 @@ function TopBar({ back, loading, aiEnabled }) {
   const [setupPin, setSetupPin] = useState('');
   const [vaultBusy, setVaultBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -309,6 +313,22 @@ function TopBar({ back, loading, aiEnabled }) {
     }
   };
 
+  const [muting, setMuting] = useState(false);
+  const toggleMute = async () => {
+    if (muting || !room._id) return;
+    const next = !room.isMuted;
+    setMuting(true);
+    try {
+      await muteConversation(room._id, next);
+      dispatch({ type: Actions.CONVERSATION_MUTED, conversationId: room._id, muted: next });
+      toast.success(next ? 'Conversation muted.' : 'Conversation unmuted.');
+    } catch (e) {
+      errorToast('Could not update mute setting. Please try again.');
+    } finally {
+      setMuting(false);
+    }
+  };
+
   const handleBlock = async () => {
     if (!other.username) return;
     try {
@@ -498,22 +518,35 @@ function TopBar({ back, loading, aiEnabled }) {
             <div className="absolute right-0 top-10 z-50 min-w-[180px] rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl animate-in fade-in-0 zoom-in-95">
               <button
                 type="button"
-                disabled
-                data-disabled
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground opacity-50 cursor-not-allowed"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  setShowSearch(true);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
-                <Search className="h-3.5 w-3.5" />
-                <span data-disabled>Search</span>
+                <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Search</span>
               </button>
 
               <button
                 type="button"
-                disabled
-                data-disabled
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground opacity-50 cursor-not-allowed"
+                disabled={muting}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  toggleMute();
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <BellOff className="h-3.5 w-3.5" />
-                <span data-disabled>Mute</span>
+                {room.isMuted ? (
+                  <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                  <BellOff className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+                <span>{room.isMuted ? 'Unmute' : 'Mute'}</span>
               </button>
 
               {aiEnabled && (
@@ -732,6 +765,7 @@ function TopBar({ back, loading, aiEnabled }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {showSearch && <MessageSearchPopup roomID={room._id || routeRoomId} onClose={() => setShowSearch(false)} />}
     </div>
   );
 }

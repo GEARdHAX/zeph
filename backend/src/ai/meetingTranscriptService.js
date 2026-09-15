@@ -205,12 +205,15 @@ const generateMeetingSummary = async ({ meetingId, userId, requestId }) => {
     return result;
   }
 
+  const now = new Date();
   await MeetingTranscript.updateOne(
     { meeting: meetingId },
     {
       summary: result.text,
       status: 'SUMMARIZED',
-      updatedAt: new Date(),
+      summaryProvider: result.providerUsed || null,
+      generatedAt: now,
+      updatedAt: now,
     },
   );
 

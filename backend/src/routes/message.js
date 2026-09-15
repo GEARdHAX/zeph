@@ -146,7 +146,17 @@ module.exports = async (req, res, next) => {
           Room.findByIdAndUpdate(roomID, {
             $set: { lastUpdate: message.date, lastMessage: message._id, lastAuthor: authorID },
           })
-            .then((room) => {
+            .then(async (room) => {
+              // Batched once for every recipient rather than one query per
+              // person inside the loop below — mute is the only thing that
+              // loop needs to know per-recipient beyond their own id.
+              const mutedStates = await ConversationUserState.find({
+                conversation: roomID,
+                user: { $in: room.people },
+                isMuted: true,
+              }).select('user');
+              const mutedUserIds = new Set(mutedStates.map((s) => s.user.toString()));
+
               room.people.forEach((person) => {
                 const myUserID = req.user.id;
                 const personUserID = person.toString();
@@ -178,7 +188,12 @@ module.exports = async (req, res, next) => {
                 });
 
                 if (personUserID !== myUserID) {
-                  store.io.to(personUserID).emit('message-in', { status: 200, message, room });
+                  store.io.to(personUserID).emit('message-in', {
+                    status: 200,
+                    message,
+                    room,
+                    muted: mutedUserIds.has(personUserID),
+                  });
                 }
               });
               res.status(200).json({ message, room });

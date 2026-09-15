@@ -167,6 +167,7 @@ const runGoverned = async ({ userId, ip, prompt, dedupeKey, maxTokens, metricsFe
       ok: true,
       text: validation.text,
       requestId: rid,
+      providerUsed,
       providerLatencyMs,
       totalLatencyMs,
     };

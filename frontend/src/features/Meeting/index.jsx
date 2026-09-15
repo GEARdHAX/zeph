@@ -53,7 +53,19 @@ function Meeting() {
   const [callStatus] = useGlobal('callStatus');
   const [callDirection] = useGlobal('callDirection');
   const [joined, setJoined] = useGlobal('joined');
-  const [isMaximized, setMaximized] = useState(true);
+  // Video crop style (object-fit: cover vs contain) — previously user-
+  // toggleable via the "Fill screen"/"Fit to screen" button, which despite
+  // its Maximize/Minimize icon never actually invoked the browser's
+  // Fullscreen API (see isFullscreen below, which now owns that button).
+  // Pinned to cover (full-bleed, no letterboxing) — the sensible default
+  // for a video call — rather than removed outright, so Streams/Interface/
+  // LittleInterface's isMaximized prop plumbing stays unchanged.
+  const isMaximized = true;
+  // Real fullscreen state, synced both ways: toggleFullscreen() drives it,
+  // and the fullscreenchange listener below catches the user exiting via
+  // Esc/browser-chrome so the icon doesn't go stale.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef(null);
   const [isGrid, setGrid] = useState(true);
   const [topBar, setTopBar] = useState(true);
   const [acccepted, setAccepted] = useGlobal('accepted');
@@ -123,6 +135,37 @@ function Meeting() {
   useEffect(() => {
     setMeeting(roomID);
   }, []);
+
+  // Keeps isFullscreen accurate when the user exits fullscreen WITHOUT
+  // clicking our own button — Esc, the browser's own "Exit fullscreen"
+  // chrome, or the OS switching away. Without this the button's icon/label
+  // would silently go stale (still say "Fit to screen" while the page is
+  // actually back in normal layout).
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current?.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+      // fullscreenchange (above) also fires and would set this correctly,
+      // but setting it here too means the icon updates immediately rather
+      // than waiting on that event round-trip.
+      setIsFullscreen(!!document.fullscreenElement);
+    } catch (err) {
+      // Fullscreen requests reject if not triggered by a direct user
+      // gesture, or if the browser/embedder disallows it entirely (some
+      // in-app webviews) — fail quietly rather than surface a toast for
+      // what's a non-essential visual feature.
+      console.error('Fullscreen request failed:', err);
+    }
+  };
 
   // Each wraps getUserMedia/getDisplayMedia with a user-visible error —
   // a denied permission or a busy device otherwise rejected silently,
@@ -331,7 +374,7 @@ function Meeting() {
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col">
+    <div ref={containerRef} className="relative flex h-full w-full flex-col">
       {connecting && (
         <div className="absolute left-1/2 top-4 z-[1001] -translate-x-1/2 rounded-full border border-white/15 bg-black/75 px-4 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-2xl">
           Connecting…
@@ -406,9 +449,9 @@ function Meeting() {
 
             <ControlButton icon={UserPlus} title="Add people" onClick={() => setAddPeers(true)} />
             <ControlButton
-              icon={isMaximized ? Minimize : Maximize}
-              title={isMaximized ? 'Fit to screen' : 'Fill screen'}
-              onClick={() => setMaximized(!isMaximized)}
+              icon={isFullscreen ? Minimize : Maximize}
+              title={isFullscreen ? 'Exit fullscreen' : 'Fill screen'}
+              onClick={toggleFullscreen}
             />
             <ControlButton
               icon={isGrid ? Columns2 : Grid3x3}

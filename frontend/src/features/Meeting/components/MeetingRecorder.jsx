@@ -1,14 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGlobal } from 'reactn';
-import { Mic, Square, Loader2, Sparkles } from 'lucide-react';
+import { Mic, Square } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ZephGeneratingLoader } from '@/components/ui/ZephGeneratingLoader';
-import uploadMedia from '../../../actions/uploadMedia';
-import summarizeMeeting from '../../../actions/summarizeMeeting';
-import getMeetingSummary from '../../../actions/getMeetingSummary';
-import { getAiErrorMessage, MESSAGES } from '../../../lib/aiErrorMessage';
 
 // Zeph AI — Meeting AI (Phase 14). Explicit, opt-in recording: nothing is
 // captured until the user clicks Record, and the recording is local audio
@@ -16,41 +10,61 @@ import { getAiErrorMessage, MESSAGES } from '../../../lib/aiErrorMessage';
 // participants' audio, which this client never has raw access to anyway;
 // see AI-STRATEGY.md's E2EE-adjacent privacy stance applied here: the
 // caller's own words are their own to opt in with, not something silently
-// captured on their behalf). Uploads via the existing upload-media pipeline
-// (audio category), then triggers the backend's transcribe+summarize flow
-// and polls for the async result if BullMQ is handling it.
-const POLL_INTERVAL_MS = 4000;
-
-// The BullMQ path (transcribe → eligibility → summarize) is normally well
-// under a minute; 3 minutes is a generous ceiling that still guarantees the
-// dialog can never spin forever if the job dies silently, the transcript
-// gets stuck on a non-terminal status, or a stale dedup lock keeps every
-// retry from starting.
-const POLL_DEADLINE_MS = 3 * 60 * 1000;
+// captured on their behalf).
+//
+// This component ONLY records — it does not upload or summarize. The
+// backend requires the meeting to have actually ended (Meeting.endedAt)
+// before it will summarize (checkMeetingSummaryEligibility's MEETING_NOT_
+// ENDED), so stopping the recorder mid-call and immediately calling
+// /summarize was guaranteed to 422 every time. The recorded blob is instead
+// held in the `pendingMeetingRecording` global; callManager.leave() picks
+// it up once the call has genuinely ended and finalizes it there — see
+// finalizeMeetingRecording in callManager.js, which is what actually
+// uploads, calls /summarize, and toasts the result. This component only
+// needs to unmount cleanly without losing an in-progress recording.
+//
+// Codec choice matters for the upload step: WebM and MP4 share their
+// container-level magic bytes between audio-only and video streams, so the
+// backend's upload sniffer (backend/src/utils/sniffFileCategory.js — never
+// trusts a client-claimed MIME type) can't tell an audio-only WebM/MP4 blob
+// apart from a video one and always classifies it as 'video', which then
+// fails the meeting-audio lookup. Ogg/Opus has an unambiguous signature
+// ('OggS'), so it's preferred whenever MediaRecorder supports it (Chrome/
+// Firefox/Edge). Browsers without Ogg support (notably Safari/iOS) fall
+// back to isMeetingAudioFallback=true, which callManager.js's finalize step
+// uses to route the upload through a dedicated meeting-audio endpoint
+// instead of the general /api/upload/media pipeline.
+const PREFERRED_MIME_TYPES = ['audio/ogg;codecs=opus', 'audio/ogg'];
+const pickRecordingMimeType = () => {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return { mimeType: undefined, isMeetingAudioFallback: true };
+  const supported = PREFERRED_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
+  return supported ? { mimeType: supported, isMeetingAudioFallback: false } : { mimeType: undefined, isMeetingAudioFallback: true };
+};
 
 function MeetingRecorder({ meetingId }) {
   const [audioStream] = useGlobal('audioStream');
+  const setPendingRecording = useGlobal('pendingMeetingRecording')[1];
   const [recording, setRecording] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [summary, setSummary] = useState(null);
-  const [error, setError] = useState(null);
-  const [canRetry, setCanRetry] = useState(false);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
-  const pollTimeoutRef = useRef(null);
-  const pollDeadlineRef = useRef(0);
-  const abortRef = useRef(null);
-  const mountedRef = useRef(true);
 
   useEffect(
     () => () => {
-      mountedRef.current = false;
-      clearTimeout(pollTimeoutRef.current);
-      abortRef.current?.abort();
+      // Unmounting (navigating away, the call ending) while still recording
+      // must still capture what was said, not silently drop it — stop()
+      // flushes the final ondataavailable chunk before firing onstop.
       if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
     },
     [],
   );
+
+  const handleRecordingComplete = () => {
+    if (chunksRef.current.length === 0) return;
+    const { mimeType, isMeetingAudioFallback } = mediaRecorderRef.current._recordingChoice;
+    const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' });
+    setPendingRecording({ meetingId, blob, mimeType: mimeType || 'audio/webm', isMeetingAudioFallback });
+    toast.success("Recording saved — you'll get an AI summary once the meeting ends.");
+  };
 
   const startRecording = () => {
     if (!audioStream) {
@@ -58,16 +72,16 @@ function MeetingRecorder({ meetingId }) {
       return;
     }
     chunksRef.current = [];
-    const recorder = new MediaRecorder(audioStream);
+    const choice = pickRecordingMimeType();
+    const recorder = new MediaRecorder(audioStream, choice.mimeType ? { mimeType: choice.mimeType } : undefined);
+    recorder._recordingChoice = choice; // stashed for handleRecordingComplete — MediaRecorder has no other slot for caller metadata
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
-    recorder.onstop = () => handleRecordingComplete();
+    recorder.onstop = handleRecordingComplete;
     recorder.start();
     mediaRecorderRef.current = recorder;
     setRecording(true);
-    setError(null);
-    setSummary(null);
   };
 
   const stopRecording = () => {
@@ -77,186 +91,18 @@ function MeetingRecorder({ meetingId }) {
     setRecording(false);
   };
 
-  const pollForSummary = async () => {
-    if (!mountedRef.current) return;
-    try {
-      const res = await getMeetingSummary(meetingId);
-      const { status } = res.data;
-      if (status === 'SUMMARIZED') {
-        setProcessing(false);
-        setSummary(res.data.summary);
-        return;
-      }
-      if (status === 'FAILED') {
-        setProcessing(false);
-        setError(MESSAGES[res.data.failureReason] || 'Could not generate a summary for this meeting.');
-        // A transcript exists but summarizing failed transiently — a retry
-        // is worth offering. Eligibility verdicts are permanent, so not those.
-        setCanRetry(res.data.failureReason === 'SUMMARY_FAILED' || res.data.failureReason === 'INVALID_OUTPUT');
-        return;
-      }
-      // Non-terminal (TRANSCRIBING / TRANSCRIBED / SUMMARIZING). Keep
-      // polling — but never past the deadline: a job can die silently or a
-      // stale dedup lock can block every retry, and the dialog must not
-      // spin forever.
-      if (Date.now() > pollDeadlineRef.current) {
-        setProcessing(false);
-        setError('This is taking longer than expected. You can try again.');
-        setCanRetry(true);
-        return;
-      }
-      pollTimeoutRef.current = setTimeout(pollForSummary, POLL_INTERVAL_MS);
-    } catch (e) {
-      if (!mountedRef.current) return;
-      setProcessing(false);
-      setError(getAiErrorMessage(e));
-    }
-  };
-
-  const startPolling = () => {
-    pollDeadlineRef.current = Date.now() + POLL_DEADLINE_MS;
-    pollForSummary();
-  };
-
-  // User-initiated dismissal while generation is still in flight — stop
-  // polling and abort the in-flight request, then reset to idle. Generation
-  // itself keeps running server-side (there's no cancel-job endpoint, and
-  // there's no need for one: leaving the dialog just stops watching it).
-  const cancelAndClose = () => {
-    clearTimeout(pollTimeoutRef.current);
-    abortRef.current?.abort();
-    setProcessing(false);
-    setSummary(null);
-    setError(null);
-    setCanRetry(false);
-  };
-
-  const retry = async () => {
-    setError(null);
-    setCanRetry(false);
-    setProcessing(true);
-    try {
-      // No mediaId — the transcript already exists server-side; this just
-      // re-runs summary generation.
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const res = await summarizeMeeting(meetingId, null, controller.signal);
-      if (res.status === 202) {
-        startPolling();
-        return;
-      }
-      setProcessing(false);
-      setSummary(res.data.summary);
-    } catch (e) {
-      if (e.code === 'ERR_CANCELED') return;
-      if (!mountedRef.current) return;
-      setProcessing(false);
-      setError(getAiErrorMessage(e));
-      setCanRetry(true);
-    }
-  };
-
-  const handleRecordingComplete = async () => {
-    if (chunksRef.current.length === 0) return;
-    setProcessing(true);
-    setError(null);
-    const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-    const file = new File([blob], `meeting-${meetingId}.webm`, { type: 'audio/webm' });
-
-    try {
-      const uploadRes = await uploadMedia(file);
-      const mediaId = uploadRes.data.media._id;
-
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const summarizeRes = await summarizeMeeting(meetingId, mediaId, controller.signal);
-
-      if (summarizeRes.status === 202) {
-        startPolling();
-        return;
-      }
-      setProcessing(false);
-      setSummary(summarizeRes.data.summary);
-    } catch (e) {
-      if (e.code === 'ERR_CANCELED') return;
-      if (!mountedRef.current) return;
-      setProcessing(false);
-      setError(getAiErrorMessage(e));
-    }
-  };
-
   return (
-    <>
-      <Button
-        type="button"
-        size="icon"
-        variant="ghost"
-        disabled={processing}
-        onClick={recording ? stopRecording : startRecording}
-        title={recording ? 'Stop recording & summarize' : 'Record meeting for an AI summary'}
-        aria-label={recording ? 'Stop recording & summarize' : 'Record meeting for an AI summary'}
-        className="h-12 w-12 shrink-0 rounded-full text-white shadow-md transition-transform active:scale-95 sm:h-14 sm:w-14 bg-white/10 hover:bg-white/20"
-      >
-        {processing ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
-        ) : recording ? (
-          <Square className="h-5 w-5 text-destructive" fill="currentColor" />
-        ) : (
-          <Mic className="h-5 w-5" />
-        )}
-      </Button>
-
-      <Dialog
-        open={processing || !!summary || !!error}
-        onOpenChange={(next) => {
-          if (next) return;
-          // Closing (the X button, Escape, or an overlay click) must always
-          // work, including mid-generation — previously guarded on
-          // `!processing`, which meant the X rendered but silently did
-          // nothing while a summary was generating, with no other way out
-          // before the poll deadline.
-          if (processing) cancelAndClose();
-          else {
-            setSummary(null);
-            setError(null);
-            setCanRetry(false);
-          }
-        }}
-      >
-        <DialogContent className="rounded-2xl border border-border bg-card sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Meeting Summary
-            </DialogTitle>
-            {summary && <DialogDescription>AI-generated — may be inaccurate.</DialogDescription>}
-            {processing && <DialogDescription>AI transcription and summarization in progress</DialogDescription>}
-          </DialogHeader>
-          {processing ? (
-            <div className="py-6 flex items-center justify-center">
-              <ZephGeneratingLoader
-                size={160}
-                text="Summarizing"
-                subtext="Transcribing audio & synthesizing meeting notes..."
-              />
-            </div>
-          ) : error ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-xs leading-relaxed text-destructive">{error}</p>
-              {canRetry && (
-                <Button type="button" size="sm" onClick={retry} className="self-start">
-                  Try again
-                </Button>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">{summary}</p>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      onClick={recording ? stopRecording : startRecording}
+      title={recording ? 'Stop recording' : 'Record meeting for an AI summary (available after the call ends)'}
+      aria-label={recording ? 'Stop recording' : 'Record meeting for an AI summary'}
+      className="h-12 w-12 shrink-0 rounded-full text-white shadow-md transition-transform active:scale-95 sm:h-14 sm:w-14 bg-white/10 hover:bg-white/20"
+    >
+      {recording ? <Square className="h-5 w-5 text-destructive" fill="currentColor" /> : <Mic className="h-5 w-5" />}
+    </Button>
   );
 }
 

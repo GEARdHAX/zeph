@@ -22,6 +22,7 @@ vi.mock('../../../actions/blockUser', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/unblockUser', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/getMeetingRoom', () => ({ default: vi.fn() }));
 vi.mock('../../../actions/postCall', () => ({ default: vi.fn() }));
+vi.mock('../../../actions/muteConversation', () => ({ default: vi.fn() }));
 vi.mock('react-toastify', () => ({ toast: { warn: vi.fn(), error: vi.fn(), success: vi.fn() } }));
 
 // eslint-disable-next-line import/first
@@ -38,6 +39,8 @@ import blockUser from '../../../actions/blockUser';
 import unblockUser from '../../../actions/unblockUser';
 // eslint-disable-next-line import/first
 import getMeetingRoom from '../../../actions/getMeetingRoom';
+// eslint-disable-next-line import/first
+import muteConversation from '../../../actions/muteConversation';
 // eslint-disable-next-line import/first
 import postCall from '../../../actions/postCall';
 
@@ -89,6 +92,7 @@ beforeEach(async () => {
   unblockUser.mockReset();
   getMeetingRoom.mockReset();
   postCall.mockReset();
+  muteConversation.mockReset();
   toast.error.mockReset();
   toast.warn.mockReset();
   toast.success.mockReset();
@@ -100,18 +104,45 @@ afterEach(() => {
 });
 
 describe('Conversation TopBar — privacy menu', () => {
-  it('renders all six menu items in order, with Search/Mute/Report disabled', async () => {
+  it('renders all six menu items in order, with only Report disabled', async () => {
     const user = userEvent.setup();
     renderTopBar();
 
     await user.click(screen.getByRole('button', { name: 'More options' }));
 
-    expect(await screen.findByText('Search')).toHaveAttribute('data-disabled');
-    expect(screen.getByText('Mute')).toHaveAttribute('data-disabled');
+    // Search and Mute are real, wired-up actions now (message search popup /
+    // conversation-mute toggle) — only Report is still a disabled placeholder.
+    expect(await screen.findByText('Search')).not.toHaveAttribute('data-disabled');
+    expect(screen.getByText('Mute')).not.toHaveAttribute('data-disabled');
     expect(screen.getByText('Hide / Lock DM')).not.toHaveAttribute('data-disabled');
     expect(screen.getByText('Delete DM')).not.toHaveAttribute('data-disabled');
     expect(screen.getByText('Block')).not.toHaveAttribute('data-disabled');
     expect(screen.getByText('Report')).toHaveAttribute('data-disabled');
+  });
+
+  it('clicking "Mute" calls muteConversation(true) and flips the item to "Unmute"', async () => {
+    const user = userEvent.setup();
+    muteConversation.mockResolvedValue({ data: { status: 'success', isMuted: true } });
+    renderTopBar();
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    await user.click(await screen.findByText('Mute'));
+
+    await waitFor(() => expect(muteConversation).toHaveBeenCalledWith('room-1', true));
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    expect(await screen.findByText('Unmute')).toBeInTheDocument();
+  });
+
+  it('clicking "Unmute" on an already-muted room calls muteConversation(false)', async () => {
+    const user = userEvent.setup();
+    muteConversation.mockResolvedValue({ data: { status: 'success', isMuted: false } });
+    renderTopBar({ ...ROOM, isMuted: true });
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    await user.click(await screen.findByText('Unmute'));
+
+    await waitFor(() => expect(muteConversation).toHaveBeenCalledWith('room-1', false));
   });
 
   it('"Hide / Lock DM" opens the confirmation dialog and calls hideConversation on confirm when a vault already exists', async () => {
@@ -227,12 +258,12 @@ describe('Conversation TopBar — privacy menu', () => {
     expect(blockUser).not.toHaveBeenCalled();
   });
 
-  it('disabled Search/Mute/Report items do not trigger any action', async () => {
+  it('the disabled Report item does not trigger any action', async () => {
     const user = userEvent.setup();
     renderTopBar();
 
     await user.click(screen.getByRole('button', { name: 'More options' }));
-    await user.click(await screen.findByText('Search'));
+    await user.click(screen.getByText('Report'));
 
     expect(hideConversation).not.toHaveBeenCalled();
     expect(deleteConversation).not.toHaveBeenCalled();
