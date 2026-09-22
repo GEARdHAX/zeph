@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import FriendInvitePreview from './pages/InvitePreview/FriendInvitePreview';
 import GroupInvitePreview from './pages/InvitePreview/GroupInvitePreview';
+import MeetingInvitePreview from './pages/InvitePreview/MeetingInvitePreview';
 import setAuthToken from './actions/setAuthToken';
 import initIO from './actions/initIO';
 import PictureInPicture from './features/PictureInPicture';
@@ -152,6 +153,7 @@ function App() {
               back here post-login, see init.js/Login/index.jsx). */}
           <Route path="/invite/f/:token" element={<FriendInvitePreview />} />
           <Route path="/invite/g/:token" element={<GroupInvitePreview />} />
+          <Route path="/invite/m/:token" element={<MeetingInvitePreview />} />
           <Route path="/*" element={!token ? <Navigate to="/login" /> : <Home />} />
         </Routes>
         {/* Sibling to <Routes>, not inside any Route — never unmounted by

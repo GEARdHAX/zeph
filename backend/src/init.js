@@ -305,6 +305,18 @@ module.exports = (mediasoupEnabled) => {
           const user = await User.findById(payload.id);
           if (!user) return done(null, false);
 
+          // A suspended (DEACTIVATED) account must lose access immediately,
+          // not just at their next login — this is the one chokepoint every
+          // authenticated request passes through, so checking it here cuts
+          // off an already-issued, still-valid JWT the moment an admin
+          // suspends the account, rather than waiting for it to expire.
+          // DELETED is defense-in-depth (a hard-deleted user document is
+          // already unfindable above; this only matters if that ever
+          // changes to a soft-delete instead).
+          if (user.accountStatus === 'DEACTIVATED' || user.accountStatus === 'DELETED') {
+            return done(null, false);
+          }
+
           // Tokens issued before device-sessions existed have no deviceId — treat
           // as a legacy session (same trust level as today) rather than force-logout.
           if (payload.deviceId) {

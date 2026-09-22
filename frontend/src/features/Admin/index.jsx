@@ -16,6 +16,7 @@ import {
   Network,
   Sparkles,
   Gauge,
+  Flag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useTheme from '../../lib/useTheme';
@@ -225,11 +226,19 @@ function Admin() {
           </Button>
           <div>
             <h1 className="text-base font-bold text-foreground">Admin Console</h1>
-            <p className="text-xs text-muted-foreground">Manage users, access permissions, and roles</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-xl text-xs font-semibold"
+            onClick={() => navigate('/admin/reports')}
+          >
+            <Flag className="h-4 w-4" />
+            Reports
+          </Button>
           <Button
             variant="outline"
             size="sm"

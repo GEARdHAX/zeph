@@ -70,8 +70,21 @@ module.exports = (req, res, next) => {
         });
         return res.status(404).json({ email: 'User not found.' });
       }
-      argon2
-        .verify(user.password, password)
-        .then((correct) => (correct ? sendResponse(user) : sendError('bad_password')));
+      argon2.verify(user.password, password).then((correct) => {
+        if (!correct) return sendError('bad_password');
+        if (user.accountStatus === 'DEACTIVATED' || user.accountStatus === 'DELETED') {
+          SecurityEventService.record({
+            type: 'LOGIN_FAILED',
+            severity: 'medium',
+            actor: { userId: user._id },
+            source: context,
+            target: { resource: '/api/login', action: 'login' },
+            result: 'blocked',
+            metadata: { reason: 'account_suspended' },
+          });
+          return res.status(403).json({ email: 'This account has been suspended.' });
+        }
+        return sendResponse(user);
+      });
     });
 };

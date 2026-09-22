@@ -34,6 +34,7 @@ const ThreatIntelligence = lazy(() => import('../../features/Admin/ThreatIntelli
 const Sensors = lazy(() => import('../../features/Admin/Sensors'));
 const NetworkIntelligence = lazy(() => import('../../features/Admin/NetworkIntelligence'));
 const SecurityAiIncidents = lazy(() => import('../../features/Admin/SecurityAiIncidents'));
+const Reports = lazy(() => import('../../features/Admin/Reports'));
 
 function Home() {
   const location = useLocation();
@@ -194,6 +195,16 @@ function Home() {
                 <RequireAdmin>
                   <Suspense fallback={<LazyFallback />}>
                     <SecurityAiIncidents />
+                  </Suspense>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/reports"
+              element={
+                <RequireAdmin>
+                  <Suspense fallback={<LazyFallback />}>
+                    <Reports />
                   </Suspense>
                 </RequireAdmin>
               }

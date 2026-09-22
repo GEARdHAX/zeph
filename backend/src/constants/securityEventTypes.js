@@ -36,6 +36,8 @@ const SecurityEventTypes = Object.freeze({
 
   ADMIN_ACTION: 'ADMIN_ACTION',
 
+  USER_REPORTED: 'USER_REPORTED',
+
   // Phase 2 — Zero Trust (spec section 24). One event per policy-engine
   // decision (see lib/zeroTrust.js), plus session/device state changes the
   // risk engine's own logic can now derive (sessionContext.js).

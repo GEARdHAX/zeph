@@ -12,6 +12,7 @@ import {
   XOctagon,
   Grid3x3,
   Columns2,
+  Share2,
   Menu,
   ChevronLeft,
   ChevronUp,
@@ -29,6 +30,7 @@ import Ringing from './components/Ringing';
 import Streams from './components/Streams';
 import LittleStreams from './components/LittleStreams';
 import MeetingRecorder from './components/MeetingRecorder';
+import ShareMeetingInvite from './components/ShareMeetingInvite';
 import callManager from '../../lib/callManager';
 import getInfo from '../../actions/getInfo';
 
@@ -73,6 +75,7 @@ function Meeting() {
   const setOver = useGlobal('over')[1];
   const setMeeting = useGlobal('meetingID')[1];
   const [addPeers, setAddPeers] = useState(false);
+  const [showShareInvite, setShowShareInvite] = useState(false);
   // No loading state previously covered the initial join at all — only a
   // mid-call socket drop ("Reconnecting…" below) did. onJoin flips `joined`
   // true synchronously and this component falls straight through to the
@@ -448,6 +451,7 @@ function Meeting() {
             <div className="mx-0.5 h-8 w-px bg-white/15" />
 
             <ControlButton icon={UserPlus} title="Add people" onClick={() => setAddPeers(true)} />
+            <ControlButton icon={Share2} title="Share meeting" onClick={() => setShowShareInvite(true)} />
             <ControlButton
               icon={isFullscreen ? Minimize : Maximize}
               title={isFullscreen ? 'Exit fullscreen' : 'Fill screen'}
@@ -463,6 +467,7 @@ function Meeting() {
       </Streams>
       {!isGrid && !topBar && <TopBar localStream={localStream} />}
       {addPeers && <AddPeers onClose={() => setAddPeers(false)} />}
+      {showShareInvite && <ShareMeetingInvite meetingId={roomID} onClose={() => setShowShareInvite(false)} />}
     </div>
   );
 }

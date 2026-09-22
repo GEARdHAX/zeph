@@ -57,6 +57,7 @@ import blockUser from '../../../actions/blockUser';
 import unblockUser from '../../../actions/unblockUser';
 import muteConversation from '../../../actions/muteConversation';
 import MessageSearchPopup from './MessageSearchPopup';
+import ReportUserDialog from './ReportUserDialog';
 import Actions from '../../../constants/Actions';
 import Config from '../../../config';
 
@@ -111,6 +112,7 @@ function TopBar({ back, loading, aiEnabled }) {
   const [vaultBusy, setVaultBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -655,15 +657,33 @@ function TopBar({ back, loading, aiEnabled }) {
                 </button>
               )}
 
-              <button
-                type="button"
-                disabled
-                data-disabled
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground opacity-50 cursor-not-allowed"
-              >
-                <Flag className="h-3.5 w-3.5" />
-                <span data-disabled>Report</span>
-              </button>
+              {room.isGroup ? (
+                <button
+                  type="button"
+                  disabled
+                  data-disabled
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground opacity-50 cursor-not-allowed"
+                  title="Reporting a specific person isn't available from a group chat yet"
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                  <span data-disabled>Report</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!other._id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    setShowReport(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                  <span>Report</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -766,6 +786,14 @@ function TopBar({ back, loading, aiEnabled }) {
         </DialogContent>
       </Dialog>
       {showSearch && <MessageSearchPopup roomID={room._id || routeRoomId} onClose={() => setShowSearch(false)} />}
+      {showReport && (
+        <ReportUserDialog
+          roomID={room._id || routeRoomId}
+          reportedUserId={other._id}
+          reportedUserName={other.firstName}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 }

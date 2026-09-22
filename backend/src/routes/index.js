@@ -32,10 +32,23 @@ const aiAnalyzeLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix
 // flood.
 const messageSendLimit = inviteRateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'message:send' });
 const messageSearchLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'message:search' });
+// A report is a serious, infrequent user action — a real user files a
+// handful a day at most. Kept tight mainly to stop scripted mass-reporting
+// (harassment via false reports, or flooding the admin queue).
+const reportCreateLimit = inviteRateLimit({ max: 10, windowMs: 60 * 60 * 1000, keyPrefix: 'report:create' });
 // Passwordless login is unauthenticated and does a username lookup + a
 // WebAuthn verify per call — bound both the enumeration surface and the
 // verify cost. 20/min per IP is far above any human sign-in cadence.
 const passkeyLoginLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'passkey:login' });
+// Meeting invites get their own budget, separate from friend/group invites
+// above — a meeting invite is meant to be short-lived and created more
+// often per session (e.g. a new link per call), so sharing invite:create's
+// budget would make ordinary meeting use trip the same limiter as a
+// friend-invite spam attempt. Token validation/acceptance especially must
+// resist brute-force guessing (spec §19) — kept tight per requester.
+const meetingInviteCreateLimit = inviteRateLimit({ max: 20, windowMs: 60 * 60 * 1000, keyPrefix: 'meeting-invite:create' });
+const meetingInvitePreviewLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'meeting-invite:preview' });
+const meetingInviteAcceptLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'meeting-invite:accept' });
 
 // Zero Trust (Phase 2) — mounted AFTER jwtAuth, same middleware-chain
 // position every rate limiter already occupies. Only on the routes
@@ -121,6 +134,11 @@ router.post('/user/list', passport.authenticate('jwt', { session: false }, null)
 // admin routes — see the isPrivileged 404 comment further down).
 router.get('/admin/ai-quota/:userId', jwtAuth, require('./admin/ai-quota-get'));
 router.post('/admin/ai-quota/reset', jwtAuth, require('./admin/ai-quota-reset'));
+router.post('/admin/user/suspend', jwtAuth, require('./admin/user-suspend'));
+
+router.post('/reports', jwtAuth, reportCreateLimit, require('./reports/create'));
+router.get('/reports', jwtAuth, require('./reports/list'));
+router.post('/reports/:reportId/review', jwtAuth, require('./reports/review'));
 // Login-passkey management (enroll / list / remove) — authenticated: you
 // must already be signed in to add or remove a passkey for your account.
 router.post('/passkey/register/options', jwtAuth, require('./passkey/register-options'));
@@ -375,6 +393,28 @@ router.post('/group/invites/create', jwtAuth, inviteCreateLimit, require('./grou
 router.get('/group/invites/:token', invitePreviewLimit, require('./group/invites/preview'));
 router.post('/group/invites/:token/join', jwtAuth, inviteAcceptLimit, require('./group/invites/join'));
 router.post('/group/invites/:token/revoke', jwtAuth, require('./group/invites/revoke'));
+
+// Meeting share-link/QR invites — see docs (if any) and
+// authorization/meetingInvitePolicy.js. Token is the sole authorization
+// lookup key (never meetingId alone, spec §2); preview is intentionally
+// unauthenticated (spec §11/§17); accept/create/revoke/list all require a
+// real Zeph session, with the accepting identity always taken from
+// req.user, never a request body field.
+router.post(
+  '/meetings/:meetingId/invites',
+  jwtAuth,
+  meetingInviteCreateLimit,
+  require('./meetings/invites/create'),
+);
+router.get('/meetings/:meetingId/invites', jwtAuth, require('./meetings/invites/list'));
+router.get('/meeting-invites/:token', meetingInvitePreviewLimit, require('./meetings/invites/preview'));
+router.post(
+  '/meeting-invites/:token/accept',
+  jwtAuth,
+  meetingInviteAcceptLimit,
+  require('./meetings/invites/accept'),
+);
+router.post('/meeting-invites/:inviteId/revoke', jwtAuth, require('./meetings/invites/revoke'));
 
 // Admin-only security telemetry query API (spec section 17) — RBAC enforced
 // inside each handler via isPrivileged(req.user), same pattern the

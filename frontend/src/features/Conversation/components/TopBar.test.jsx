@@ -104,20 +104,39 @@ afterEach(() => {
 });
 
 describe('Conversation TopBar — privacy menu', () => {
-  it('renders all six menu items in order, with only Report disabled', async () => {
+  it('renders all six menu items in order, none disabled for a DM', async () => {
     const user = userEvent.setup();
     renderTopBar();
 
     await user.click(screen.getByRole('button', { name: 'More options' }));
 
-    // Search and Mute are real, wired-up actions now (message search popup /
-    // conversation-mute toggle) — only Report is still a disabled placeholder.
+    // Search, Mute and Report are all real, wired-up actions now (message
+    // search popup / conversation-mute toggle / report dialog).
     expect(await screen.findByText('Search')).not.toHaveAttribute('data-disabled');
     expect(screen.getByText('Mute')).not.toHaveAttribute('data-disabled');
     expect(screen.getByText('Hide / Lock DM')).not.toHaveAttribute('data-disabled');
     expect(screen.getByText('Delete DM')).not.toHaveAttribute('data-disabled');
     expect(screen.getByText('Block')).not.toHaveAttribute('data-disabled');
-    expect(screen.getByText('Report')).toHaveAttribute('data-disabled');
+    expect(screen.getByText('Report')).not.toHaveAttribute('data-disabled');
+  });
+
+  it('Report stays disabled for a group room (no single reportable "other")', async () => {
+    const user = userEvent.setup();
+    renderTopBar({ ...ROOM, isGroup: true, title: 'Group Chat' });
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+
+    expect(await screen.findByText('Report')).toHaveAttribute('data-disabled');
+  });
+
+  it('clicking "Report" opens the report dialog for the other participant', async () => {
+    const user = userEvent.setup();
+    renderTopBar();
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    await user.click(await screen.findByText('Report'));
+
+    expect(await screen.findByText('Report Other')).toBeInTheDocument();
   });
 
   it('clicking "Mute" calls muteConversation(true) and flips the item to "Unmute"', async () => {
@@ -258,13 +277,14 @@ describe('Conversation TopBar — privacy menu', () => {
     expect(blockUser).not.toHaveBeenCalled();
   });
 
-  it('the disabled Report item does not trigger any action', async () => {
+  it('clicking the disabled Report item in a group room does not open the report dialog or trigger any other action', async () => {
     const user = userEvent.setup();
-    renderTopBar();
+    renderTopBar({ ...ROOM, isGroup: true, title: 'Group Chat' });
 
     await user.click(screen.getByRole('button', { name: 'More options' }));
     await user.click(screen.getByText('Report'));
 
+    expect(screen.queryByText(/^Report /)).not.toBeInTheDocument();
     expect(hideConversation).not.toHaveBeenCalled();
     expect(deleteConversation).not.toHaveBeenCalled();
     expect(blockUser).not.toHaveBeenCalled();

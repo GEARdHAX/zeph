@@ -36,6 +36,13 @@ passport.use(
         const user = await User.findById(payload.id);
         if (!user) return done(null, false);
 
+        // Mirrors init.js's real JWT strategy exactly — a suspended
+        // (DEACTIVATED) or DELETED account must lose access on its very
+        // next request, not just its next login.
+        if (user.accountStatus === 'DEACTIVATED' || user.accountStatus === 'DELETED') {
+          return done(null, false);
+        }
+
         if (payload.deviceId) {
           const session = await Session.findById(payload.deviceId);
           if (!session || session.revokedAt) return done(null, false);
