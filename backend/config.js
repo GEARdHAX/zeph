@@ -191,6 +191,11 @@ module.exports = {
   nodemailer: {
     from: process.env.MAILER_FROM || 'admin@example.com',
   },
+  // Brevo's HTTP API (port 443) instead of SMTP (port 587) — some hosts
+  // (e.g. Render's free tier) block/throttle outbound SMTP ports, which
+  // showed up as connection timeouts. When set, sendMail.js uses this
+  // instead of the SMTP transport below.
+  brevoApiKey: process.env.BREVO_API_KEY || null,
   nodemailerTransport: {
     service: process.env.MAILER_SERVICE || undefined, // example: hotmail (leave blank if using own smtp below)
     host: process.env.MAILER_HOST || undefined, // example: smtp.yourdomain.tld (leave blank if using service above)

@@ -21,6 +21,7 @@ const mockTransport = (overrides = {}) => {
 beforeEach(() => {
   jest.clearAllMocks();
   store.config = {
+    brevoApiKey: null,
     nodemailerTransport: {
       host: 'smtp-relay.brevo.com',
       port: 587,
@@ -63,5 +64,42 @@ describe('sendMail', () => {
     } catch (e) {
       expect(JSON.stringify(e.message)).not.toContain('super-secret-smtp-key');
     }
+  });
+
+  describe('with BREVO_API_KEY set (HTTP API path, bypasses SMTP entirely)', () => {
+    beforeEach(() => {
+      store.config.brevoApiKey = 'xkeysib-test-key';
+      global.fetch = jest.fn();
+    });
+
+    afterEach(() => {
+      delete global.fetch;
+    });
+
+    it('posts to the Brevo API with the parsed sender, never touching nodemailer', async () => {
+      global.fetch.mockResolvedValue({ ok: true });
+
+      await sendMail({ from: 'zeph. <no-reply@zeph.app>', to: 'user@example.com', subject: 'hi', html: '<p>hi</p>' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api.brevo.com/v3/smtp/email',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({ 'api-key': 'xkeysib-test-key' }),
+        }),
+      );
+      const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+      expect(body.sender).toEqual({ name: 'zeph.', email: 'no-reply@zeph.app' });
+      expect(body.to).toEqual([{ email: 'user@example.com' }]);
+      expect(nodemailer.createTransport).not.toHaveBeenCalled();
+    });
+
+    it('rejects without leaking the API key when Brevo returns an error status', async () => {
+      global.fetch.mockResolvedValue({ ok: false, status: 401, text: async () => '{"message":"Unauthorized"}' });
+
+      await expect(
+        sendMail({ from: 'no-reply@zeph.app', to: 'user@example.com', subject: 'hi', html: '<p>hi</p>' }),
+      ).rejects.toThrow('Brevo API error 401');
+    });
   });
 });
