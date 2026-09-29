@@ -25,6 +25,12 @@ process.on('unhandledRejection', (reason) => {
   logger.error({ err: reason }, 'Unhandled promise rejection — see stack for origin');
 });
 
+// A synchronous throw anywhere (e.g. a malformed socket event payload) would
+// otherwise kill the whole process — log and keep running, same as above.
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught exception — see stack for origin');
+});
+
 logger.info('zeph server starting');
 
 const express = require('express');

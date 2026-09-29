@@ -53,6 +53,10 @@ const UserSchema = new Schema({
     enum: ['ACTIVE', 'DEACTIVATED', 'DELETED'],
     default: 'ACTIVE',
   },
+  // Opt-out for non-critical email (digests, invites, etc. — future
+  // stages). Security/account-lifecycle emails (suspension, deletion,
+  // password reset/change) ignore this and always send.
+  emailNotifications: { type: Boolean, default: true },
 });
 
 UserSchema.pre('save', function preSave(next) {

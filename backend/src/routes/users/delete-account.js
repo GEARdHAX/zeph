@@ -1,8 +1,10 @@
 const argon2 = require('argon2');
 const User = require('../../models/User');
 const Session = require('../../models/Session');
+const Email = require('../../models/Email');
 const cleanupDeletedUser = require('../../utils/cleanupDeletedUser');
 const store = require('../../store');
+const config = require('../../../config');
 const logger = require('../../logger');
 
 // Self-service account deletion — password re-verification required (unlike
@@ -21,8 +23,19 @@ module.exports = async (req, res) => {
   const correct = await argon2.verify(user.password, password);
   if (!correct) return res.status(403).json({ error: true, reason: 'incorrect_password' });
 
+  const { email, firstName, username } = user;
+
   await User.deleteOne({ _id: user._id });
   await Session.updateMany({ user: user._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
+
+  if (email) {
+    Email({
+      from: config.nodemailer.from,
+      to: email,
+      subject: `${config.appTitle || config.appName || 'zeph.'} - Account deleted`,
+      html: `<p>Hello ${firstName || username},<br/><br/>Your account and its data have been deleted, as requested.<br/><br/>If you didn't request this, please contact support immediately.</p>`,
+    }).save();
+  }
 
   try {
     await cleanupDeletedUser(user._id);

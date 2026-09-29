@@ -14,4 +14,8 @@ export default {
   wordmark: 'zeph.',
   theme: 'dark',
   showCredits: import.meta.env.VITE_SHOW_CREDITS === 'true',
+  // Frontend's own version, independent of the backend's /api/info response
+  // (which reflects backend/package.json and can drift from the frontend
+  // build). Falls back to /api/info's value when unset — see Login/index.jsx.
+  version: import.meta.env.VITE_APP_VERSION || '',
 };

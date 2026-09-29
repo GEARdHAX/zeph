@@ -249,7 +249,7 @@ function Login() {
           <div className="text-xs text-zinc-400 z-10 flex items-center gap-1">
             <span>©{new Date().getFullYear()}</span>
             <ZephWordmark className="text-xs font-semibold text-zinc-300" />
-            <span>{`v${info.version || '1.0.0'}`}</span>
+            <span>{`v${Config.version || info.version || '1.0.0'}`}</span>
             {Config.showCredits && (
               <>
                 <span>•</span>

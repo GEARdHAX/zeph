@@ -1,6 +1,8 @@
 const User = require('../models/User');
+const Email = require('../models/Email');
 const cleanupDeletedUser = require('../utils/cleanupDeletedUser');
 const store = require('../store');
+const config = require('../../config');
 const validator = require('validator');
 const isEmpty = require('../utils/isEmpty');
 const xss = require('xss');
@@ -33,5 +35,14 @@ module.exports = async (req, res, next) => {
 
   logger.info({ deletedUserId: result._id, byUserId: req.user.id }, 'User deleted by admin');
   store.io.to(result._id.toString()).emit('user-deleted', { id: result._id });
+
+  if (result.email) {
+    Email({
+      from: config.nodemailer.from,
+      to: result.email,
+      subject: `${config.appTitle || config.appName || 'zeph.'} - Account deleted`,
+      html: `<p>Hello ${result.firstName || result.username},<br/><br/>Your account and its data have been deleted by an administrator.<br/><br/>If you believe this is a mistake, please contact support.</p>`,
+    }).save();
+  }
   res.status(200).json({ result });
 };

@@ -3,7 +3,7 @@ const logger = require('../logger');
 const { broadcastPresence } = require('../presence');
 
 module.exports = (socket, data) => {
-  let { status } = data;
+  let { status } = data || {};
   if (store.onlineUsers.get(socket).status === 'busy') return;
   store.onlineUsers.delete(socket);
   store.onlineUsers.set(socket, {

@@ -1,5 +1,7 @@
 const User = require('../../models/User');
+const Email = require('../../models/Email');
 const store = require('../../store');
+const config = require('../../../config');
 const { isPrivileged } = require('../../authorization/policy');
 const SecurityEventService = require('../../services/securityEventService');
 const securityEventContext = require('../../utils/securityEventContext');
@@ -25,7 +27,9 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: true, reason: 'CANNOT_SUSPEND_SELF' });
   }
 
-  const target = await User.findById(userId).select('_id username level accountStatus').catch(() => null);
+  const target = await User.findById(userId)
+    .select('_id username level accountStatus email firstName')
+    .catch(() => null);
   if (!target) return res.status(404).json({ error: true });
 
   // An admin can't be suspended by a peer admin through this lighter-weight
@@ -58,6 +62,15 @@ module.exports = async (req, res) => {
   // 'user-deleted' emit to the same personal room.
   if (suspended) {
     store.io.to(target._id.toString()).emit('account-suspended');
+
+    if (target.email) {
+      Email({
+        from: config.nodemailer.from,
+        to: target.email,
+        subject: `${config.appTitle || config.appName || 'zeph.'} - Account suspended`,
+        html: `<p>Hello ${target.firstName || target.username},<br/><br/>Your account has been suspended by an administrator.<br/><br/>If you believe this is a mistake, please contact support.</p>`,
+      }).save();
+    }
   }
 
   res.status(200).json({ status: 'success', accountStatus: target.accountStatus });

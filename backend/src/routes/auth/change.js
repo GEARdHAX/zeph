@@ -40,8 +40,12 @@ router.post('*', async (req, res) => {
     return res.status(404).json({ status: 'error', code: 'email required' });
   }
 
-  if (!code) {
+  if (!code || typeof code !== 'string') {
     return res.status(404).json({ status: 'error', code: 'auth code required' });
+  }
+
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    return res.status(404).json({ status: 'error', code: 'email required' });
   }
 
   email = email.trim().toLowerCase();
