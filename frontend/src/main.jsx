@@ -13,6 +13,13 @@ import App from './App';
 import * as serviceWorker from './serviceWorker';
 import init from './init';
 import store from './store';
+// Side-effect import: useTheme.js applies the stored/resolved theme to the
+// DOM (data-theme attribute + .dark/.light class) at module load — must
+// happen before the first render, not lazily whenever some component
+// first calls useTheme(), or index.css's dark-mode CSS variable overrides
+// (keyed on data-theme being ABSENT, not just "dark") stay active even
+// when the app is rendering as light mode. See useTheme.js's own comment.
+import './lib/useTheme';
 
 init().then(() => {
   const root = ReactDOM.createRoot(document.getElementById('root'));

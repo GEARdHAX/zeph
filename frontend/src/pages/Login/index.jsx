@@ -390,8 +390,8 @@ function Login() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         className="h-11 rounded-xl"
-                        showPasswordToggle
-                        isPasswordVisible={showLoginPassword}
+                        isPassword
+                        showPassword={showLoginPassword}
                         onTogglePassword={() => setShowLoginPassword(!showLoginPassword)}
                       />
                     </div>
@@ -483,25 +483,27 @@ function Login() {
                       className="h-10 rounded-xl"
                     />
                     <Input
+                      id="reg-password"
                       type={showRegisterPassword ? 'text' : 'password'}
                       placeholder="Password"
                       value={registerPassword}
                       onChange={(e) => setRegisterPassword(e.target.value)}
                       required
                       className="h-10 rounded-xl"
-                      showPasswordToggle
-                      isPasswordVisible={showRegisterPassword}
+                      isPassword
+                      showPassword={showRegisterPassword}
                       onTogglePassword={() => setShowRegisterPassword(!showRegisterPassword)}
                     />
                     <Input
+                      id="reg-repeat-password"
                       type={showRegisterRepeatPassword ? 'text' : 'password'}
                       placeholder="Repeat Password"
                       value={registerRepeatPassword}
                       onChange={(e) => setRegisterRepeatPassword(e.target.value)}
                       required
                       className="h-10 rounded-xl"
-                      showPasswordToggle
-                      isPasswordVisible={showRegisterRepeatPassword}
+                      isPassword
+                      showPassword={showRegisterRepeatPassword}
                       onTogglePassword={() => setShowRegisterRepeatPassword(!showRegisterRepeatPassword)}
                     />
 

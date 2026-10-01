@@ -9,6 +9,7 @@ import sendCode from '../../actions/sendCode';
 import changePassword from '../../actions/changePassword';
 import BrandLogo from '../../components/BrandLogo';
 import ZephWordmark from '../../components/ZephWordmark';
+import loginBg from '../../assets/login-bg.png';
 
 // Same dark-hero / centered-card layout as Login/index.jsx — this page
 // previously used a full-bleed background photo (assets/background.jpg)
@@ -75,9 +76,17 @@ function ForgotPassword() {
   return (
     <Div100vh>
       <div className="flex h-full w-full overflow-y-auto bg-background text-foreground lg:overflow-hidden">
-        {/* Left Side: Dark Hero Panel — same treatment as Login */}
+        {/* Left Side: Dark Hero Panel — same treatment as Login, including
+            the same background photo (previously this page used its own
+            custom gradient-blur decorations instead of loginBg — now
+            matches Login/index.jsx's left panel exactly). */}
         <div className="relative hidden w-[45%] max-w-[560px] min-w-[380px] shrink-0 flex-col justify-between overflow-hidden bg-[#070708] p-10 text-white lg:flex xl:p-14">
-          <div>
+          <div
+            className="pointer-events-none absolute inset-0 bg-cover bg-bottom bg-no-repeat opacity-40"
+            style={{ backgroundImage: `url(${loginBg})` }}
+          />
+
+          <div className="relative z-10">
             <Link to="/login" className="flex items-center gap-3">
               <BrandLogo variant="dark" className="h-8 w-8" />
               <ZephWordmark className="text-2xl font-extrabold tracking-tight text-white" />
@@ -88,26 +97,15 @@ function ForgotPassword() {
               <br />
               <span className="text-primary">password.</span>
             </h1>
-            <p className="mt-4 max-w-[340px] text-sm leading-relaxed text-zinc-400">
+            <p className="mt-4 max-w-[340px] text-sm leading-relaxed text-zinc-300 drop-shadow-sm">
               Enter your email to receive a verification code, then choose a new password to get back into your account.
             </p>
           </div>
 
-          <div className="flex items-center gap-1 text-xs text-zinc-500 z-10">
+          <div className="relative z-10 flex items-center gap-1 text-xs text-zinc-400">
             <span>{`© ${new Date().getFullYear()}`}</span>
-            <ZephWordmark className="text-xs font-semibold text-zinc-400" />
+            <ZephWordmark className="text-xs font-semibold text-zinc-300" />
           </div>
-
-          <div
-            className="pointer-events-none absolute -bottom-28 -right-28 h-80 w-80 rounded-full opacity-35 blur-[90px]"
-            style={{ background: 'radial-gradient(circle, var(--color-primary, #e11d48) 0%, transparent 70%)' }}
-          />
-          <div
-            className="pointer-events-none absolute -bottom-10 right-0 h-48 w-48 rotate-45 opacity-20"
-            style={{
-              background: 'linear-gradient(135deg, transparent 40%, var(--color-primary, #e11d48) 100%)',
-            }}
-          />
         </div>
 
         {/* Right Side: Form Panel */}
