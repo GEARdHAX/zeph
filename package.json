@@ -5,5 +5,8 @@
   "private": true,
   "engines": {
     "node": "20.x.x"
+  },
+  "scripts": {
+    "heroku-postbuild": "cd backend && npm install"
   }
 }
