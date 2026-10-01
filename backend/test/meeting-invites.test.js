@@ -6,6 +6,8 @@ const User = require('../src/models/User');
 const Meeting = require('../src/models/Meeting');
 const MeetingInvite = require('../src/models/MeetingInvite');
 const MeetingInviteAcceptance = require('../src/models/MeetingInviteAcceptance');
+const MeetingParticipant = require('../src/models/MeetingParticipant');
+const Room = require('../src/models/Room');
 
 let app;
 
@@ -533,5 +535,126 @@ describe('Multiple independent invites', () => {
       expect(invite.tokenHash).toBeUndefined();
       expect(invite.token).toBeUndefined();
     });
+  });
+});
+
+// Phase 10 audit findings N1/N2, fixed in this pass:
+// N1 — a current group member could create a meeting invite, accept it
+//      themselves, and read the meeting's summary without ever actually
+//      joining the call (authorization previously read Meeting.users, the
+//      same append-only set invite-acceptance writes to — not actual
+//      attendance). Fixed by authorizing summary/participants access from
+//      MeetingParticipant instead (authorization/meetingInvitePolicy.js's
+//      isAuthorizedForMeetingHistory).
+// N2 — invites could be created for, and accepted into, a meeting that had
+//      already ended, inflating Meeting.users for a meeting no one
+//      attended. Fixed by rejecting both create and accept once
+//      meeting.endedAt is set.
+describe('Security fix (Phase 10, N1) — invite acceptance alone does not grant summary access', () => {
+  it('a group member who creates and self-accepts an invite is still denied the meeting summary (never actually joined)', async () => {
+    const host = await createUser();
+    const groupMember = await createUser();
+    const room = await Room.create({ people: [host._id, groupMember._id], title: 'Team', isGroup: true });
+    const meeting = await createMeeting({ caller: host._id, group: room._id, users: [host._id] });
+
+    // groupMember is a real, current member of the group — authorized to
+    // CREATE an invite (isAuthorizedForMeeting still allows this; creating
+    // a link for your own team's meeting is legitimate) and then accepts
+    // it themselves, which only ever adds them to Meeting.users —
+    // eligibility to join, never proof they actually did.
+    const createRes = await createInvite(groupMember, meeting._id);
+    expect(createRes.status).toBe(200);
+    const token = tokenFromUrl(createRes.body.url);
+
+    const acceptRes = await request(app)
+      .post(`/api/meeting-invites/${token}/accept`)
+      .set('Authorization', `Bearer ${tokenFor(groupMember)}`);
+    expect(acceptRes.status).toBe(200);
+
+    const meetingAfter = await Meeting.findById(meeting._id);
+    expect(meetingAfter.users.map((u) => u.toString())).toContain(groupMember._id.toString());
+
+    // No MeetingParticipant row was ever created (accept.js never writes
+    // one — only mediasoup/index.js's real 'join' socket handler does), so
+    // despite now being in Meeting.users, summary/participants access must
+    // still be denied.
+    const summaryRes = await request(app)
+      .get(`/api/meeting/${meeting._id}/summary`)
+      .set('Authorization', `Bearer ${tokenFor(groupMember)}`);
+    expect(summaryRes.status).toBe(403);
+    expect(summaryRes.body.reason).toBe('NOT_A_PARTICIPANT');
+
+    const participantsRes = await request(app)
+      .get(`/api/meeting/${meeting._id}/participants`)
+      .set('Authorization', `Bearer ${tokenFor(groupMember)}`);
+    expect(participantsRes.status).toBe(403);
+  });
+
+  it('a user with a real MeetingParticipant row (actually joined) IS authorized for the summary', async () => {
+    const host = await createUser();
+    const attendee = await createUser();
+    const meeting = await createMeeting({ caller: host._id, users: [host._id, attendee._id], endedAt: new Date() });
+    await MeetingParticipant.create({ meeting: meeting._id, user: attendee._id, joinedAt: new Date() });
+
+    const res = await request(app)
+      .get(`/api/meeting/${meeting._id}/summary`)
+      .set('Authorization', `Bearer ${tokenFor(attendee)}`);
+    // 404 (no transcript doc yet) proves authorization passed — a 403
+    // would mean the fix wrongly denied a real attendee.
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('Security fix (Phase 10, N2) — invites cannot be created or accepted for an ended meeting', () => {
+  it('rejects creating a new invite for a meeting that has already ended', async () => {
+    const host = await createUser();
+    const meeting = await createMeeting({ caller: host._id, users: [host._id], endedAt: new Date() });
+
+    const res = await createInvite(host, meeting._id);
+    expect(res.status).toBe(410);
+    expect(res.body.reason).toBe('MEETING_ENDED');
+  });
+
+  it('rejects accepting a valid (unexpired, unrevoked) invite once the meeting has since ended', async () => {
+    const host = await createUser();
+    const stranger = await createUser();
+    const meeting = await createMeeting({ caller: host._id, users: [host._id] });
+
+    const createRes = await createInvite(host, meeting._id);
+    expect(createRes.status).toBe(200);
+    const token = tokenFromUrl(createRes.body.url);
+
+    // Meeting ends AFTER the invite was created but before it's accepted —
+    // the invite itself is still "valid" (not expired/revoked/exhausted).
+    await Meeting.updateOne({ _id: meeting._id }, { endedAt: new Date() });
+
+    const acceptRes = await request(app)
+      .post(`/api/meeting-invites/${token}/accept`)
+      .set('Authorization', `Bearer ${tokenFor(stranger)}`);
+    expect(acceptRes.status).toBe(410);
+    expect(acceptRes.body.reason).toBe('MEETING_ENDED');
+
+    // The use-count claimed atomically before this rejection must be
+    // refunded — a rejected accept must not burn into maxUses.
+    const inviteAfter = await MeetingInvite.findOne({ meeting: meeting._id });
+    expect(inviteAfter.useCount).toBe(0);
+
+    // Stranger must NOT have been added to Meeting.users either.
+    const meetingAfter = await Meeting.findById(meeting._id);
+    expect(meetingAfter.users.map((u) => u.toString())).not.toContain(stranger._id.toString());
+  });
+
+  it('a meeting-ended rejection does not prevent a DIFFERENT, still-active invite from working', async () => {
+    const host = await createUser();
+    const attendee = await createUser();
+    const meeting = await createMeeting({ caller: host._id, users: [host._id] });
+
+    const createRes = await createInvite(host, meeting._id);
+    const token = tokenFromUrl(createRes.body.url);
+
+    const acceptRes = await request(app)
+      .post(`/api/meeting-invites/${token}/accept`)
+      .set('Authorization', `Bearer ${tokenFor(attendee)}`);
+    expect(acceptRes.status).toBe(200);
   });
 });

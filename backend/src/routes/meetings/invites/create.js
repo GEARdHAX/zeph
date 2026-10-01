@@ -30,6 +30,15 @@ module.exports = async (req, res) => {
     return res.status(403).json({ error: true });
   }
 
+  // Audit finding (Phase 10, N2): creating a new invite to an already-ended
+  // meeting was never blocked — closing this at the source, not just at
+  // accept time (see accept.js's matching MEETING_ENDED check), so a stale
+  // meeting never gets a fresh shareable link in the first place.
+  if (meeting.endedAt) {
+    logger.warn({ meetingId, actorId, reason: 'meeting_ended' }, 'meeting_invite_create_rejected');
+    return res.status(410).json({ error: true, reason: 'MEETING_ENDED' });
+  }
+
   const expiryKey = Object.prototype.hasOwnProperty.call(EXPIRY_OPTIONS_MS, expiresIn) ? expiresIn : DEFAULT_EXPIRY_KEY;
   const expiresAt = new Date(Date.now() + EXPIRY_OPTIONS_MS[expiryKey]);
 

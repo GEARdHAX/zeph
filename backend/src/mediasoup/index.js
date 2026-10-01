@@ -242,6 +242,27 @@ const initSocket = (socket) => {
 
   socket.on('consume', async (data, callback) => {
     try {
+      // Audit finding (Phase 10, N4-equivalent): unlike 'join' and
+      // 'produce', this handler had NO authorization check at all — any
+      // authenticated socket that knew a producerID/socketID pair could
+      // pull another meeting's audio/video merely by calling 'consume'
+      // directly, without ever having passed authorizeMeetingJoin for that
+      // meeting. The authorization check is against THIS socket's own
+      // server-recorded room (store.roomIDs, set only by the 'join'
+      // handler after authorizeMeetingJoin already passed) — never a
+      // client-supplied meetingId, since this event's payload doesn't even
+      // carry one.
+      const roomID = store.roomIDs[socket.id];
+      const authz = await authorizeMeetingJoin(roomID, socket.decoded_token.id);
+      if (!authz.ok) {
+        logger.warn(
+          { meetingId: roomID, userId: socket.decoded_token.id, reason: authz.reason },
+          'Unauthorized mediasoup consume attempt rejected',
+        );
+        callback({ error: 'unauthorized' });
+        return;
+      }
+
       const producer = producers[data.socketID] && producers[data.socketID][data.producerID];
       if (!producer) throw new Error('Producer not found — it may have already left');
 
@@ -375,7 +396,21 @@ const initSocket = (socket) => {
   });
 
   socket.on('leave', async (data, callback) => {
-    await leaveRoom(socket, data.roomID);
+    // Audit finding (Phase 10, N4): this trusted data.roomID from the
+    // client, same as the 'disconnect' handler below does NOT (it already
+    // correctly uses store.roomIDs[socket.id]). A client sending an
+    // arbitrary/wrong roomID hit leaveRoom's
+    // consumerUserIDs[roomID].splice(indexOf(socket.id), 1) — if this
+    // socket isn't actually in THAT room's list, indexOf returns -1 and
+    // splice(-1, 1) silently removes the room's LAST entry instead: some
+    // other, unrelated participant's socket id. That can falsely flip
+    // stillHasParticipants to empty, setting Meeting.endedAt and closing a
+    // stranger's CallSession for a meeting the caller was never even
+    // authorized into. Using the server's own record of this socket's
+    // room (same source 'disconnect' already trusts) makes both the
+    // authorization gap and the splice bug impossible: this will always be
+    // either the room the socket actually joined, or null/undefined.
+    await leaveRoom(socket, store.roomIDs[socket.id]);
     if (callback) callback();
   });
 

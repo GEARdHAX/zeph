@@ -8,6 +8,7 @@ const { checkMeetingSummaryEligibility } = require('../../ai/eligibility');
 const { generateMeetingSummary, transcribeMeetingAudio } = require('../../ai/meetingTranscriptService');
 const { enqueueMeetingSummaryJob, getQueue } = require('../../queues/meetingAiQueue');
 const { resolveRequestId, aiFailureResponse } = require('../../ai/telemetry');
+const { isAuthorizedForMeetingHistory } = require('../../authorization/meetingInvitePolicy');
 
 // Zeph AI — Meeting AI (Phase 14). POST /api/meeting/:id/summarize —
 // { mediaId } for the FIRST call (client already uploaded the recorded
@@ -15,18 +16,10 @@ const { resolveRequestId, aiFailureResponse } = require('../../ai/telemetry');
 // omit mediaId on subsequent calls once a transcript already exists (e.g.
 // retrying summary generation after a transient provider failure).
 //
-// Meeting-summary-persistence pass: DELIBERATELY narrower than mediasoup/
-// index.js's authorizeMeetingJoin — no "current group member" fallback.
-// Requesting/generating a summary is participant-history-scoped, same as
-// viewing one (routes/meeting/get-summary.js) — see that file's comment
-// for the full reasoning. Meeting.users ($addToSet on join, never pruned)
-// is the participant history; caller/callee cover 1:1 calls.
-const authorizeSummaryAccess = (meeting, userId) => {
-  const userIdStr = userId.toString();
-  if (meeting.caller && meeting.caller.toString() === userIdStr) return true;
-  if (meeting.callee && meeting.callee.toString() === userIdStr) return true;
-  return (meeting.users || []).some((u) => u.toString() === userIdStr);
-};
+// Authorization: requesting/generating a summary is participant-history-
+// scoped, same as viewing one (routes/meeting/get-summary.js) — see
+// authorization/meetingInvitePolicy.js's isAuthorizedForMeetingHistory for
+// the full reasoning.
 
 module.exports = async (req, res) => {
   const requestId = resolveRequestId(req);
@@ -49,7 +42,7 @@ module.exports = async (req, res) => {
   const meeting = await Meeting.findById(meetingId).catch(() => null);
   if (!meeting) return res.status(404).json({ error: true, requestId });
 
-  if (!authorizeSummaryAccess(meeting, req.user.id)) {
+  if (!(await isAuthorizedForMeetingHistory(meeting, req.user.id))) {
     return res.status(403).json({ error: true, reason: 'NOT_A_PARTICIPANT', requestId });
   }
 
@@ -60,7 +53,7 @@ module.exports = async (req, res) => {
   // with the rejection buried in a log line the user never sees.
   // (INSUFFICIENT_TRANSCRIPT still can't be checked until transcription
   // runs — that verdict is persisted by the worker for the frontend poll.)
-  const eligibility = checkMeetingSummaryEligibility(buildPolicy(config), meeting);
+  const eligibility = await checkMeetingSummaryEligibility(buildPolicy(config), meeting);
   if (!eligibility.eligible) {
     return res.status(422).json({
       error: true,

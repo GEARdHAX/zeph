@@ -4,6 +4,7 @@
 // on the existing {room:1} index — see models/Message.js — never a full fetch
 // scanned in application code, per Phase 18).
 const Message = require('../models/Message');
+const MeetingParticipant = require('../models/MeetingParticipant');
 const { REJECTION_REASONS } = require('./policy');
 
 // conversationType comes from the caller (room.isGroup), not guessed here —
@@ -60,7 +61,18 @@ const isSummaryStale = (policy, messageCountAtSummary, currentCount) =>
 // eligibility, since eligibility must be checkable BEFORE any AI cost is
 // incurred — see meetingTranscriptService.js's own ordering: duration/
 // participant checks run before transcription is even requested).
-const checkMeetingSummaryEligibility = (policy, meeting, transcriptWordCount) => {
+//
+// Audit finding (Phase 10, N2): participantCount previously came from
+// meeting.users.length — the same append-only eligibility set invite
+// ACCEPTANCE writes to via $addToSet (meetings/invites/accept.js), with no
+// check that the meeting had already ended at accept time. That meant
+// accepting an invite to an ALREADY-ENDED meeting could still inflate this
+// count and push a genuinely too-small meeting over minParticipants,
+// without anyone having actually attended. MeetingParticipant — written
+// only from a real backend-confirmed mediasoup connection — is the
+// correct count instead; this function now counts those directly rather
+// than trusting a value derived from Meeting.users.
+const checkMeetingSummaryEligibility = async (policy, meeting, transcriptWordCount) => {
   const { meetingSummary } = policy;
 
   if (!meeting.endedAt) {
@@ -77,7 +89,7 @@ const checkMeetingSummaryEligibility = (policy, meeting, transcriptWordCount) =>
     };
   }
 
-  const participantCount = (meeting.users || []).length;
+  const participantCount = await MeetingParticipant.countDocuments({ meeting: meeting._id });
   if (participantCount < meetingSummary.minParticipants) {
     return {
       eligible: false,

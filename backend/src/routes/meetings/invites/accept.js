@@ -49,6 +49,20 @@ module.exports = async (req, res) => {
     return res.status(404).json({ error: true, reason: 'MEETING_NOT_FOUND' });
   }
 
+  // Audit finding (Phase 10, N2): accept never checked whether the meeting
+  // had already ended. A stranger could accept a still-"valid" (not
+  // expired/revoked) invite link to a meeting that finished hours earlier,
+  // which — before the MeetingParticipant-based authorization fix above —
+  // granted retroactive summary access, and still pointlessly pollutes
+  // Meeting.users (the live-join eligibility set) for a meeting that's
+  // over. Refunds the use-count the atomic claim above already consumed,
+  // same pattern as the ALREADY_IN_MEETING rejection below.
+  if (meeting.endedAt) {
+    await MeetingInvite.updateOne({ _id: invite._id }, { $inc: { useCount: -1 } });
+    logger.info({ meetingId: meeting._id, inviteId: invite._id, userId }, 'meeting_invite_rejected_meeting_ended');
+    return res.status(410).json({ error: true, reason: 'MEETING_ENDED' });
+  }
+
   // Real bug this guards against: the invite creator (or anyone already on
   // the call) opens their own invite link — e.g. a second tab/device, or
   // just re-clicking a link they shared — and the accept-then-navigate flow

@@ -150,7 +150,7 @@ const generateMeetingSummary = async ({ meetingId, userId, requestId }) => {
 
   const policy = buildPolicy(store.config);
   const wordCount = countWords(transcriptDoc.transcript);
-  const eligibility = checkMeetingSummaryEligibility(policy, meeting, wordCount);
+  const eligibility = await checkMeetingSummaryEligibility(policy, meeting, wordCount);
   if (!eligibility.eligible) {
     // Persist the verdict so GET /meeting/:id/summary (the frontend poll on
     // the async path) reports it instead of the meeting sitting on

@@ -11,6 +11,7 @@ const User = require('../src/models/User');
 const Meeting = require('../src/models/Meeting');
 const Media = require('../src/models/Media');
 const MeetingTranscript = require('../src/models/MeetingTranscript');
+const MeetingParticipant = require('../src/models/MeetingParticipant');
 const Room = require('../src/models/Room');
 
 let app;
@@ -67,6 +68,16 @@ const createMeeting = (overrides = {}) =>
     startedAt: overrides.startedAt || new Date('2026-01-01T10:00:00Z'),
     endedAt: overrides.endedAt === undefined ? new Date('2026-01-01T10:30:00Z') : overrides.endedAt,
   });
+
+// Records real attendance — the correct fixture for "this user actually
+// joined and is part of eligibility/authorization counts," now that both
+// meeting-summary authorization (authorization/meetingInvitePolicy.js's
+// isAuthorizedForMeetingHistory) and eligibility (ai/eligibility.js's
+// checkMeetingSummaryEligibility) read MeetingParticipant directly rather
+// than Meeting.users (Phase 10 audit fix N1/N2 — Meeting.users is an
+// eligibility/invite-acceptance set, not proof of attendance).
+const recordAttendance = (meetingId, userId, joinedAt = new Date('2026-01-01T10:05:00Z')) =>
+  MeetingParticipant.create({ meeting: meetingId, user: userId, joinedAt });
 
 // storage.js's local-disk mode (no R2 configured, the test default) needs a
 // REAL file at the storageKey path — getObjectStream() does an actual fs
@@ -202,6 +213,8 @@ describe('POST /api/meeting/:id/summarize — eligibility (no Redis -> synchrono
     const user = await createUser();
     const other = await createUser();
     const meeting = await createMeeting({ caller: user._id, users: [user._id, other._id] });
+    await recordAttendance(meeting._id, user._id);
+    await recordAttendance(meeting._id, other._id);
     const media = await createMedia(user._id);
 
     const res = await request(app)
@@ -218,6 +231,8 @@ describe('POST /api/meeting/:id/summarize — eligibility (no Redis -> synchrono
     const user = await createUser();
     const other = await createUser();
     const meeting = await createMeeting({ caller: user._id, users: [user._id, other._id] });
+    await recordAttendance(meeting._id, user._id);
+    await recordAttendance(meeting._id, other._id);
     const media = await createMedia(user._id);
 
     const res = await request(app)
@@ -240,6 +255,8 @@ describe('POST /api/meeting/:id/summarize — eligibility (no Redis -> synchrono
     const user = await createUser();
     const other = await createUser();
     const meeting = await createMeeting({ caller: user._id, users: [user._id, other._id] });
+    await recordAttendance(meeting._id, user._id);
+    await recordAttendance(meeting._id, other._id);
     const media = await createMedia(user._id);
 
     store.config.aiProvider = 'groq';
@@ -268,6 +285,8 @@ describe('POST /api/meeting/:id/summarize — eligibility (no Redis -> synchrono
     const user = await createUser();
     const other = await createUser();
     const meeting = await createMeeting({ caller: user._id, users: [user._id, other._id] });
+    await recordAttendance(meeting._id, user._id);
+    await recordAttendance(meeting._id, other._id);
     const media = await createMedia(user._id);
 
     await request(app)
@@ -325,10 +344,20 @@ describe('GET /api/meeting/:id/summary', () => {
 });
 
 describe('Meeting-scoped summary access — participant history, not presence or group membership', () => {
-  it("a participant who already LEFT the meeting can still read its summary (Meeting.users is append-only)", async () => {
+  it("a participant who already LEFT the meeting can still read its summary (MeetingParticipant is a permanent attendance record)", async () => {
     const userA = await createUser();
     const userB = await createUser();
     const meeting = await createMeeting({ caller: userA._id, users: [userA._id, userB._id] });
+    // userB actually joined and later left — recorded via MeetingParticipant
+    // (joinedAt set, leftAt set), the real attendance record. Leaving never
+    // deletes this row (callHistoryService only ever updates leftAt), so
+    // past attendance remains provable/authorized after departure.
+    await MeetingParticipant.create({
+      meeting: meeting._id,
+      user: userB._id,
+      joinedAt: new Date('2026-01-01T10:05:00Z'),
+      leftAt: new Date('2026-01-01T10:10:00Z'),
+    });
     await MeetingTranscript.create({
       meeting: meeting._id,
       transcript: 'word '.repeat(200),
@@ -336,9 +365,6 @@ describe('Meeting-scoped summary access — participant history, not presence or
       status: 'SUMMARIZED',
     });
 
-    // userB "left" — nothing in this codebase removes a user from
-    // Meeting.users on leave (mediasoup/index.js's leaveRoom only $pulls
-    // `peers`, the live-socket list); this simulates that by construction.
     const res = await request(app)
       .get(`/api/meeting/${meeting._id}/summary`)
       .set('Authorization', `Bearer ${tokenFor(userB)}`);
@@ -347,14 +373,14 @@ describe('Meeting-scoped summary access — participant history, not presence or
     expect(res.body.summary).toBe('done summary');
   });
 
-  it('a participant who joined for only 1 second (still just one entry in Meeting.users) can read the summary', async () => {
+  it('a participant who joined for only 1 second can still read the summary', async () => {
     const userA = await createUser();
     const userC = await createUser();
-    // Meeting.users has no join/leave timestamps — a 1-second visit and a
-    // full-meeting attendance are indistinguishable in the data model,
-    // which is exactly the point: presence duration is irrelevant to
+    // A 1-second visit and a full-meeting attendance both produce exactly
+    // one MeetingParticipant row — presence duration is irrelevant to
     // summary-access authorization, only "did they ever join" is.
     const meeting = await createMeeting({ caller: userA._id, users: [userA._id, userC._id] });
+    await recordAttendance(meeting._id, userC._id);
     await MeetingTranscript.create({
       meeting: meeting._id,
       transcript: 'word '.repeat(200),
@@ -451,6 +477,8 @@ describe('POST /api/meeting/:id/summarize — duplicate generation prevention', 
     const user = await createUser();
     const other = await createUser();
     const meeting = await createMeeting({ caller: user._id, users: [user._id, other._id] });
+    await recordAttendance(meeting._id, user._id);
+    await recordAttendance(meeting._id, other._id);
     await MeetingTranscript.create({
       meeting: meeting._id,
       transcript: 'word '.repeat(200),
@@ -488,6 +516,8 @@ describe('POST /api/meeting/:id/summarize — duplicate generation prevention', 
     const userA = await createUser();
     const userB = await createUser();
     const meeting = await createMeeting({ caller: userA._id, users: [userA._id, userB._id] });
+    await recordAttendance(meeting._id, userA._id);
+    await recordAttendance(meeting._id, userB._id);
     // Pre-seed a transcript (as if userA already recorded+transcribed) so
     // both requests go straight to the summarize step, maximizing the race
     // window on generateMeetingSummary itself rather than on transcription.
