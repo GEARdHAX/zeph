@@ -1,4 +1,5 @@
 import IO from 'socket.io-client';
+import jwtDecode from 'jwt-decode';
 import { setGlobal, getGlobal } from 'reactn';
 import { toast } from 'react-toastify';
 import { PhoneIncoming, Users, ShieldOff, UserPlus, UserCheck } from 'lucide-react';
@@ -9,6 +10,8 @@ import store from '../store';
 import getRooms from './getRooms';
 import syncMessages from './syncMessages';
 import markMessageRead from './markMessageRead';
+import message from './message';
+import { outboxGetAllForUser, outboxDelete, outboxIncrementRetry } from '../lib/outboxDb';
 import messageSound from '../assets/message.mp3';
 import socketPromise from '../lib/socket.io-promise';
 import getMediaCategory from '../lib/mediaType';
@@ -260,6 +263,72 @@ export const disconnectIO = () => {
   }
 };
 
+// Max in-flight outbox sends at once on a reconnect/initial-load flush — a
+// user who was offline for a while could have many pending messages;
+// sending them all concurrently would both flood the server (Section 38,
+// bypassing nothing — the existing per-user rate limiter in message.js
+// still applies to every one of these) and risk out-of-order arrival
+// within the same room (Section 16). Sequential-per-room is the simplest
+// way to preserve that ordering without inventing a second protocol.
+const OUTBOX_FLUSH_CONCURRENCY = 3;
+
+// Retries every message still sitting in this account's durable outbox —
+// left behind by a closed tab/lost network before the original
+// retryWithBackoff attempt (BottomBar.jsx) finished. Reuses the exact same
+// POST /api/message + clientID the original send used, so the server's
+// existing {room,author,clientID} uniqueness guarantee (Message.js) is
+// what actually prevents a duplicate if the first attempt secretly
+// succeeded — this function does not need its own dedup logic.
+export const flushPendingOutbox = async (userId) => {
+  if (!userId) return;
+  const pending = await outboxGetAllForUser(userId).catch(() => []);
+  if (!pending.length) return;
+
+  const sendOne = async (record) => {
+    try {
+      const res = await message({
+        roomID: record.roomID,
+        content: record.content,
+        type: record.type,
+        clientID: record.clientID,
+      });
+      store.dispatch({
+        type: Actions.MESSAGE_UPDATE,
+        clientID: record.clientID,
+        patch: { _id: res.data.message._id, status: 'sent' },
+      });
+      await outboxDelete(record.clientID);
+    } catch (err) {
+      // A 4xx here (other than 429) means the request is permanently
+      // invalid (e.g. the room was deleted while offline) — matches
+      // retryWithBackoff's own non-retryable classification, so the record
+      // is dropped rather than retried forever on every future reconnect.
+      const status = err?.response?.status;
+      if (status >= 400 && status < 500 && status !== 429) {
+        store.dispatch({ type: Actions.MESSAGE_UPDATE, clientID: record.clientID, patch: { status: 'failed' } });
+        await outboxDelete(record.clientID).catch(() => {});
+      } else {
+        await outboxIncrementRetry(record.clientID).catch(() => {});
+      }
+    }
+  };
+
+  // Bounded-concurrency queue, sequential within a room (ordering), parallel
+  // across different rooms (throughput) — grouping by roomID keeps same-room
+  // sends in their original order without serializing everything globally.
+  const byRoom = new Map();
+  pending.forEach((record) => {
+    if (!byRoom.has(record.roomID)) byRoom.set(record.roomID, []);
+    byRoom.get(record.roomID).push(record);
+  });
+  const roomQueues = Array.from(byRoom.values()).map((records) =>
+    records.reduce((chain, record) => chain.then(() => sendOne(record)), Promise.resolve()),
+  );
+  for (let i = 0; i < roomQueues.length; i += OUTBOX_FLUSH_CONCURRENCY) {
+    await Promise.all(roomQueues.slice(i, i + OUTBOX_FLUSH_CONCURRENCY));
+  }
+};
+
 const initIO = (token) => (dispatch) => {
   if (activeSocket) activeSocket.disconnect();
 
@@ -277,6 +346,24 @@ const initIO = (token) => (dispatch) => {
   io.on('authenticated', () => {
     console.log('IO authenticated');
     dispatch({ type: Actions.IO_INIT, io });
+
+    // Flush the durable outbox on EVERY authenticate, not just a
+    // reconnect — unlike the incoming-message resync below, a pending
+    // outbox entry can predate this page load entirely (left behind by a
+    // tab that closed before its send completed), so it needs retrying on
+    // first load too, not only after a drop. Decoded straight from the
+    // token this closure already has, not reactn's `user` global — at
+    // least one initIO() call site (init.js) dispatches before that global
+    // is guaranteed set, which would otherwise make the very first flush
+    // after a page reload silently no-op.
+    let currentUserId;
+    try {
+      const decoded = jwtDecode(token);
+      currentUserId = decoded && decoded.id;
+    } catch (e) {
+      currentUserId = undefined;
+    }
+    flushPendingOutbox(currentUserId).catch((err) => console.log('outbox flush failed', err));
 
     // Only resync on a *re*-authenticate (i.e. after a drop) — the first authenticate
     // on initial load has nothing to fill a gap for, and the room's initial message

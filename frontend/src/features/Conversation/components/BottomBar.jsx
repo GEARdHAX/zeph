@@ -16,6 +16,7 @@ import Actions from '../../../constants/Actions';
 import getRooms from '../../../actions/getRooms';
 import typing from '../../../actions/typing';
 import retryWithBackoff from '../../../lib/retryWithBackoff';
+import { outboxPut, outboxDelete } from '../../../lib/outboxDb';
 import draftReply from '../../../actions/draftReply';
 import rewriteMessage from '../../../actions/rewriteMessage';
 import deleteConversation from '../../../actions/deleteConversation';
@@ -174,6 +175,14 @@ function BottomBar({ aiEnabled }) {
         clientID,
       });
 
+    // Durable outbox write happens BEFORE the network attempt — a message
+    // that only exists in Redux is gone forever if the tab closes before
+    // retryWithBackoff finishes (its own retry window is a few seconds,
+    // not "until the user comes back"). Best-effort: if IndexedDB is
+    // unavailable (Section 56), the send still proceeds exactly as before,
+    // just without close/reload recovery — never block sending on this.
+    outboxPut({ clientID, userId: user.id, roomID: room._id, content: text, type: 'text' }).catch(() => {});
+
     retryWithBackoff(sendRequest)
       .then((res) => {
         dispatch({
@@ -181,6 +190,7 @@ function BottomBar({ aiEnabled }) {
           clientID,
           patch: { _id: res.data.message._id, status: 'sent' },
         });
+        outboxDelete(clientID).catch(() => {});
         getRooms()
           .then((res2) => dispatch({ type: Actions.SET_ROOMS, rooms: res2.data.rooms }))
           .catch((err) => console.log(err));
@@ -189,6 +199,15 @@ function BottomBar({ aiEnabled }) {
         console.log(err);
         if (err.response?.data?.reason === 'SLOW_MODE') {
           toast.error('Slow mode is on — wait a moment before sending another message.');
+        }
+        // 4xx (other than 429, already excluded by retryWithBackoff) means
+        // the request itself is invalid — the outbox record would just
+        // fail the same way again on reconnect-flush, so it's removed here
+        // rather than left to retry forever. A genuine network/transient
+        // failure (no response at all) leaves the record in place for
+        // flushPendingOutbox to pick up on the next reconnect.
+        if (err.response) {
+          outboxDelete(clientID).catch(() => {});
         }
         dispatch({ type: Actions.MESSAGE_UPDATE, clientID, patch: { status: 'failed' } });
       });

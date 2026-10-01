@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import 'fake-indexeddb/auto';
+
+vi.mock('./message', () => ({ default: vi.fn() }));
+
+// eslint-disable-next-line import/first
 import {
   previewText,
   NewMessageToast,
@@ -8,7 +13,16 @@ import {
   RemovedFromGroupToast,
   FriendRequestReceivedToast,
   FriendRequestAcceptedToast,
+  flushPendingOutbox,
 } from './initIO';
+// eslint-disable-next-line import/first
+import message from './message';
+// eslint-disable-next-line import/first
+import store from '../store';
+// eslint-disable-next-line import/first
+import Actions from '../constants/Actions';
+// eslint-disable-next-line import/first
+import { outboxPut, outboxGetAllForUser, outboxClearForUser } from '../lib/outboxDb';
 
 describe('previewText — message toast preview text', () => {
   it('shows the real text content for a text message, not a generic label', () => {
@@ -185,5 +199,105 @@ describe('RemovedFromGroupToast', () => {
     render(<RemovedFromGroupToast groupName={null} reason="removed" actorName={null} />);
 
     expect(screen.getByText('Group')).toBeInTheDocument();
+  });
+});
+
+describe('flushPendingOutbox — reconnect/first-load retry of the durable outbox', () => {
+  const USER_ID = 'user-flush-1';
+
+  beforeEach(async () => {
+    message.mockReset();
+    // Isolation by owner, not by swapping the IndexedDB factory — same
+    // reasoning as BottomBar.test.jsx: outboxDb.js's cached module-scope
+    // connection must stay attached to the same underlying data across
+    // tests in this file, or writes silently go to a disconnected instance.
+    await outboxClearForUser(USER_ID);
+    await outboxClearForUser('someone-else');
+  });
+
+  it('does nothing when the outbox is empty', async () => {
+    await flushPendingOutbox(USER_ID);
+    expect(message).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when userId is missing (never flush under an unknown account)', async () => {
+    await outboxPut({ clientID: 'c-no-user', userId: USER_ID, roomID: 'r1', content: 'hi', type: 'text' });
+    await flushPendingOutbox(undefined);
+    expect(message).not.toHaveBeenCalled();
+    // Still present — nothing was flushed or dropped by the no-op call.
+    expect(await outboxGetAllForUser(USER_ID)).toHaveLength(1);
+  });
+
+  it('retries a pending message using the same clientID, removes it from the outbox, and dispatches MESSAGE_UPDATE with the server id', async () => {
+    message.mockResolvedValueOnce({ data: { message: { _id: 'server-flushed-1' } } });
+    await outboxPut({ clientID: 'c-flush-1', userId: USER_ID, roomID: 'room-1', content: 'recovered', type: 'text' });
+    // flushPendingOutbox dispatches to the real app store singleton
+    // (store.js), not an injected one — seed a matching optimistic message
+    // first so MESSAGE_UPDATE's clientID patch has a real row to land on,
+    // the same way BottomBar's own MESSAGE dispatch would have before a
+    // page reload interrupted the original send.
+    store.dispatch({
+      type: Actions.MESSAGE,
+      message: { clientID: 'c-flush-1', content: 'recovered', status: 'sending' },
+    });
+
+    await flushPendingOutbox(USER_ID);
+
+    expect(message).toHaveBeenCalledWith({
+      roomID: 'room-1',
+      content: 'recovered',
+      type: 'text',
+      clientID: 'c-flush-1',
+    });
+    expect(await outboxGetAllForUser(USER_ID)).toHaveLength(0);
+    await waitFor(() => {
+      const updated = store.getState().io.messages.find((m) => m.clientID === 'c-flush-1');
+      expect(updated).toMatchObject({ _id: 'server-flushed-1', status: 'sent' });
+    });
+  });
+
+  it('keeps a message in the outbox on a transient failure (no response) for the next flush to retry', async () => {
+    message.mockRejectedValueOnce(new Error('network down'));
+    await outboxPut({ clientID: 'c-flush-2', userId: USER_ID, roomID: 'room-1', content: 'still trying', type: 'text' });
+
+    await flushPendingOutbox(USER_ID);
+
+    const pending = await outboxGetAllForUser(USER_ID);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].retryCount).toBe(1);
+  });
+
+  it('drops a message on a permanent (4xx, non-429) failure instead of retrying it forever', async () => {
+    const permanentError = new Error('forbidden');
+    permanentError.response = { status: 403, data: {} };
+    message.mockRejectedValueOnce(permanentError);
+    await outboxPut({ clientID: 'c-flush-3', userId: USER_ID, roomID: 'room-1', content: 'rejected', type: 'text' });
+
+    await flushPendingOutbox(USER_ID);
+
+    expect(await outboxGetAllForUser(USER_ID)).toHaveLength(0);
+  });
+
+  it('keeps a message in the outbox on a 429 (rate limited) for the next flush to retry', async () => {
+    const rateLimitError = new Error('rate limited');
+    rateLimitError.response = { status: 429, data: {} };
+    message.mockRejectedValueOnce(rateLimitError);
+    await outboxPut({ clientID: 'c-flush-4', userId: USER_ID, roomID: 'room-1', content: 'try later', type: 'text' });
+
+    await flushPendingOutbox(USER_ID);
+
+    expect(await outboxGetAllForUser(USER_ID)).toHaveLength(1);
+  });
+
+  it('only flushes the given user\'s own pending messages, never another account\'s', async () => {
+    await outboxPut({ clientID: 'c-other-user', userId: 'someone-else', roomID: 'room-2', content: 'not mine', type: 'text' });
+    await outboxPut({ clientID: 'c-flush-5', userId: USER_ID, roomID: 'room-1', content: 'mine', type: 'text' });
+    message.mockResolvedValue({ data: { message: { _id: 'server-flushed-5' } } });
+
+    await flushPendingOutbox(USER_ID);
+
+    expect(message).toHaveBeenCalledTimes(1);
+    expect(message).toHaveBeenCalledWith(expect.objectContaining({ clientID: 'c-flush-5' }));
+    expect(await outboxGetAllForUser('someone-else')).toHaveLength(1);
   });
 });

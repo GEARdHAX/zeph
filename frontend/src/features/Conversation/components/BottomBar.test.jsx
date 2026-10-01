@@ -73,6 +73,10 @@ import uploadMedia from '../../../actions/uploadMedia';
 import deleteConversation from '../../../actions/deleteConversation';
 // eslint-disable-next-line import/first
 import { toast } from 'react-toastify';
+// eslint-disable-next-line import/first
+import 'fake-indexeddb/auto';
+// eslint-disable-next-line import/first
+import { outboxGetAllForUser, outboxClearForUser } from '../../../lib/outboxDb';
 
 const ROOM = { _id: 'room-1', people: ['user-1', 'user-2'] };
 const ME = { id: 'user-1', firstName: 'Me', lastName: 'Self' };
@@ -102,6 +106,13 @@ function renderBottomBar() {
 }
 
 beforeEach(async () => {
+  // Clears any outbox records left by a previous test — outboxDb.js caches
+  // its IndexedDB connection at module scope (intentionally, matching a
+  // real browser session), so swapping global.indexedDB per test would
+  // desync that cached connection from a fresh factory instead of actually
+  // isolating tests. Clearing by owner (ME.id) is the real app's own
+  // isolation mechanism (Section 58), reused here rather than reinvented.
+  await outboxClearForUser(ME.id);
   await setGlobal({
     ref: 'ref',
     user: ME,
@@ -192,6 +203,79 @@ describe('BottomBar offline-retry send flow', () => {
 
     expect(message).toHaveBeenCalledTimes(4);
     expect(store.getState().io.messages[0].status).toBe('failed');
+  });
+
+  it('writes the message to the durable outbox before the request resolves, then removes it once the server ACKs', async () => {
+    let resolveRequest;
+    message.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+
+    const userEv = userEvent.setup();
+    renderBottomBar();
+    const input = screen.getByRole('textbox', { name: 'Type something to send...' });
+
+    await userEv.type(input, 'durable please');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    });
+
+    // Present in the outbox while the request is still in flight — this is
+    // the actual close-the-tab-now protection; it must be written before
+    // the network call settles, not after.
+    const pendingDuringFlight = await outboxGetAllForUser(ME.id);
+    expect(pendingDuringFlight).toHaveLength(1);
+    expect(pendingDuringFlight[0]).toMatchObject({ roomID: ROOM._id, content: 'durable please', type: 'text' });
+
+    await act(async () => {
+      resolveRequest({ data: { message: { _id: 'server-id-3' } } });
+    });
+
+    await waitFor(async () => {
+      expect(await outboxGetAllForUser(ME.id)).toHaveLength(0);
+    });
+  });
+
+  it('keeps the outbox record on a transient (no-response) failure so a later reconnect can retry it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    message.mockRejectedValue(new Error('network down'));
+
+    const userEv = userEvent.setup({ delay: null });
+    renderBottomBar();
+    const input = screen.getByRole('textbox', { name: 'Type something to send...' });
+
+    await userEv.type(input, 'will fail transiently');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000 + 2000 + 4000 + 100);
+    });
+
+    const stillPending = await outboxGetAllForUser(ME.id);
+    expect(stillPending).toHaveLength(1);
+    expect(stillPending[0].content).toBe('will fail transiently');
+  });
+
+  it('drops the outbox record on a permanent (4xx) failure instead of retrying it forever', async () => {
+    const permanentError = new Error('forbidden');
+    permanentError.response = { status: 403, data: {} };
+    message.mockRejectedValue(permanentError);
+
+    const userEv = userEvent.setup();
+    renderBottomBar();
+    const input = screen.getByRole('textbox', { name: 'Type something to send...' });
+
+    await userEv.type(input, 'will be rejected');
+    await userEv.click(screen.getByRole('button', { name: 'Send message' }));
+
+    await waitFor(async () => {
+      expect(await outboxGetAllForUser(ME.id)).toHaveLength(0);
+    });
   });
 
   it('does not send an empty message', async () => {
