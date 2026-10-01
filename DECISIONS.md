@@ -5,6 +5,60 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-048: Supersede D-009 — modest paid hosting budget approved, AWS no longer excluded — 2026-10-02
+
+**Context:** D-009 (2026-07-18) set a hard "₹0 forever, no credit card,
+ever" constraint, explicitly eliminating AWS, Azure, DigitalOcean,
+Hetzner, and Fly.io. D-045 (2026-09-01) later documented an Azure B1s VM
+as an approved time-boxed exception to that rule — but that VM was never
+actually provisioned; D-045 describes a plan that was written, not
+executed. In practice, every backend deploy since has been on PaaS hosts
+(Render, briefly Heroku) that cannot run mediasoup at all (confirmed
+again in this pass, same root cause already documented in
+`infra/render.md`: a PaaS dyno/service exposes exactly one public port,
+and mediasoup needs its own raw UDP/TCP port range for WebRTC media) — so
+no deployment has ever actually had working voice/video calling.
+
+**What changed:** The owner now has a debit card available and a GitHub
+Student dev-pack credit (~$13/month for 24 months). The "no credit card,
+ever" constraint was a project-level policy choice, not a reflection of
+what the owner could personally afford — now that it no longer applies,
+there's no reason to keep architecting around it, especially since doing
+so has concretely blocked calling from ever working in any real
+deployment.
+
+**Decision:** D-009 is superseded. AWS is no longer excluded. A modest
+recurring budget (roughly the size of the dev-pack credit) is acceptable
+in exchange for a real VM with SSH access and control over the port
+range — the one thing no PaaS host in this project's history has been
+able to provide, and the actual blocker for mediasoup calling specifically
+(not a cost problem; a networking-model problem).
+
+**Options considered:**
+- Keep hunting for a free-forever host with SSH + open ports (Serv00
+  remains the only one found; registration has been closed with no
+  reopening ETA since D-010).
+- Accept a small paid VM. Chosen — removes the search entirely and
+  finally makes calling possible, which $0-hunting across six-plus
+  providers (Glitch, Render, Serv00, Azure-planned-but-unbuilt, Heroku)
+  has not achieved across this project's whole history.
+
+**Trade-off:** Real recurring cost for the first time (previously $0 or
+time-boxed free credits only). Scoped deliberately: one modest VM, not a
+blank check — CLAUDE.md's updated Cost Architecture section still warns
+against adding paid infrastructure beyond what's needed to run the app.
+
+**Not yet done:** no VM has been provisioned under this decision yet.
+Render (`api.zephchat.tech`) remains the live backend, API-only, exactly
+as before. This decision only removes the policy blocker; the actual
+migration to a VM with mediasoup enabled is a separate, future piece of
+work.
+
+**Files changed:** `CLAUDE.md` (Zero-Cost Architecture section rewritten
+as "Cost Architecture — Modest Paid Budget Approved").
+
+---
+
 ## D-047: Zeph AI Phases 10-14 — frontend integration, observability, load testing, hardening, Meeting AI — 2026-09-05
 
 **Context:** D-046 shipped the backend governance pipeline (gateway,
