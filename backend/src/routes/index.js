@@ -1,28 +1,39 @@
 const router = require('express').Router();
 const passport = require('passport');
 const Config = require('../../config');
-const inviteRateLimit = require('../lib/inviteRateLimit');
+const { createTokenBucketLimiter, KeyResolvers } = require('../lib/createTokenBucketLimiter');
 const zeroTrust = require('../lib/zeroTrust');
 const { sensorAuth } = require('../lib/sensorAuth');
 const sensorRateLimit = require('../lib/sensorRateLimit');
 
 const jwtAuth = passport.authenticate('jwt', { session: false }, null);
-const inviteCreateLimit = inviteRateLimit({ max: 20, windowMs: 60 * 60 * 1000, keyPrefix: 'invite:create' });
-const invitePreviewLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'invite:preview' });
-const inviteAcceptLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'invite:accept' });
+// Distributed Redis token-bucket rate limiting (see docs/RATE-LIMITING.md)
+// — replaces the hand-rolled single-process Map-based inviteRateLimit.js
+// (removed). Policy numbers (capacity/refillRate) live in
+// lib/rateLimitPolicy.js, carried over unchanged from each of these
+// limiters' old (max, windowMs) pair — see that file's own comment on the
+// conversion. keyResolver is chosen per route based on where each limiter
+// actually sits in its route's middleware chain relative to auth, not
+// assumed — see each route mount below.
+const inviteCreateLimit = createTokenBucketLimiter({ policyName: 'INVITE_CREATE', keyResolver: KeyResolvers.byUser });
+// Unauthenticated (preview is a public share-link landing page) — must key
+// by IP, there is no user identity available here.
+const invitePreviewLimit = createTokenBucketLimiter({ policyName: 'INVITE_PREVIEW', keyResolver: KeyResolvers.byIp });
+const inviteAcceptLimit = createTokenBucketLimiter({ policyName: 'INVITE_ACCEPT', keyResolver: KeyResolvers.byUser });
 // Phase 4 — one sensor can send at most 60 batches/min (a bpftrace-backed
 // sensor batches on a several-second interval per spec section 17, so this
 // is generous headroom, not a tight budget); globally, 20 sensors' worth of
 // that same rate — matches spec section 55's "1/10/100 sensors" load shape
 // without pre-provisioning for 100 on day one (raise if real fleet size
-// approaches it).
+// approaches it). Untouched by this migration — a genuinely separate
+// subsystem (sensorId identity, not userId/IP) kept on its own limiter.
 const sensorEventsLimit = sensorRateLimit({ perSensorMax: 60, globalMax: 1200, windowMs: 60 * 1000 });
 // Phase 6 — manual AI analysis is admin-only already, but still rate-
 // limited per admin (spec section 48: "do not let users submit arbitrary
 // massive data... use rate limiting") — an LLM call is expensive
 // (latency, resource contention with the automated BullMQ pipeline), so
 // even a trusted admin is bounded to a modest rate, not unlimited.
-const aiAnalyzeLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'security-ai:analyze' });
+const aiAnalyzeLimit = createTokenBucketLimiter({ policyName: 'SECURITY_AI_ANALYZE', keyResolver: KeyResolvers.byUser });
 // Phase 7 audit finding: message-send previously had no dedicated rate
 // limiter — only the generic apiLimiter fallback (300 req/15min, shared
 // across every /api route not otherwise covered), which is far too loose
@@ -30,25 +41,34 @@ const aiAnalyzeLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix
 // any real conversational pace (a burst of rapid replies, pasting a long
 // message split by the client, etc.) while still bounding a scripted
 // flood.
-const messageSendLimit = inviteRateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'message:send' });
-const messageSearchLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'message:search' });
+const messageSendLimit = createTokenBucketLimiter({ policyName: 'MESSAGE_SEND', keyResolver: KeyResolvers.byUser });
+const messageSearchLimit = createTokenBucketLimiter({ policyName: 'MESSAGE_SEARCH', keyResolver: KeyResolvers.byUser });
 // A report is a serious, infrequent user action — a real user files a
 // handful a day at most. Kept tight mainly to stop scripted mass-reporting
 // (harassment via false reports, or flooding the admin queue).
-const reportCreateLimit = inviteRateLimit({ max: 10, windowMs: 60 * 60 * 1000, keyPrefix: 'report:create' });
+const reportCreateLimit = createTokenBucketLimiter({ policyName: 'REPORT_CREATE', keyResolver: KeyResolvers.byUser });
 // Passwordless login is unauthenticated and does a username lookup + a
 // WebAuthn verify per call — bound both the enumeration surface and the
 // verify cost. 20/min per IP is far above any human sign-in cadence.
-const passkeyLoginLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'passkey:login' });
+const passkeyLoginLimit = createTokenBucketLimiter({ policyName: 'PASSKEY_LOGIN', keyResolver: KeyResolvers.byIp });
 // Meeting invites get their own budget, separate from friend/group invites
 // above — a meeting invite is meant to be short-lived and created more
 // often per session (e.g. a new link per call), so sharing invite:create's
 // budget would make ordinary meeting use trip the same limiter as a
 // friend-invite spam attempt. Token validation/acceptance especially must
 // resist brute-force guessing (spec §19) — kept tight per requester.
-const meetingInviteCreateLimit = inviteRateLimit({ max: 20, windowMs: 60 * 60 * 1000, keyPrefix: 'meeting-invite:create' });
-const meetingInvitePreviewLimit = inviteRateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'meeting-invite:preview' });
-const meetingInviteAcceptLimit = inviteRateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'meeting-invite:accept' });
+const meetingInviteCreateLimit = createTokenBucketLimiter({
+  policyName: 'MEETING_INVITE_CREATE',
+  keyResolver: KeyResolvers.byUser,
+});
+const meetingInvitePreviewLimit = createTokenBucketLimiter({
+  policyName: 'MEETING_INVITE_PREVIEW',
+  keyResolver: KeyResolvers.byIp,
+});
+const meetingInviteAcceptLimit = createTokenBucketLimiter({
+  policyName: 'MEETING_INVITE_ACCEPT',
+  keyResolver: KeyResolvers.byUser,
+});
 
 // Zero Trust (Phase 2) — mounted AFTER jwtAuth, same middleware-chain
 // position every rate limiter already occupies. Only on the routes

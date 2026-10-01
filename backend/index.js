@@ -129,6 +129,19 @@ app.use('/meeting/*', express.static(`${__dirname}/../frontend/dist`));
 const server = http.createServer(app);
 store.app = app;
 store.config = Config;
+
+// Fail fast on a misconfigured RATE_LIMIT_* env var (zero/negative/NaN
+// capacity or refill rate) — better to crash at boot than discover a
+// broken rate-limit policy on the first real request in production.
+{
+  const { validateAllPolicies } = require('./src/lib/rateLimitPolicy');
+  try {
+    validateAllPolicies();
+  } catch (err) {
+    logger.error({ err }, 'Invalid rate limit policy configuration — refusing to start');
+    process.exit(1);
+  }
+}
 // Socket.IO's engine.io transport does its own CORS check, independent of
 // Express's cors() middleware above — without this, the initial polling/
 // websocket handshake is rejected as cross-origin before any app-level auth
@@ -288,6 +301,7 @@ const gracefulShutdown = async (signal) => {
     const { closeSensorDedupConnection } = require('./src/services/ebpf/sensorEventDedup');
     const { closeNetworkIntelConnection } = require('./src/services/networkIntel/cache');
     const { closeSecurityAiCacheConnection } = require('./src/services/securityAi/cache');
+    const { closeRateLimitConnection } = require('./src/lib/rateLimitClient');
     await Promise.all([
       closeQueueConnection(),
       closeRedisAdapterConnections(),
@@ -297,6 +311,7 @@ const gracefulShutdown = async (signal) => {
       closeSensorDedupConnection(),
       closeNetworkIntelConnection(),
       closeSecurityAiCacheConnection(),
+      closeRateLimitConnection(),
     ]);
 
     // 6. Close Mongo.

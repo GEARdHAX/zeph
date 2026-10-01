@@ -3,7 +3,7 @@ const logger = require('./logger');
 const events = require('./events');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
+const { createTokenBucketLimiter, KeyResolvers } = require('./lib/createTokenBucketLimiter');
 const router = require('./routes');
 const formidableMiddleware = require('express-formidable');
 const mongoose = require('mongoose');
@@ -19,8 +19,6 @@ const Meeting = require('./models/Meeting');
 const Room = require('./models/Room');
 const GroupMember = require('./models/GroupMember');
 const { broadcastPresence } = require('./presence');
-const SecurityEventService = require('./services/securityEventService');
-const securityEventContext = require('./utils/securityEventContext');
 
 // Wires the Socket.IO connection/auth lifecycle onto store.io. Split out from the default
 // export so tests can boot just the socket layer without also connecting to Mongo / mounting
@@ -173,87 +171,39 @@ module.exports = (mediasoupEnabled) => {
 
   store.app.use(cors({ origin: store.config.corsOrigin }));
 
-  // Shared 429 handler — express-rate-limit's `handler` option fully
-  // replaces its own default response-sending, so this both records a
-  // RATE_LIMIT_TRIGGERED event AND sends the same JSON body every limiter
-  // below previously produced via `message:` (that option becomes inert
-  // once `handler` is set, so the body is reproduced here explicitly rather
-  // than left to silently change). limiterName identifies which budget was
-  // hit — useful once more than one limiter exists, which is already true.
-  const rateLimitHandler = (limiterName, body) => (req, res) => {
-    SecurityEventService.record({
-      type: 'RATE_LIMIT_TRIGGERED',
-      severity: 'medium',
-      actor: req.user ? { userId: req.user.id } : {},
-      source: securityEventContext(req),
-      target: { resource: req.originalUrl, action: limiterName },
-      result: 'blocked',
-      metadata: { limiter: limiterName },
-    });
-    res.status(429).json(body);
-  };
-
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: rateLimitHandler('auth', { status: 'error', message: 'Too many requests, please try again later.' }),
-  });
-  const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 300,
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: rateLimitHandler('api', { status: 'error', message: 'Too many requests, please try again later.' }),
-  });
+  // Distributed Redis token-bucket rate limiting (see docs/RATE-LIMITING.md)
+  // — replaces express-rate-limit's in-memory MemoryStore, which was
+  // process-local (reset on every deploy/restart, and gave N× the intended
+  // budget across N backend instances). All six limiters below run BEFORE
+  // passport.initialize() in this middleware chain, so req.user is never
+  // populated yet at this point — every one of them keys by IP
+  // (KeyResolvers.byIp), never by user, regardless of whether the routes
+  // they guard are "logically" authenticated ones. SecurityEventService
+  // recording and the 429 response shape are both handled internally by
+  // createTokenBucketLimiter — no per-limiter handler needed any more.
+  const authLimiter = createTokenBucketLimiter({ policyName: 'AUTH', keyResolver: KeyResolvers.byIp });
+  const apiLimiter = createTokenBucketLimiter({ policyName: 'API', keyResolver: KeyResolvers.byIp });
   // AI calls are slow and resource-intensive (even against a local model) — a much
   // tighter budget than general API traffic.
-  const aiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 15,
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: rateLimitHandler('ai', { status: 'error', message: 'AI request limit reached, please try again later.' }),
-  });
+  const aiLimiter = createTokenBucketLimiter({ policyName: 'AI', keyResolver: KeyResolvers.byIp });
   // Username search/profile-resolution/friend-requests/new-conversation-with-a-
   // stranger are the enumeration + unsolicited-contact abuse surface (username
   // brute-forcing, mass friend-request spam, spamming DMs at strangers) —
   // tighter than general API traffic, looser than auth since search is used
   // interactively while typing.
-  const discoveryLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: rateLimitHandler('discovery', { status: 'error', message: 'Too many requests, please try again later.' }),
-  });
+  const discoveryLimiter = createTokenBucketLimiter({ policyName: 'DISCOVERY', keyResolver: KeyResolvers.byIp });
   // Deletion is a mutation on data that already exists (not spam-creation),
   // so this is deliberately looser than discoveryLimiter — but still bounded
   // against a buggy client or script hammering delete on every message in a
   // long thread.
-  const deleteLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 60,
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: rateLimitHandler('delete', { status: 'error', message: 'Too many requests, please try again later.' }),
-  });
+  const deleteLimiter = createTokenBucketLimiter({ policyName: 'DELETE', keyResolver: KeyResolvers.byIp });
   // PIN brute-force is the real risk on vault unlock — a 4-12 digit PIN has
   // far less entropy than a password, so this is materially tighter than
   // authLimiter's 20/15min despite being conceptually similar ("prove who
   // you are"). Covers both unlock paths (PIN verify, passkey assertion
   // verify) — either one is the attacker's target, not just one of them.
-  const vaultUnlockLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 8,
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: rateLimitHandler('vault_unlock', {
-      status: 'error',
-      message: 'Too many vault unlock attempts, please try again later.',
-    }),
-  });
+  // Fails closed on a Redis outage (see rateLimitPolicy.js's FAIL_CLOSED set).
+  const vaultUnlockLimiter = createTokenBucketLimiter({ policyName: 'VAULT_UNLOCK', keyResolver: KeyResolvers.byIp });
   store.app.use(
     ['/api/login', '/api/register', '/api/auth/change', '/api/auth/code', '/api/auth/verify', '/api/check-user'],
     authLimiter,

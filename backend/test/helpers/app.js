@@ -16,12 +16,23 @@ store.io = {
   to: () => ({ emit: () => {} }),
   emit: () => {},
 };
-// Never let tests touch a real external Redis (BullMQ/Socket.IO adapter
-// both read store.config.redisUrl) — same reasoning as stubbing store.io
-// below: tests must be hermetic and never depend on/pollute real infra.
-// A dedicated test (queues/groupCleanup*.test.js) exercises the actual
+// Never let tests touch a real external Redis for BullMQ/Socket.IO adapter
+// (both read store.config.redisUrl) — same reasoning as stubbing store.io
+// below: tests must be hermetic and never depend on/pollute real infra. A
+// dedicated test (queues/groupCleanup*.test.js) exercises the actual
 // Redis-backed behavior in isolation with its own explicit connection.
-store.config = { ...config, redisUrl: null };
+//
+// rateLimitRedisUrl is the one exception, deliberately NOT null here: every
+// token-bucket-rate-limited route (lib/createTokenBucketLimiter.js) fails
+// CLOSED with no Redis — unlike every other optional Redis-backed feature
+// in this codebase, a request through buildApp() needs real rate-limiting
+// infrastructure to reach its handler at all. Falls back to null (fails
+// closed, same as production with no Redis configured) when REDIS_URL
+// genuinely isn't set, e.g. a CI environment without the secret — tests
+// that specifically need to exercise that fail-closed path override this
+// back to null themselves (see message-send-rate-limit.test.js's
+// dedicated "no Redis configured" describe block).
+store.config = { ...config, redisUrl: null, rateLimitRedisUrl: process.env.REDIS_URL || null };
 store.connected = true;
 
 passport.use(

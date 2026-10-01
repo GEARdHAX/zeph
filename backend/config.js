@@ -164,6 +164,12 @@ module.exports = {
   // group-deletion cleanup queue — both best-effort. Unset/unreachable
   // means single-process mode, never a boot crash. See DECISIONS.md D-035.
   redisUrl: process.env.REDIS_URL || null,
+  // Distributed rate limiting (lib/rateLimitClient.js) — same Redis as
+  // everything else in every real deployment; this only exists as its own
+  // key so test files can opt rate limiting alone into a real connection
+  // (it fails closed without one — see docs/RATE-LIMITING.md) without
+  // waking up BullMQ/the Socket.IO adapter/every other redisUrl consumer.
+  rateLimitRedisUrl: process.env.RATE_LIMIT_REDIS_URL || process.env.REDIS_URL || null,
   mongo: {
     uri: process.env.MONGO_URI,
     srv: (process.env.MONGO_SRV || '').toString() === 'true',
