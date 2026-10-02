@@ -1,5 +1,6 @@
 const IORedis = require('ioredis');
 const store = require('../store');
+const logger = require('../logger');
 
 // Shared BullMQ connection factory — a SEPARATE ioredis client from
 // setupRedisAdapter.js's pub/sub pair (BullMQ multiplexes blocking BRPOPLPUSH-
@@ -15,6 +16,24 @@ const getQueueConnection = () => {
   if (!store.config?.redisUrl) return null;
   if (!connection) {
     connection = new IORedis(store.config.redisUrl, { maxRetriesPerRequest: null });
+    // Every other Redis client in this app (ai/redisClient.js,
+    // lib/rateLimitClient.js, setupRedisAdapter.js) already has this — this
+    // one didn't. Without a listener, ioredis's default behavior on an
+    // 'error' event with zero listeners is to throw it as an uncaught
+    // exception, and BullMQ's own internal polling (Worker/QueueEvents
+    // re-issuing their blocking commands on a fixed short interval) was
+    // hitting this on every single poll once Redis started rejecting
+    // commands (e.g. Upstash's free-tier monthly request cap), producing
+    // hundreds of raw, unstructured ReplyError stack traces per second
+    // straight to stdout — drowning out every other log line (including
+    // this app's own structured pino output) until the underlying Redis
+    // issue cleared. This does not fix BullMQ's polling cadence itself
+    // (that's internal to the library, and backing off further than its
+    // default would slow legitimate job pickup under normal operation) —
+    // it only ensures the errors are logged once, structured, through the
+    // same pino pipeline every other Redis client already uses, instead of
+    // flooding raw stack traces.
+    connection.on('error', (err) => logger.warn({ err }, 'BullMQ Redis connection error'));
   }
   return connection;
 };
