@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import useAosScroll from '@/lib/useAosScroll';
-import useLandingPath from '@/lib/useLandingPath';
 import { usePageMeta } from '@/lib/seo';
 import { Button } from '@/components/ui/button';
 import { GlobeCdn } from '@/components/ui/cobe-globe-cdn';
@@ -103,7 +102,6 @@ function AboutHero() {
 
 function About() {
   const onScroll = useAosScroll();
-  const landingPath = useLandingPath();
   usePageMeta({
     title: 'About Zeph — built around the way conversations move',
     description:
@@ -276,13 +274,13 @@ function About() {
           </p>
           <div data-aos="fade-up" data-aos-delay="200" className="mt-12 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" className="rounded-full px-6">
-              <Link to={landingPath}>
+              <Link to="/">
                 Explore Zeph
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-full border-white/15 bg-white/[0.04] px-6 text-white hover:bg-white/10 hover:text-white">
-              <Link to={{ pathname: landingPath, hash: '#product' }}>See how it works</Link>
+              <Link to={{ pathname: '/', hash: '#product' }}>See how it works</Link>
             </Button>
           </div>
         </div>

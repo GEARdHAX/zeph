@@ -42,11 +42,16 @@ function RootRoute({ token }) {
   return <Home />;
 }
 
-// '/landing' stays reachable for logged-in users; logged-out visitors get the
-// canonical '/' (hash kept so /landing#security still lands on the section).
-function LandingRoute({ token }) {
+// Marketing pages (landing, about) are for logged-out visitors only. A logged-in
+// user is sent to '/', the app. '/landing' is a legacy alias for '/' (hash kept
+// so /landing#security still lands on the section).
+function LandingRedirect() {
   const { hash } = useLocation();
-  return token ? <Landing /> : <Navigate to={{ pathname: '/', hash }} replace />;
+  return <Navigate to={{ pathname: '/', hash }} replace />;
+}
+
+function GuestOnly({ token, children }) {
+  return token ? <Navigate to="/" replace /> : children;
 }
 
 function App() {
@@ -164,10 +169,18 @@ function App() {
       <Router>
         <NavigateRegistrar />
         <Routes>
-          {/* Public marketing landing page: '/' for logged-out visitors (see
-              RootRoute); '/landing' for logged-in ones, where '/' is the app. */}
-          <Route path="/landing" element={<LandingRoute token={token} />} />
-          <Route path="/about" element={<About />} />
+          {/* Marketing pages are logged-out only: the landing page is '/' (see
+              RootRoute), /landing is an alias, and /about redirects logged-in
+              users to the app. */}
+          <Route path="/landing" element={<LandingRedirect />} />
+          <Route
+            path="/about"
+            element={
+              <GuestOnly token={token}>
+                <About />
+              </GuestOnly>
+            }
+          />
           <Route path="/forgot-password" element={token ? <Navigate to="/" /> : <ForgotPassword />} />
           <Route path="/login" element={token ? <Navigate to="/" /> : <Login />} />
           {/* Public — reachable logged-out so a shared link/QR scan can preview

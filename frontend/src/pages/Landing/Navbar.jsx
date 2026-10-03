@@ -4,7 +4,6 @@ import { Menu, X } from 'lucide-react';
 import { BrandLogo } from '@/components/BrandLogo';
 import { ZephWordmark } from '@/components/ZephWordmark';
 import { Button } from '@/components/ui/button';
-import useLandingPath from '@/lib/useLandingPath';
 import scrollToSection from './scrollToSection';
 
 // Section links scroll in place on the landing page; from any other page
@@ -18,7 +17,7 @@ const NAV_LINKS = [
 
 // One renderer for a nav link so the desktop bar and the mobile dropdown can't
 // drift: in-page scroll on the landing page, /landing#section elsewhere.
-function NavItem({ link, pathname, onLanding, landingPath, className, activeClassName = 'text-white', idleClassName = 'text-white/60', onNavigate }) {
+function NavItem({ link, pathname, onLanding, className, activeClassName = 'text-white', idleClassName = 'text-white/60', onNavigate }) {
   if (link.to) {
     const current = pathname === link.to;
     return (
@@ -47,7 +46,7 @@ function NavItem({ link, pathname, onLanding, landingPath, className, activeClas
     );
   }
   return (
-    <Link to={{ pathname: landingPath, hash: link.href }} onClick={onNavigate} className={`${className} ${idleClassName}`}>
+    <Link to={{ pathname: '/', hash: link.href }} onClick={onNavigate} className={`${className} ${idleClassName}`}>
       {link.label}
     </Link>
   );
@@ -58,8 +57,7 @@ function NavItem({ link, pathname, onLanding, landingPath, className, activeClas
 // pattern for the logged-in product shell.
 function Navbar() {
   const { pathname } = useLocation();
-  const landingPath = useLandingPath();
-  const onLanding = pathname === '/' || pathname === '/landing';
+  const onLanding = pathname === '/';
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapperRef = useRef(null);
   const toggleRef = useRef(null);
@@ -93,7 +91,7 @@ function Navbar() {
           className="flex w-full items-center justify-between gap-4 rounded-full border border-white/10 bg-[rgba(12,12,12,0.72)] px-4 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.4)] backdrop-blur-md md:px-6"
           aria-label="Primary"
         >
-          <Link to={landingPath} className="flex shrink-0 items-center gap-2">
+          <Link to="/" className="flex shrink-0 items-center gap-2">
             <BrandLogo variant="dark" className="h-7 w-7" />
             <ZephWordmark className="text-lg font-semibold text-white" />
           </Link>
@@ -101,7 +99,7 @@ function Navbar() {
           <ul className="hidden items-center gap-8 md:flex">
             {NAV_LINKS.map((link) => (
               <li key={link.label}>
-                <NavItem link={link} pathname={pathname} onLanding={onLanding} landingPath={landingPath} className="text-sm font-medium transition-colors hover:text-white" />
+                <NavItem link={link} pathname={pathname} onLanding={onLanding} className="text-sm font-medium transition-colors hover:text-white" />
               </li>
             ))}
           </ul>
@@ -145,7 +143,6 @@ function Navbar() {
                   link={link}
                   pathname={pathname}
                   onLanding={onLanding}
-                  landingPath={landingPath}
                   onNavigate={closeMenu}
                   className="block rounded-2xl px-4 py-3 text-base font-medium transition-colors hover:bg-white/[0.06] hover:text-white"
                   idleClassName="text-white/70"
