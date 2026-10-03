@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { usePageMeta } from '@/lib/seo';
 import { useGlobal } from 'reactn';
 import { Link, useNavigate } from 'react-router-dom';
 import jwtDecode from 'jwt-decode';
@@ -46,6 +47,7 @@ const FEATURES = [
 ];
 
 function Login() {
+  usePageMeta({ title: 'Sign in — Zeph', description: 'Private page.', path: '/login', noindex: true });
   const navigate = useNavigate();
   const dispatch = useDispatch();
 

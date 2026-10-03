@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePageMeta } from '@/lib/seo';
 import Div100vh from 'react-div-100vh';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -19,6 +20,7 @@ import loginBg from '../../assets/login-bg.png';
 // in line with CLAUDE.md's sitewide-consistency rule ("Do NOT make only
 // the chat page polished... applies to authentication").
 function ForgotPassword() {
+  usePageMeta({ title: 'Reset your password — Zeph', description: 'Private page.', path: '/forgot-password', noindex: true });
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');

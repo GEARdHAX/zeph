@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePageMeta } from '@/lib/seo';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
@@ -10,6 +11,7 @@ import { previewFriendInvite, acceptFriendInvite } from '../../actions/invites';
 import Config from '../../config';
 
 function FriendInvitePreview() {
+  usePageMeta({ title: 'Friend invite — Zeph', description: 'Private page.', path: '/invite', noindex: true });
   const { token } = useParams();
   const navigate = useNavigate();
   const authToken = useGlobal('token')[0];

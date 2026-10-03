@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { getGlobal, useGlobal, setGlobal } from 'reactn';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ToastContainer, toast } from 'react-toastify';
 import jwtDecode from 'jwt-decode';
 import Home from './pages/Home';
+import Landing from './pages/Landing';
+import About from './pages/About';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import FriendInvitePreview from './pages/InvitePreview/FriendInvitePreview';
@@ -29,6 +31,22 @@ function NavigateRegistrar() {
     registerNavigate(navigate);
   }, [navigate]);
   return null;
+}
+
+// '/' is the landing page for logged-out visitors and the app for logged-in
+// ones. One catch-all route (not a separate '/' route) so <Home> stays mounted
+// as a logged-in user moves between '/' and its nested paths.
+function RootRoute({ token }) {
+  const { pathname } = useLocation();
+  if (!token) return pathname === '/' ? <Landing /> : <Navigate to="/login" />;
+  return <Home />;
+}
+
+// '/landing' stays reachable for logged-in users; logged-out visitors get the
+// canonical '/' (hash kept so /landing#security still lands on the section).
+function LandingRoute({ token }) {
+  const { hash } = useLocation();
+  return token ? <Landing /> : <Navigate to={{ pathname: '/', hash }} replace />;
 }
 
 function App() {
@@ -146,6 +164,10 @@ function App() {
       <Router>
         <NavigateRegistrar />
         <Routes>
+          {/* Public marketing landing page: '/' for logged-out visitors (see
+              RootRoute); '/landing' for logged-in ones, where '/' is the app. */}
+          <Route path="/landing" element={<LandingRoute token={token} />} />
+          <Route path="/about" element={<About />} />
           <Route path="/forgot-password" element={token ? <Navigate to="/" /> : <ForgotPassword />} />
           <Route path="/login" element={token ? <Navigate to="/" /> : <Login />} />
           {/* Public — reachable logged-out so a shared link/QR scan can preview
@@ -154,7 +176,7 @@ function App() {
           <Route path="/invite/f/:token" element={<FriendInvitePreview />} />
           <Route path="/invite/g/:token" element={<GroupInvitePreview />} />
           <Route path="/invite/m/:token" element={<MeetingInvitePreview />} />
-          <Route path="/*" element={!token ? <Navigate to="/login" /> : <Home />} />
+          <Route path="/*" element={<RootRoute token={token} />} />
         </Routes>
         {/* Sibling to <Routes>, not inside any Route — never unmounted by
             navigation, so an active call stays visible while browsing

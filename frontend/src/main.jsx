@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 // Variable font — one import covers the full weight range (400 body copy
 // through the heavy weight the "zeph." wordmark uses), so unlike the old
@@ -9,6 +9,8 @@ import ReactDOM from 'react-dom/client';
 import '@fontsource-variable/google-sans-flex';
 import './index.css';
 import { Provider } from 'react-redux';
+import AOS from 'aos';
+import 'aos/dist/aos.css';
 import App from './App';
 import * as serviceWorker from './serviceWorker';
 import init from './init';
@@ -20,6 +22,17 @@ import store from './store';
 // (keyed on data-theme being ABSENT, not just "dark") stay active even
 // when the app is rendering as light mode. See useTheme.js's own comment.
 import './lib/useTheme';
+
+// Single app-level init; elements opt in via data-aos. Reduced motion disables
+// AOS entirely, so content is simply visible.
+AOS.init({
+  duration: 700,
+  easing: 'ease-out-cubic',
+  once: true,
+  offset: 100,
+  anchorPlacement: 'top-bottom',
+  disable: () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+});
 
 init().then(() => {
   const root = ReactDOM.createRoot(document.getElementById('root'));

@@ -1,5 +1,9 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /invite/
 
-Sitemap: https://zephchat.tech/sitemap.xml
+Sitemap: https://www.zephchat.tech/sitemap.xml

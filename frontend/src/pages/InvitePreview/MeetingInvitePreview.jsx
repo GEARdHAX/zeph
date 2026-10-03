@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePageMeta } from '@/lib/seo';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
@@ -23,6 +24,7 @@ import { previewMeetingInvite, acceptMeetingInvite } from '../../actions/meeting
 // from scratch (never trusting a cached pre-auth INVITE_VALID state, per
 // spec §24).
 function MeetingInvitePreview() {
+  usePageMeta({ title: 'Meeting invite — Zeph', description: 'Private page.', path: '/invite', noindex: true });
   const { token } = useParams();
   const navigate = useNavigate();
   const authToken = useGlobal('token')[0];

@@ -284,3 +284,277 @@ code {
 .typing-dot:nth-child(3) {
   animation-delay: 0.36s;
 }
+
+/* Landing Features section (pages/Landing/Features.jsx) — the one sticky
+   product visual holds all five states as stacked layers; the active layer
+   fades/settles in while the previous one fades out (opacity + a small
+   translate/scale). Inactive layers are visibility:hidden after the fade so they
+   don't paint or animate. */
+.feature-layer {
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0s;
+}
+
+.feature-layer[data-state='off'] {
+  opacity: 0;
+  transform: translateY(6px) scale(0.985);
+  visibility: hidden;
+  pointer-events: none;
+  transition-delay: 0s, 0s, 0.55s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feature-layer,
+  .feature-layer[data-state='off'] {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Landing Security section (pages/Landing/Security.jsx) — a red dot passing
+   along each wire of the control-plane graph. Plays a few times once AOS
+   reveals the parent, then rests (no constant animation). Vertical on small
+   screens, horizontal where the graph lays out in rows. */
+.trust-signal {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  opacity: 0;
+}
+
+@keyframes trust-signal-y {
+  0% {
+    transform: translate(-50%, 0);
+    opacity: 0;
+  }
+  20%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, 18px);
+    opacity: 0;
+  }
+}
+
+@keyframes trust-signal-x {
+  0% {
+    transform: translate(0, -50%);
+    opacity: 0;
+  }
+  20%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(22px, -50%);
+    opacity: 0;
+  }
+}
+
+.sec-lane[data-lit='true'] .trust-signal {
+  animation: trust-signal-y 2.6s ease-in-out 3 both;
+  animation-delay: calc(var(--d, 0s) + 0.7s);
+}
+
+@media (min-width: 1024px) {
+  .trust-signal {
+    left: 0;
+    top: 50%;
+  }
+  .sec-lane[data-lit='true'] .trust-signal {
+    animation-name: trust-signal-x;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trust-signal {
+    display: none;
+  }
+}
+
+/* AOS (initialised once in main.jsx) is disabled under reduced motion, but
+   AOS's own stylesheet still hides [data-aos] elements until they animate in
+   — and its init-time disable can't reach elements React renders later. Force
+   them visible so no content depends on animation. */
+@media (prefers-reduced-motion: reduce) {
+  [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    pointer-events: auto !important;
+  }
+}
+
+/* About page (pages/About) — the fragmented->connected line and flow lines
+   draw when AOS reveals their parent; already in final state under reduced
+   motion. */
+.about-line-x,
+.about-line-y {
+  transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.35s;
+}
+
+.about-line-x {
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.about-line-y {
+  transform: scaleY(0);
+  transform-origin: top;
+}
+
+.aos-animate .about-line-x {
+  transform: scaleX(1);
+}
+
+.aos-animate .about-line-y {
+  transform: scaleY(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-line-x,
+  .about-line-y {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* About hero globe (pages/About/index.jsx). One sizing variable --d drives
+   both size and position, so the globe stays proportioned as the viewport
+   changes. Below lg it sits UNDER the text in a short stage, bottom-cropped
+   and faded; from lg it is positioned in the right-hand column, centred at
+   79% of the hero width and 55% of its height, sized by width but capped by
+   viewport height so it never rides up under the navbar. */
+.about-globe-stage {
+  position: relative;
+  height: clamp(340px, 56vw, 480px);
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.about-globe {
+  --d: clamp(420px, 120vw, 680px);
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: var(--d);
+  transform: translateX(-50%);
+  pointer-events: auto; /* the stage is pointer-events:none so only the globe itself catches input */
+}
+
+@media (min-width: 1024px) {
+  .about-globe-stage {
+    position: absolute;
+    inset: 0;
+    height: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .about-globe {
+    --d: clamp(520px, min(54vw, calc(92vh - 140px)), 1100px);
+    top: calc(55% - var(--d) / 2);
+    left: calc(79% - var(--d) / 2);
+    transform: none;
+  }
+}
+
+/* One motion language: AOS defaults move elements 100px; keep it to ~28px.
+   :not(.aos-animate) so the settled state is untouched and load order is moot. */
+[data-aos='fade-up']:not(.aos-animate) {
+  transform: translate3d(0, 28px, 0);
+}
+[data-aos='fade-down']:not(.aos-animate) {
+  transform: translate3d(0, -28px, 0);
+}
+[data-aos='fade-left']:not(.aos-animate) {
+  transform: translate3d(28px, 0, 0);
+}
+[data-aos='fade-right']:not(.aos-animate) {
+  transform: translate3d(-28px, 0, 0);
+}
+
+/* Security control plane (pages/Landing/Security.jsx) — lanes light up
+   progressively as they scroll into view (IntersectionObserver sets
+   data-lit); nodes stagger by --i. */
+.sec-lane .sec-node {
+  opacity: 0.3;
+  transition: opacity 0.6s ease calc(var(--i, 0) * 140ms);
+}
+
+.sec-lane[data-lit='true'] .sec-node {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sec-lane .sec-node {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+/* Features chapter 03 — the message travelling through the recovery states.
+   Plays when the layer becomes active (desktop) or its AOS wrapper reveals
+   (mobile); final state is shown outright under reduced motion. Row pitch is
+   58px (48px row + 10px gap), which the token's travel distance relies on. */
+.flow-step {
+  opacity: 0.3;
+}
+.flow-done {
+  opacity: 0;
+}
+
+@keyframes flow-lit {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes flow-travel {
+  0% {
+    transform: translateY(0);
+  }
+  31.25% {
+    transform: translateY(58px);
+  }
+  62.5% {
+    transform: translateY(116px);
+  }
+  93.75%,
+  100% {
+    transform: translateY(174px);
+  }
+}
+
+.feature-layer[data-state='on'][data-xf] .flow-step,
+.aos-animate .feature-layer:not([data-xf]) .flow-step {
+  animation: flow-lit 0.5s ease forwards;
+  animation-delay: calc(var(--i) * 1s);
+}
+
+.feature-layer[data-state='on'][data-xf] .flow-token,
+.aos-animate .feature-layer:not([data-xf]) .flow-token {
+  animation: flow-travel 3.2s ease-in-out forwards;
+}
+
+.feature-layer[data-state='on'][data-xf] .flow-done,
+.aos-animate .feature-layer:not([data-xf]) .flow-done {
+  animation: flow-lit 0.5s ease forwards;
+  animation-delay: 3.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-step,
+  .flow-done {
+    opacity: 1;
+    animation: none !important;
+  }
+  .flow-token {
+    transform: translateY(174px);
+    animation: none !important;
+  }
+}

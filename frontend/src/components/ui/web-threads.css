@@ -1,0 +1,9 @@
+/* No position/width/height here on purpose — those are the consumer's
+   responsibility via `className` (e.g. `absolute inset-0`). A hardcoded
+   `position: relative` here previously beat Tailwind's `absolute` utility
+   class in the cascade (equal specificity, this stylesheet loads after),
+   which pulled the container back into normal document flow and broke the
+   landing page's flex layout (the hero column collapsed to 0 height). */
+.web-threads-container {
+  overflow: hidden;
+}
