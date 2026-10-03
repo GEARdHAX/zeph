@@ -72,6 +72,7 @@ const startAiWorker = () => {
     return null;
   }
   const worker = new Worker(QUEUE_NAME, processSummaryJob, { connection, concurrency: 2 });
+  worker.on('error', (err) => logger.throttledWarn('zeph-ai-worker', 30000, { err }, 'zeph_ai_worker_error'));
   worker.on('failed', (job, err) =>
     logger.error(
       {

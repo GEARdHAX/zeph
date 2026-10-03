@@ -1,4 +1,5 @@
 const IORedis = require('ioredis');
+const { Queue } = require('bullmq');
 const store = require('../store');
 const logger = require('../logger');
 
@@ -11,6 +12,14 @@ const logger = require('../logger');
 // memoized so every queue/worker in this app reuses one connection instead
 // of opening a new socket each time this is required.
 let connection = null;
+
+// BullMQ's Worker/QueueEvents hold a blocking connection and retry their
+// blocking command roughly every 30ms while it keeps failing (e.g. Upstash's
+// quota-exceeded case) — a plain listener logs one warn-level line per
+// retry, ~30/sec per queue, drowning stdout even after the command-args
+// redact fix (logger.js) shrank each individual line. logger.throttledWarn
+// collapses that to one line per key per window.
+const THROTTLE_WINDOW_MS = 30000;
 
 const getQueueConnection = () => {
   if (!store.config?.redisUrl) return null;
@@ -30,12 +39,32 @@ const getQueueConnection = () => {
     // issue cleared. This does not fix BullMQ's polling cadence itself
     // (that's internal to the library, and backing off further than its
     // default would slow legitimate job pickup under normal operation) —
-    // it only ensures the errors are logged once, structured, through the
-    // same pino pipeline every other Redis client already uses, instead of
-    // flooding raw stack traces.
-    connection.on('error', (err) => logger.warn({ err }, 'BullMQ Redis connection error'));
+    // it only ensures the errors are logged once, structured (and now
+    // throttled — see throttledWarn above), through the same pino pipeline
+    // every other Redis client already uses, instead of flooding raw stack
+    // traces or a warn line per ~30ms retry.
+    connection.on('error', (err) =>
+      logger.throttledWarn('connection', THROTTLE_WINDOW_MS, { err }, 'BullMQ Redis connection error'),
+    );
   }
   return connection;
+};
+
+// BullMQ's Queue is its OWN EventEmitter, separate from the shared ioredis
+// connection above — a script/command failure (e.g. the same Redis-quota
+// exhaustion getQueueConnection's listener guards against) also emits
+// 'error' on the Queue instance itself. Every queue file
+// (aiQueue/groupCleanup/meetingAiQueue/securityAiQueue) built its own `new
+// Queue(...)` with no listener, so the exact same "unhandled EventEmitter
+// error crashes/dumps raw" failure mode applied one layer up, printing raw
+// Lua-script/command dumps straight to stdout. One shared constructor fixes
+// all four call sites at once instead of patching each file.
+const createQueue = (name, connection) => {
+  const queue = new Queue(name, { connection });
+  queue.on('error', (err) =>
+    logger.throttledWarn(`queue:${name}`, THROTTLE_WINDOW_MS, { err, queue: name }, 'BullMQ queue error'),
+  );
+  return queue;
 };
 
 // Test-only escape hatch — the Jest test harness (test/helpers/app.js) sets
@@ -66,4 +95,4 @@ const closeQueueConnection = async () => {
   }
 };
 
-module.exports = { getQueueConnection, closeQueueConnection };
+module.exports = { getQueueConnection, closeQueueConnection, createQueue };

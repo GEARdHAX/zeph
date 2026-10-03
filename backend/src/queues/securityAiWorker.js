@@ -79,6 +79,7 @@ const startSecurityAiWorker = () => {
   // actually serve concurrently, matching spec section 66's "configure
   // concurrency... do not allow infinite retries."
   const worker = new Worker(QUEUE_NAME, processIncidentAnalysis, { connection, concurrency: 2 });
+  worker.on('error', (err) => logger.throttledWarn('security-ai-worker', 30000, { err }, 'security_ai_worker_error'));
   worker.on('failed', (job, err) =>
     logger.error({ err, incidentId: job?.data?.incidentId }, 'security_ai_worker_job_failed'),
   );

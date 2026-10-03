@@ -142,7 +142,12 @@ const consumeToken = async ({ policyName, identity, capacity, refillRate, cost =
       redisAvailable: true,
     };
   } catch (err) {
-    logger.warn({ err, policyName, keyType: identity.split(':')[0] }, 'rate_limit_redis_error');
+    logger.throttledWarn(
+      `rate-limit:${policyName}`,
+      30000,
+      { err, policyName, keyType: identity.split(':')[0] },
+      'rate_limit_redis_error',
+    );
     return { allowed: false, redisAvailable: false, error: err.message };
   }
 };

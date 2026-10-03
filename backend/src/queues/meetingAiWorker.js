@@ -80,6 +80,7 @@ const startMeetingAiWorker = () => {
     return null;
   }
   const worker = new Worker(QUEUE_NAME, processMeetingJob, { connection, concurrency: 1 });
+  worker.on('error', (err) => logger.throttledWarn('meeting-ai-worker', 30000, { err }, 'meeting_ai_worker_error'));
   worker.on('failed', (job, err) =>
     logger.error(
       {

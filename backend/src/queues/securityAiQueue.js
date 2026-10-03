@@ -1,5 +1,4 @@
-const { Queue } = require('bullmq');
-const { getQueueConnection } = require('./connection');
+const { getQueueConnection, createQueue } = require('./connection');
 const logger = require('../logger');
 
 const QUEUE_NAME = 'security-ai-analysis';
@@ -13,7 +12,7 @@ let queue = null;
 const getQueue = () => {
   const connection = getQueueConnection();
   if (!connection) return null;
-  if (!queue) queue = new Queue(QUEUE_NAME, { connection });
+  if (!queue) queue = createQueue(QUEUE_NAME, connection);
   return queue;
 };
 

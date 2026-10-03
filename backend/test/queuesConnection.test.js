@@ -9,7 +9,7 @@
 // drowning out this app's own structured pino logs.
 const store = require('../src/store');
 const config = require('../config');
-const { getQueueConnection, closeQueueConnection } = require('../src/queues/connection');
+const { getQueueConnection, closeQueueConnection, createQueue } = require('../src/queues/connection');
 
 afterEach(async () => {
   await closeQueueConnection();
@@ -40,5 +40,30 @@ describe('getQueueConnection — error handling', () => {
     const first = getQueueConnection();
     const second = getQueueConnection();
     expect(first).toBe(second);
+  });
+});
+
+// Follow-up regression: BullMQ's Queue is its OWN EventEmitter, separate
+// from the shared ioredis connection above. aiQueue/groupCleanup/
+// meetingAiQueue/securityAiQueue each built `new Queue(...)` directly with
+// no 'error' listener, so the same unhandled-EventEmitter-error crash this
+// file originally guarded against also applied one layer up, at the Queue
+// level — e.g. a script/command failure (same Redis-quota-exhaustion case)
+// emits 'error' on the Queue instance itself, not just the connection.
+describe('createQueue — error handling', () => {
+  let queue;
+
+  afterEach(async () => {
+    if (queue) await queue.close();
+    queue = undefined;
+  });
+
+  it('attaches an error listener to the Queue instance, so a Queue-level error never becomes an uncaught exception', () => {
+    store.config = { ...config, redisUrl: 'redis://127.0.0.1:1' };
+    const connection = getQueueConnection();
+    queue = createQueue('test-queue', connection);
+
+    expect(queue.listenerCount('error')).toBeGreaterThan(0);
+    expect(() => queue.emit('error', new Error('simulated queue failure'))).not.toThrow();
   });
 });

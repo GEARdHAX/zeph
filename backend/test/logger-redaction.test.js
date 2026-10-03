@@ -62,3 +62,35 @@ describe('logger redaction (Phase 9 — Authorization header leak into access lo
     expect(JSON.parse(line).req.headers['user-agent']).toBe('test-agent-string');
   });
 });
+
+// Regression: a Redis command failure (e.g. the live Upstash quota
+// exhaustion) attaches the full command ioredis sent to err.command — for
+// BullMQ's own Lua scripts, err.command.args is the ENTIRE script source
+// plus every queue key name, multiple KB per occurrence. logger.warn({ err
+// }, ...) call sites across src/queues/*.js and src/lib/tokenBucket.js log
+// this shape directly, and before this fix it printed in full on every
+// single retry, flooding stdout.
+describe('logger redaction (BullMQ/ioredis command-args flood)', () => {
+  it('redacts err.command.args while keeping the error message/stack readable', () => {
+    const logLines = [];
+    // eslint-disable-next-line global-require
+    const { REDACT_CONFIG } = require('../src/logger');
+    const testLogger = pino({ redact: REDACT_CONFIG }, { write: (line) => logLines.push(line) });
+
+    testLogger.warn(
+      {
+        err: {
+          message: 'ERR max requests limit exceeded',
+          command: { name: 'eval', args: ['local rcall = redis.call -- huge lua script', 'bull:group-cleanup:meta'] },
+        },
+      },
+      'group_cleanup_worker_error',
+    );
+
+    const line = logLines[0];
+    expect(line).not.toContain('huge lua script');
+    const parsed = JSON.parse(line);
+    expect(parsed.err.command.args).toBe('[REDACTED]');
+    expect(parsed.err.message).toBe('ERR max requests limit exceeded');
+  });
+});

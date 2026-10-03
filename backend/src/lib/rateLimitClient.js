@@ -35,8 +35,14 @@ const getClient = () => {
       reconnectOnError: () => true,
       lazyConnect: true,
     });
-    client.on('error', (err) => logger.warn({ err }, 'Rate limit Redis client error'));
-    client.on('reconnecting', () => logger.info('Rate limit Redis client reconnecting'));
+    // Throttled: ioredis retries the connection on its own cadence (per
+    // retryStrategy above) while Redis stays down, so a plain listener here
+    // logs at that cadence indefinitely — same flood pattern as BullMQ's
+    // blocking-connection retries (see queues/connection.js).
+    client.on('error', (err) => logger.throttledWarn('rate-limit-client', 30000, { err }, 'Rate limit Redis client error'));
+    client.on('reconnecting', () =>
+      logger.throttledWarn('rate-limit-client-reconnecting', 30000, {}, 'Rate limit Redis client reconnecting'),
+    );
     client.connect().catch((err) => logger.warn({ err }, 'Rate limit Redis initial connect failed — will retry'));
   }
   return client;

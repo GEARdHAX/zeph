@@ -58,6 +58,11 @@ const startGroupCleanupWorker = () => {
     return null;
   }
   const worker = new Worker(QUEUE_NAME, processGroupCleanup, { connection });
+  // 'failed' only fires per-job; a Worker is its own EventEmitter and also
+  // emits 'error' for failures outside job processing (e.g. the same Redis-
+  // quota-exhaustion case connection.js's listener guards for the shared
+  // connection) — unguarded, that's an unhandled EventEmitter error.
+  worker.on('error', (err) => logger.throttledWarn('group-cleanup-worker', 30000, { err }, 'group_cleanup_worker_error'));
   worker.on('failed', (job, err) => logger.error({ err, groupId: job?.data?.groupId }, 'group_cleanup_failed'));
   logger.info('Group cleanup worker started');
   return worker;

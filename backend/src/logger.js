@@ -33,6 +33,14 @@ const REDACT_CONFIG = {
     '*.repeatPassword',
     '*.token',
     '*.code', // AuthCode's reset code
+    // ioredis attaches the full command it sent to any ReplyError, so a
+    // Redis-level failure (e.g. a quota/connection error) logs
+    // `err.command.args` verbatim — for BullMQ's own Lua scripts (moveStalled-
+    // JobsToWait, addDelayedJob, etc.) that's the ENTIRE script source plus
+    // every queue key name, multiple KB per line, repeated on every retry.
+    // Never actionable for debugging (the message/stack already identifies
+    // the failure), so it's dropped rather than kept truncated.
+    'err.command.args',
   ],
   censor: '[REDACTED]',
 };
@@ -43,5 +51,22 @@ const logger = pino({
   redact: REDACT_CONFIG,
 });
 
+// Some failure sources (BullMQ's blocking-connection retry, holding steady
+// at ~30ms while Redis stays down) call logger.warn() far faster than any
+// human reads logs — the command-args redact above shrinks each line, but
+// at that rate it's still thousands of near-identical lines per minute.
+// throttledWarn collapses repeats of the same `key` to at most one per
+// `windowMs`: still an immediate first log (never silent), then quiet until
+// the window elapses, instead of continuing at retry speed.
+const lastLoggedAt = new Map();
+const throttledWarn = (key, windowMs, obj, msg) => {
+  const now = Date.now();
+  const last = lastLoggedAt.get(key);
+  if (last && now - last < windowMs) return;
+  lastLoggedAt.set(key, now);
+  logger.warn(obj, msg);
+};
+
 module.exports = logger;
 module.exports.REDACT_CONFIG = REDACT_CONFIG;
+module.exports.throttledWarn = throttledWarn;
