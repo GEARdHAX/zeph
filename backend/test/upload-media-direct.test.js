@@ -123,6 +123,9 @@ describe('Direct-to-R2 flow (mocked storage) — presign then complete', () => {
     jest.spyOn(storage, 'deleteObject').mockImplementation(async (key) => {
       fakeR2Objects.delete(key);
     });
+    jest.spyOn(storage, 'getObjectMetadata').mockImplementation(async (key) =>
+      fakeR2Objects.has(key) ? { size: fakeR2Objects.get(key).length } : null,
+    );
   });
 
   afterEach(() => fakeR2Objects.clear());
@@ -157,6 +160,27 @@ describe('Direct-to-R2 flow (mocked storage) — presign then complete', () => {
 
     const stored = await Media.findById(presignRes.body.mediaId);
     expect(stored.status).toBe('READY');
+  });
+
+  it('rejects an object that is larger than the category limit even though the declared size was small', async () => {
+    const user = await createUser();
+    const presign = await request(app)
+      .post('/api/upload/media/presign')
+      .set('Authorization', `Bearer ${tokenFor(user)}`)
+      .send({ filename: 'photo.png', size: 1000 });
+    expect(presign.status).toBe(200);
+    expect(presign.body.storageKey).toMatch(/^private\/users\/[a-f0-9]{24}\/attachments\/[0-9a-f-]{36}\.png$/);
+
+    const oversized = Buffer.alloc(10 * 1024 * 1024 + 1, 1); // image limit is 10MB
+    await simulateClientUpload(presign.body.storageKey, oversized, 'image/png');
+
+    const complete = await request(app)
+      .post(`/api/upload/media/${presign.body.mediaId}/complete`)
+      .set('Authorization', `Bearer ${tokenFor(user)}`)
+      .send({});
+    expect(complete.status).toBe(413);
+    expect(fakeR2Objects.has(presign.body.storageKey)).toBe(false); // deleted from R2
+    expect((await Media.findById(presign.body.mediaId)).status).toBe('FAILED');
   });
 
   it("deletes the R2 object and marks FAILED when the uploaded bytes don't match the claimed category (renamed executable)", async () => {

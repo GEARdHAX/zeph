@@ -50,6 +50,20 @@ module.exports = async (req, res) => {
     return res.status(statusCode).json({ status: statusCode, error: reason });
   };
 
+  // What actually reached R2 can differ from what the client declared at presign time: check it
+  // with a HEAD (no download) before spending time/bandwidth on the object. This also closes the
+  // gap where a client declares a small size, then uploads a file over the category limit.
+  let metadata;
+  try {
+    metadata = await storage.getObjectMetadata(media.storageKey);
+  } catch (err) {
+    logger.error({ err, mediaId }, 'Failed to read uploaded object metadata');
+    return fail('STORAGE_ERROR', 500);
+  }
+  if (!metadata) return fail('OBJECT_NOT_FOUND', 404);
+  if (metadata.size > mediaPolicy.getMaxSize(media.category)) return fail('FILE_TOO_LARGE', 413);
+  media.size = metadata.size;
+
   let stream;
   try {
     stream = await storage.getObjectStream(media.storageKey);
@@ -107,6 +121,8 @@ module.exports = async (req, res) => {
     media.thumbnailKey = req.fields.posterStorageKey;
   }
 
+  // Served with this type by the CDN / media route; derived from the validated extension.
+  media.mimeType = mediaPolicy.mimeForFile(originalExtension, media.category);
   media.status = 'READY';
 
   try {

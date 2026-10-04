@@ -1,0 +1,11 @@
+{
+  "name": "zeph",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker: signed-URL edge delivery for the private zeph-uploads R2 bucket",
+  "scripts": {
+    "test": "node --test",
+    "deploy": "npx wrangler deploy"
+  }
+}

@@ -22,7 +22,7 @@ let s3Commands = null;
 const getS3 = () => {
   if (!s3Client) {
     // Lazy-required so a local-disk-only deploy never loads the SDK at all.
-    const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+    const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
     s3Client = new S3Client({
       region: 'auto',
       endpoint: process.env.R2_ENDPOINT,
@@ -31,7 +31,7 @@ const getS3 = () => {
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
       },
     });
-    s3Commands = { PutObjectCommand, GetObjectCommand, DeleteObjectCommand };
+    s3Commands = { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand };
   }
   return { client: s3Client, commands: s3Commands };
 };
@@ -131,7 +131,34 @@ const deleteObject = async (key) => {
   }
 };
 
+// { size, contentType } for an existing object, or null when it does not exist. Cheap (a HEAD):
+// used to check what a client actually uploaded straight to R2 without downloading it.
+const getObjectMetadata = async (key) => {
+  if (useObjectStorage) {
+    const { client, commands } = getS3();
+    try {
+      const res = await client.send(new commands.HeadObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }));
+      return { size: res.ContentLength, contentType: res.ContentType };
+    } catch (err) {
+      if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) return null;
+      throw err;
+    }
+  }
+
+  try {
+    const stat = await fs.promises.stat(localPathFor(key));
+    return { size: stat.size, contentType: undefined };
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw err;
+  }
+};
+
+const objectExists = async (key) => !!(await getObjectMetadata(key));
+
 module.exports = {
+  getObjectMetadata,
+  objectExists,
   useObjectStorage,
   putObject,
   getObjectStream,

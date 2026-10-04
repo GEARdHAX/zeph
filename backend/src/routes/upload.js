@@ -3,6 +3,7 @@ const sharp = require('sharp');
 const Image = require('../models/Image');
 const storage = require('../storage');
 const store = require('../store');
+const { avatarKey } = require('../storageKeys');
 const logger = require('../logger');
 const randomstring = require('randomstring');
 
@@ -43,7 +44,7 @@ module.exports = async (req, res) => {
   // the old direct-fs write this replaces which only ever worked on a
   // persistent local disk (broken on Render's ephemeral filesystem). See
   // Image.js's storageKey comment / DECISIONS.md.
-  const baseKey = `${req.user.id}/${shieldedID}.jpg`;
+  const baseKey = avatarKey(req.user.id, shieldedID);
 
   try {
     const mainBuffer = await sharp(path).rotate().toBuffer();
@@ -51,7 +52,7 @@ module.exports = async (req, res) => {
 
     await Promise.all(
       store.config.sizes.map(async (size) => {
-        const sizedKey = `${req.user.id}/${shieldedID}-${size}.jpg`;
+        const sizedKey = `${baseKey.slice(0, -4)}-${size}.jpg`;
         const dimensions = crop === 'square' ? { width: size, height: size } : { width: size };
         const resizedBuffer = await sharp(path).rotate().resize(dimensions).toBuffer();
         await storage.putObject(sizedKey, Readable.from(resizedBuffer), 'image/jpeg');

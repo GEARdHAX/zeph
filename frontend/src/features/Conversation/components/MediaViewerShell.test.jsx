@@ -244,11 +244,13 @@ describe('MediaViewerShell — new-format (message.media) audio/video/image', ()
 
   it('the Download button is disabled until the authorized fetch resolves', async () => {
     let resolveFetch;
-    axios.get.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveFetch = resolve;
-        }),
+    axios.get.mockImplementation((url) =>
+      // CDN off: the signed-URL probe is refused, so the authenticated blob request is the one we control.
+      url.endsWith('/url')
+        ? Promise.reject(Object.assign(new Error('404'), { response: { data: { error: 'CDN_NOT_AVAILABLE' } } }))
+        : new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
     );
     render(
       <MediaViewerShell messages={[AUDIO_MEDIA_MESSAGE]} initialMessage={AUDIO_MEDIA_MESSAGE} onClose={vi.fn()} />,
@@ -256,6 +258,7 @@ describe('MediaViewerShell — new-format (message.media) audio/video/image', ()
 
     expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
 
+    await waitFor(() => expect(resolveFetch).toBeDefined());
     resolveFetch({ data: new Blob(['x'], { type: 'audio/mpeg' }) });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Download' })).not.toBeDisabled());
   });

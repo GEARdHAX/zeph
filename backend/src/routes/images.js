@@ -1,6 +1,7 @@
 const fs = require('fs');
 const Images = require('../models/Image');
 const storage = require('../storage');
+const cdn = require('../cdn');
 const logger = require('../logger');
 
 module.exports = async (req, res) => {
@@ -24,6 +25,16 @@ module.exports = async (req, res) => {
   // path. See Image.js's storageKey comment.
   if (descriptor.storageKey) {
     const key = size ? `${descriptor.storageKey.slice(0, -4)}-${size}.jpg` : descriptor.storageKey;
+
+    // New-scheme public images are immutable (a changed picture is a new shieldedID, hence a new
+    // key), so hand the browser to the CDN edge instead of streaming through Node. Old keys and a
+    // disabled CDN fall through to the original streaming path below.
+    const cdnUrl = cdn.createPublicUrl(key);
+    if (cdnUrl) {
+      res.set('Cache-Control', 'public, max-age=3600');
+      return res.redirect(302, cdnUrl);
+    }
+
     try {
       const stream = await storage.getObjectStream(key);
       stream.pipe(res);

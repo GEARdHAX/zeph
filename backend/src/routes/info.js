@@ -2,6 +2,7 @@ const pkg = require('../../package.json');
 const store = require('../store');
 const { aiTextEnabled } = require('../ai/providerRouter');
 const storage = require('../storage');
+const cdn = require('../cdn');
 
 module.exports = (req, res, next) => {
   const config = store.config;
@@ -24,5 +25,7 @@ module.exports = (req, res, next) => {
     // this to choose between upload-media-presign.js's flow and the
     // original upload-media.js proxy-through-Node route. See DECISIONS.md.
     directUploadEnabled: storage.useObjectStorage,
+    // True when signed Cloudflare CDN URLs can be issued (CDN_BASE_URL + CDN_SIGNING_SECRET set).
+    cdnEnabled: cdn.isEnabled(),
   });
 };

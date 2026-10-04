@@ -73,7 +73,8 @@ describe('POST /api/upload — avatar image goes through storage.js', () => {
     expect(uploadRes.body.image.storageKey).toBeTruthy();
 
     const stored = await Image.findById(uploadRes.body.image._id);
-    expect(stored.storageKey).toMatch(new RegExp(`^${user._id}/`));
+    // public/ prefix = immutable, CDN-cacheable picture (see src/storageKeys.js)
+    expect(stored.storageKey).toMatch(new RegExp(`^public/users/${user._id}/avatar/`));
 
     const serveRes = await request(app).get(`/api/images/${stored.shieldedID}`);
     expect(serveRes.status).toBe(200);

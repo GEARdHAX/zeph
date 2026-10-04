@@ -144,6 +144,13 @@ router.get(
   passport.authenticate('jwt', { session: false }, null),
   require('./media').thumbnail,
 );
+// CDN path: same auth + room-membership check, returns a short-lived signed Cloudflare URL.
+router.get('/media/:id/url', passport.authenticate('jwt', { session: false }, null), require('./media').signedUrl);
+router.get(
+  '/media/:id/thumbnail/url',
+  passport.authenticate('jwt', { session: false }, null),
+  require('./media').thumbnailSignedUrl,
+);
 router.post('/register', require('./register'));
 router.post('/user/delete', passport.authenticate('jwt', { session: false }, null), require('./user-delete'));
 router.post('/user/edit', passport.authenticate('jwt', { session: false }, null), require('./user-edit'));

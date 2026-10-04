@@ -180,7 +180,22 @@ const isAllowedMime = (category, mimetype) => {
   return !!def && def.mimes.includes(mimetype);
 };
 
+// Exact MIME type for an extension that already passed the allowlist. Direct (presigned) uploads
+// never see a browser-supplied type, and a category's `mimes` list is not aligned with its
+// extensions, so the type served to viewers comes from here (falling back to the category's first).
+const MIME_BY_EXTENSION = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif',
+  '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+  '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.ogg': 'audio/ogg',
+  '.opus': 'audio/opus', '.weba': 'audio/webm',
+  '.pdf': 'application/pdf',
+};
+
+const mimeForFile = (extension, category) =>
+  MIME_BY_EXTENSION[(extension || '').toLowerCase()] || (MEDIA_CATEGORIES[category] && MEDIA_CATEGORIES[category].mimes[0]) || 'application/octet-stream';
+
 module.exports = {
+  mimeForFile,
   MEDIA_CATEGORIES,
   BLOCKED_EXTENSIONS,
   SecurityLevel,

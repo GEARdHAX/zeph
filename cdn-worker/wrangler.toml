@@ -1,0 +1,17 @@
+# Deploy with: npx wrangler login && npx wrangler secret put CDN_SIGNING_SECRET && npx wrangler deploy
+# The bucket stays PRIVATE: the Worker reads it through this binding, not through S3 credentials.
+name = "zeph"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "zeph-uploads"
+
+[vars]
+# Comma-separated frontend origins allowed to fetch() private files (blob/PDF/download viewers).
+# Plain <img>/<video> loads need no CORS. Public (cached) responses always use `*`.
+ALLOWED_ORIGINS = "https://zephchat.tech,https://www.zephchat.tech,http://localhost:5173"
+
+# Secret (never in this file):  npx wrangler secret put CDN_SIGNING_SECRET
+# Must equal CDN_SIGNING_SECRET on the Render backend.

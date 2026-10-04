@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
 const sharp = require('sharp');
-const randomstring = require('randomstring');
+const { attachmentKey } = require('../storageKeys');
 const Media = require('../models/Media');
 const storage = require('../storage');
 const logger = require('../logger');
@@ -92,7 +92,6 @@ module.exports = async (req, res) => {
   // eslint-disable-next-line no-control-regex
   const sanitizedName = (file.name || 'file').replace(/[\x00-\x1f/\\]/g, '').slice(0, 255);
 
-  const shield = randomstring.generate({ length: 120, charset: 'alphanumeric', capitalization: 'lowercase' });
   const media = new Media({
     uploaderId: req.user.id,
     originalName: sanitizedName,
@@ -104,7 +103,7 @@ module.exports = async (req, res) => {
   await media.save();
 
   const safeExtension = originalExtension && originalExtension.length <= 10 ? originalExtension : '.bin';
-  const storageKey = `${req.user.id}/${shield}${media._id}${safeExtension}`;
+  const storageKey = attachmentKey(req.user.id, safeExtension);
 
   try {
     await storage.putObject(storageKey, fs.createReadStream(file.path), file.type);
@@ -124,7 +123,7 @@ module.exports = async (req, res) => {
   // uploads it as a second small image alongside the main file.
   if (category === 'image') {
     try {
-      const thumbKey = `${req.user.id}/${shield}${media._id}-thumb.jpg`;
+      const thumbKey = `${storageKey}-thumb.jpg`;
       const thumbBuffer = await sharp(file.path).rotate().resize({ width: 256 }).jpeg().toBuffer();
       await storage.putObject(thumbKey, Readable.from(thumbBuffer), 'image/jpeg');
       media.thumbnailKey = thumbKey;
@@ -136,7 +135,7 @@ module.exports = async (req, res) => {
     }
   } else if (category === 'video' && poster) {
     try {
-      const thumbKey = `${req.user.id}/${shield}${media._id}-thumb.jpg`;
+      const thumbKey = `${storageKey}-thumb.jpg`;
       await storage.putObject(thumbKey, fs.createReadStream(poster.path), 'image/jpeg');
       media.thumbnailKey = thumbKey;
     } catch (err) {

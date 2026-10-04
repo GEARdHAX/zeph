@@ -1,9 +1,9 @@
 const path = require('path');
-const randomstring = require('randomstring');
 const Media = require('../models/Media');
 const storage = require('../storage');
 const logger = require('../logger');
 const mediaPolicy = require('../mediaPolicy');
+const { attachmentKey } = require('../storageKeys');
 
 // Step 1 of the direct-to-R2 upload flow (see upload-media-complete.js for
 // step 2). Only what's checkable WITHOUT the file's actual bytes runs here:
@@ -41,7 +41,6 @@ module.exports = async (req, res) => {
 
   // eslint-disable-next-line no-control-regex
   const sanitizedName = filename.replace(/[\x00-\x1f/\\]/g, '').slice(0, 255);
-  const shield = randomstring.generate({ length: 120, charset: 'alphanumeric', capitalization: 'lowercase' });
 
   const media = new Media({
     uploaderId: req.user.id,
@@ -53,7 +52,7 @@ module.exports = async (req, res) => {
   await media.save();
 
   const safeExtension = originalExtension && originalExtension.length <= 10 ? originalExtension : '.bin';
-  const storageKey = `${req.user.id}/${shield}${media._id}${safeExtension}`;
+  const storageKey = attachmentKey(req.user.id, safeExtension);
   media.storageKey = storageKey;
   await media.save();
 
@@ -75,7 +74,7 @@ module.exports = async (req, res) => {
   let posterUploadUrl = null;
   let posterStorageKey = null;
   if (poster === 'true' && category === 'video') {
-    posterStorageKey = `${req.user.id}/${shield}${media._id}-thumb.jpg`;
+    posterStorageKey = `${storageKey}-thumb.jpg`;
     posterUploadUrl = await storage.getPresignedUploadUrl(posterStorageKey, 'image/jpeg');
   }
 
