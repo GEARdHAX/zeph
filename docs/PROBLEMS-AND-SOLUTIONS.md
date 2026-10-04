@@ -68,6 +68,15 @@ About 1-2 s on a real network: a new Cloudflare session, the connection handshak
 | The `join` still hung | Render log: `util.isDate is not a function` in `nedb`. Render runs a newer Node than a laptop on Node 22; Node 23 removed those helpers; `nedb` throws inside its own callbacks where no try/catch can see it | Reading Render's server log line | `backend/src/compat/utilPolyfill.js` restores the missing helpers, loaded first in `index.js`. Tested in a fresh process with the helpers deleted, so it proves the behaviour on any Node version |
 | Passkey errors locally | The passkey ID came from the first `CORS_ORIGIN` entry (`zephchat.tech`), which a `localhost` page can't use | Reading config against the env | `VAULT_RP_ID=localhost` locally, `zephchat.tech` on Render |
 
+## Part 6: Icons and link previews
+
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| Google showed a generic globe instead of the zeph icon | Every icon file was distorted and mislabelled (`favicon-32` was 87x90, `logo192` 137x138, `logo512` 150x140, `favicon.ico` a 16 px file from 2019), and only 16/32 px favicons were declared. Google needs a square icon, a multiple of 48 px, at a crawlable URL | Redrew the mark as one vector and generated a correct set from it with `frontend/scripts/build-brand-assets.cjs`: `favicon.svg`, 16/32/48/96 px PNGs, a multi-size `favicon.ico`, 180 px apple-touch icon, 192/512 px logos and a maskable 512 px. The head declares 48 and 96 px; the manifest sizes are now true (Chrome had also warned about `logo192.png`) |
+| The link preview thumbnail cut the wordmark to "ph." | The 1200x630 card had everything on the left, and chat apps centre-crop it to a square | New card with a centred lockup (mark, wordmark, tagline) that reads whole as both a wide card and a square crop, saved as `og-zeph-v2.png` so crawlers and chat apps fetch it instead of reusing the cached old one |
+
+Google refreshes favicons on its own schedule (days to weeks); requesting indexing of the home page in Search Console speeds it up.
+
 ## What worked as a method
 
 1. **Measure before tuning.** The video-quality fix came from `getStats()` numbers, not guesses.

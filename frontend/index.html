@@ -1,4 +1,4 @@
-﻿<!doctype html>
+﻿﻿<!doctype html>
 <html lang="en">
   <head>
     <base href="./" />
@@ -6,6 +6,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400;700&display=swap" rel="stylesheet" />
+    <!-- Square icons, one vector source (scripts/build-brand-assets.cjs). Google needs a square icon whose size is a
+         multiple of 48 px (48 and 96 here) on a stable, crawlable URL; the .ico also answers the /favicon.ico probe. -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no" />
@@ -19,7 +25,8 @@
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Zeph — Connections that flow" />
     <meta property="og:description" content="Real-time chat, meetings and optional AI summaries in one connected conversation." />
-    <meta property="og:image" content="https://www.zephchat.tech/og-zeph.png" />
+    <meta property="og:image" content="https://www.zephchat.tech/og-zeph-v2.png" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Zeph — Connections that flow" />
@@ -27,7 +34,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Zeph — Connections that flow" />
     <meta name="twitter:description" content="Real-time chat, meetings and optional AI summaries in one connected conversation." />
-    <meta name="twitter:image" content="https://www.zephchat.tech/og-zeph.png" />
+    <meta name="twitter:image" content="https://www.zephchat.tech/og-zeph-v2.png" />
     <meta name="twitter:image:alt" content="Zeph — Connections that flow" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
