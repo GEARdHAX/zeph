@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGlobal } from 'reactn';
-import { Mic, Square } from 'lucide-react';
+import { Sparkles, Square } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 
@@ -99,9 +99,9 @@ function MeetingRecorder({ meetingId }) {
       onClick={recording ? stopRecording : startRecording}
       title={recording ? 'Stop recording' : 'Record meeting for an AI summary (available after the call ends)'}
       aria-label={recording ? 'Stop recording' : 'Record meeting for an AI summary'}
-      className="h-12 w-12 shrink-0 rounded-full text-white shadow-md transition-transform active:scale-95 sm:h-14 sm:w-14 bg-white/10 hover:bg-white/20"
+      className="h-11 w-11 shrink-0 rounded-full text-white shadow-md transition-transform active:scale-95 sm:h-14 sm:w-14 bg-white/10 hover:bg-white/20"
     >
-      {recording ? <Square className="h-5 w-5 text-destructive" fill="currentColor" /> : <Mic className="h-5 w-5" />}
+      {recording ? <Square className="h-5 w-5 text-destructive" fill="currentColor" /> : <Sparkles className="h-5 w-5" />}
     </Button>
   );
 }

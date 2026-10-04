@@ -1,40 +1,31 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { createStore, combineReducers } from 'redux';
-import { setGlobal } from 'reactn';
 import rtc from '../../../reducers/rtc';
 import io from '../../../reducers/io';
-import Streams from './Streams';
+import Streams, { gridShape } from './Streams';
 
-// Spotlight/grid layout bugs fixed together:
-// 1. Spotlight mode had NO visible way to switch who was spotlighted from
-//    inside the layout itself (the only thumbnail strip lived in TopBar's
-//    LittleStreams, gated behind an unrelated toggle).
-// 2. The spotlighted peer was looked up via `peer.socketID === mainPeer`
-//    where mainPeer was the whole stashed OBJECT, not a string — always
-//    false, so the tile kept rendering stale video/audio stream refs.
-// 3. setMainStream was called during render (not an effect) when nothing
-//    was yet spotlighted.
-// 4. A short last ROW in the grid stretched its tiles to fill the full row
-//    width, visibly wider than tiles in a full row above.
+// Meet-style layout: every tile carries its owner's name, a person who shares their screen gets a
+// separate "<name>'s screen" tile that takes the stage, and the tiled grid adapts to head-count
+// and screen size.
 
 const peer = (socketID, overrides = {}) => ({
   socketID,
   userID: `user-${socketID}`,
   user: { firstName: socketID, lastName: 'Peer' },
-  video: null,
-  audio: null,
-  isScreen: false,
   ...overrides,
 });
 
-const makeStore = ({ consumers, peers, myID = 'me' }) =>
+const makeStore = ({ consumers, peers, producers = [], myID = 'me', counterpart = null }) =>
   createStore(combineReducers({ rtc, io }), {
-    rtc: { producers: [], consumers, peers, counterpart: null },
+    rtc: { producers, consumers, peers, counterpart },
     io: { id: myID },
   });
+
+// jsdom has no MediaStream; the tile only needs `.isVideo` and ids for classification.
+const videoStream = (socketID, producerID) => ({ isVideo: true, socketID, producerID });
 
 const renderStreams = (store, props = {}) =>
   render(
@@ -43,83 +34,115 @@ const renderStreams = (store, props = {}) =>
     </Provider>,
   );
 
-beforeEach(async () => {
-  await setGlobal({ mainStream: null });
+describe('gridShape', () => {
+  it('tiles like Meet: 1 full, 2 side by side, 3-4 two columns, then wider', () => {
+    expect(gridShape(1, true)).toEqual({ cols: 1, rows: 1 });
+    expect(gridShape(2, true)).toEqual({ cols: 2, rows: 1 });
+    expect(gridShape(3, true)).toEqual({ cols: 2, rows: 2 });
+    expect(gridShape(4, true)).toEqual({ cols: 2, rows: 2 });
+    expect(gridShape(6, true)).toEqual({ cols: 3, rows: 2 });
+    expect(gridShape(10, true)).toEqual({ cols: 4, rows: 3 });
+  });
+
+  it('stacks two tiles on a phone and uses two columns after that', () => {
+    expect(gridShape(1, false)).toEqual({ cols: 1, rows: 1 });
+    expect(gridShape(2, false)).toEqual({ cols: 1, rows: 2 });
+    expect(gridShape(3, false)).toEqual({ cols: 2, rows: 2 });
+    expect(gridShape(5, false)).toEqual({ cols: 2, rows: 3 });
+  });
 });
 
-describe('Streams — grid mode', () => {
-  it('renders every peer as an equal-width grid tile (no stretched last-row tile)', () => {
+describe('Streams — tiled mode', () => {
+  it('shows every participant with their name', () => {
     const store = makeStore({
       consumers: ['me', 'a', 'b', 'c'],
       peers: { a: peer('a'), b: peer('b'), c: peer('c') },
     });
     renderStreams(store, { isGrid: true });
-
-    // 3 peers -> side = ceil(sqrt(3)) = 2 columns; a CSS grid keeps every
-    // tile the same size regardless of the last row having only 1 item —
-    // verified structurally here (grid-template-columns present, one
-    // container, no per-row wrapper divs with differing tile counts).
-    expect(screen.getByText('a Peer')).toBeInTheDocument();
-    expect(screen.getByText('b Peer')).toBeInTheDocument();
-    expect(screen.getByText('c Peer')).toBeInTheDocument();
+    ['a Peer', 'b Peer', 'c Peer'].forEach((name) => expect(screen.getByText(name)).toBeInTheDocument());
+    expect(screen.queryByTestId('stage')).toBeNull(); // nobody presenting: even grid, no stage
   });
 
   it('shows the waiting state with no peers', () => {
-    const store = makeStore({ consumers: ['me'], peers: {} });
-    renderStreams(store, { isGrid: true });
+    renderStreams(makeStore({ consumers: ['me'], peers: {} }), { isGrid: true });
     expect(screen.getByText('Waiting for others to join...')).toBeInTheDocument();
+  });
+
+  it('falls back to the 1:1 counterpart when the consumer list has not arrived', () => {
+    const store = makeStore({ consumers: ['me'], peers: {}, counterpart: { firstName: 'Dana', lastName: 'Lee' } });
+    renderStreams(store, { isGrid: true });
+    expect(screen.getByText('Dana Lee')).toBeInTheDocument();
+  });
+});
+
+describe('Streams — screen share', () => {
+  const sharing = () => ({
+    store: makeStore({
+      consumers: ['me', 'a', 'b'],
+      peers: { a: peer('a'), b: peer('b') },
+      producers: [
+        { producerID: 'sess/video-1', isScreen: false },
+        { producerID: 'sess/screen-1', isScreen: true },
+      ],
+    }),
+    streams: [videoStream('a', 'sess/video-1'), videoStream('a', 'sess/screen-1')],
+  });
+
+  it("puts the presenter's screen on the stage, labelled with their name, and keeps everyone else in the strip", () => {
+    const { store, streams } = sharing();
+    renderStreams(store, { isGrid: true, streams });
+
+    const stage = screen.getByTestId('stage');
+    expect(within(stage).getByText("a Peer's screen")).toBeInTheDocument();
+    // the presenter's own camera tile and the other participant stay visible, named, in the strip
+    expect(screen.getByTestId('tile-a')).toBeInTheDocument();
+    expect(screen.getByTestId('tile-b')).toBeInTheDocument();
+    expect(within(screen.getByTestId('tile-a')).getByText('a Peer')).toBeInTheDocument();
+    expect(within(screen.getByTestId('tile-b')).getByText('b Peer')).toBeInTheDocument();
+  });
+
+  it('lets you pin another tile onto the stage and unpin it again', async () => {
+    const { store, streams } = sharing();
+    const user = userEvent.setup();
+    renderStreams(store, { isGrid: true, streams });
+
+    await user.click(document.querySelector('button[title="Focus on b Peer"]'));
+    expect(within(screen.getByTestId('stage')).getByText('b Peer')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Unpin' }));
+    expect(within(screen.getByTestId('stage')).getByText("a Peer's screen")).toBeInTheDocument();
+  });
+
+  it('shows two presenters as two separately named screens', () => {
+    const streams = [videoStream('a', 'sa/screen-1'), videoStream('b', 'sb/screen-1')];
+    const store = makeStore({
+      consumers: ['me', 'a', 'b'],
+      peers: { a: peer('a'), b: peer('b') },
+      producers: [
+        { producerID: 'sa/screen-1', isScreen: true },
+        { producerID: 'sb/screen-1', isScreen: true },
+      ],
+    });
+    renderStreams(store, { isGrid: true, streams });
+    expect(screen.getByText("a Peer's screen")).toBeInTheDocument();
+    expect(screen.getByText("b Peer's screen")).toBeInTheDocument();
   });
 });
 
 describe('Streams — spotlight mode', () => {
-  // The thumbnail buttons carry a `title="Focus on X"` tooltip AND visible
-  // text content (LittleInterface's avatar-initials fallback + the bare
-  // first name) — per the ARIA accessible-name algorithm, ALL visible
-  // descendant text is concatenated and wins over `title` when both are
-  // present, so a thumbnail's real accessible name is e.g. "APa" (initials
-  // "AP" + name "a"), not the title string. Queried via a data-testid
-  // instead of fighting that concatenation — more robust than depending on
-  // exactly how AvatarFallback happens to compose initials.
-
-  it('auto-selects a peer to spotlight when none is chosen yet, showing a thumbnail strip to switch', async () => {
-    const store = makeStore({
-      consumers: ['me', 'a', 'b'],
-      peers: { a: peer('a'), b: peer('b') },
-    });
-    renderStreams(store, { isGrid: false });
-
-    // The auto-select effect fires after mount — b (most recently joined
-    // in actualPeers order) becomes the spotlight ("b Peer", the larger
-    // Interface tile's fuller name), and the thumbnail strip shows both
-    // peers (by their "Focus on X" tooltip title, queried directly on the
-    // DOM attribute rather than via accessible-name matching).
-    expect(await screen.findByText('b Peer')).toBeInTheDocument();
-    expect(document.querySelector('button[title="Focus on a"]')).not.toBeNull();
-    expect(document.querySelector('button[title="Focus on b"]')).not.toBeNull();
-  });
-
-  it('clicking a thumbnail switches the spotlighted peer', async () => {
-    const store = makeStore({
-      consumers: ['me', 'a', 'b'],
-      peers: { a: peer('a'), b: peer('b') },
-    });
+  it('spotlights the most recent person and lets you switch via the strip', async () => {
+    const store = makeStore({ consumers: ['me', 'a', 'b'], peers: { a: peer('a'), b: peer('b') } });
     const user = userEvent.setup();
     renderStreams(store, { isGrid: false });
 
-    // b is auto-selected first (see the test above).
-    await screen.findByText('b Peer');
-    await user.click(document.querySelector('button[title="Focus on a"]'));
-
-    // The main tile now shows a's full name; b is no longer the spotlight.
-    expect(await screen.findByText('a Peer')).toBeInTheDocument();
-    expect(screen.queryByText('b Peer')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('stage')).getByText('b Peer')).toBeInTheDocument();
+    await user.click(document.querySelector('button[title="Focus on a Peer"]'));
+    expect(within(screen.getByTestId('stage')).getByText('a Peer')).toBeInTheDocument();
   });
 
-  it('does not show a thumbnail strip with only one other peer (nothing to switch to)', async () => {
-    const store = makeStore({ consumers: ['me', 'a'], peers: { a: peer('a') } });
-    renderStreams(store, { isGrid: false });
-
-    await screen.findByText('a Peer'); // the spotlighted tile itself
+  it('has no strip with only one other person', () => {
+    renderStreams(makeStore({ consumers: ['me', 'a'], peers: { a: peer('a') } }), { isGrid: false });
+    expect(within(screen.getByTestId('stage')).getByText('a Peer')).toBeInTheDocument();
     expect(document.querySelector('button[title^="Focus on"]')).toBeNull();
   });
 });

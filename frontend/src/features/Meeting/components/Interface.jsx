@@ -1,8 +1,12 @@
 import { useEffect, useRef } from 'react';
+import { Monitor } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
 import Config from '../../../config';
 
-function Interface({ audio, video, peer = {}, isMaximized, isScreen }) {
+// One participant tile (a person's camera / avatar, or a shared screen). Every tile carries a
+// name tag so you always know who is who; the person tile also owns that person's <audio>.
+function Interface({ audio, video, peer = {}, isMaximized, isScreen, label, compact = false, testId }) {
   const audioRef = useRef(null);
   const videoRef = useRef(null);
 
@@ -17,9 +21,16 @@ function Interface({ audio, video, peer = {}, isMaximized, isScreen }) {
   }, [video]);
 
   const initials = `${(peer?.firstName || 'U').charAt(0)}${(peer?.lastName || '').charAt(0)}`.toUpperCase();
+  const name = label || [peer?.firstName, peer?.lastName].filter(Boolean).join(' ') || 'Guest';
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-3xl border border-border/40 bg-card/60 backdrop-blur-xl">
+    <div
+      data-testid={testId}
+      className={cn(
+        'relative flex h-full w-full items-center justify-center overflow-hidden border border-border/40 bg-card/60 shadow-sm backdrop-blur-xl',
+        compact ? 'rounded-xl' : 'rounded-2xl sm:rounded-3xl',
+      )}
+    >
       {audio && (
         <audio ref={audioRef} onLoadedMetadata={() => audioRef.current.play()} className="hidden" controls={false} />
       )}
@@ -34,9 +45,14 @@ function Interface({ audio, video, peer = {}, isMaximized, isScreen }) {
           style={{ objectFit: !isMaximized || isScreen ? 'contain' : 'cover' }}
         />
       ) : (
-        <div className="relative flex flex-col items-center justify-center gap-4 p-4 text-center">
-          <div className="absolute h-36 w-36 rounded-full bg-primary/20 blur-3xl" />
-          <Avatar className="relative h-24 w-24 border-2 border-primary/30 bg-gradient-to-br from-rose-600 to-primary text-white shadow-xl sm:h-28 sm:w-28">
+        <div className="relative flex items-center justify-center p-2">
+          <div className={cn('absolute rounded-full bg-primary/20 blur-3xl', compact ? 'h-16 w-16' : 'h-36 w-36')} />
+          <Avatar
+            className={cn(
+              'relative border-2 border-primary/30 bg-gradient-to-br from-rose-600 to-primary text-white shadow-xl',
+              compact ? 'h-9 w-9' : 'h-20 w-20 sm:h-28 sm:w-28',
+            )}
+          >
             {peer?.picture && (
               <img
                 src={`${Config.url || ''}/api/images/${peer.picture.shieldedID}/256`}
@@ -44,18 +60,24 @@ function Interface({ audio, video, peer = {}, isMaximized, isScreen }) {
                 className="aspect-square size-full object-cover"
               />
             )}
-            <AvatarFallback className="bg-transparent text-2xl font-bold text-white sm:text-3xl">
+            <AvatarFallback
+              className={cn('bg-transparent font-bold text-white', compact ? 'text-[10px]' : 'text-xl sm:text-3xl')}
+            >
               {initials}
             </AvatarFallback>
           </Avatar>
-          <div className="relative flex flex-col items-center gap-1">
-            <span className="text-sm font-bold text-foreground sm:text-base">
-              {peer?.firstName ? `${peer.firstName} ${peer.lastName || ''}` : 'Participant'}
-            </span>
-            <span className="text-xs text-muted-foreground">{audio ? 'Audio only' : 'Spectator'}</span>
-          </div>
         </div>
       )}
+
+      <div
+        className={cn(
+          'absolute flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-full bg-black/60 font-medium text-white backdrop-blur-md',
+          compact ? 'bottom-1 left-1 px-1.5 py-0.5 text-[10px]' : 'bottom-2 left-2 px-2.5 py-1 text-xs sm:bottom-3 sm:left-3 sm:text-sm',
+        )}
+      >
+        {isScreen && <Monitor className={cn('shrink-0', compact ? 'h-3 w-3' : 'h-3.5 w-3.5')} aria-hidden />}
+        <span className="truncate">{name}</span>
+      </div>
     </div>
   );
 }

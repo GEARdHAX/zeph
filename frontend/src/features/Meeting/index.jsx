@@ -13,22 +13,20 @@ import {
   Grid3x3,
   Columns2,
   Share2,
-  Menu,
+  MoreHorizontal,
   ChevronLeft,
-  ChevronUp,
-  ChevronDown,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGlobal } from 'reactn';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import Join from './components/Join';
 import AddPeers from './components/AddPeers';
 import Ringing from './components/Ringing';
 import Streams from './components/Streams';
-import LittleStreams from './components/LittleStreams';
 import MeetingRecorder from './components/MeetingRecorder';
 import ShareMeetingInvite from './components/ShareMeetingInvite';
 import callManager from '../../lib/callManager';
@@ -63,13 +61,14 @@ function Meeting() {
   // for a video call — rather than removed outright, so Streams/Interface/
   // LittleInterface's isMaximized prop plumbing stays unchanged.
   const isMaximized = true;
+  // Phones' browsers mostly cannot capture the screen; hide the button instead of failing on tap.
+  const canShareScreen = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
   // Real fullscreen state, synced both ways: toggleFullscreen() drives it,
   // and the fullscreenchange listener below catches the user exiting via
   // Esc/browser-chrome so the icon doesn't go stale.
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
   const [isGrid, setGrid] = useState(true);
-  const [topBar, setTopBar] = useState(true);
   const [acccepted, setAccepted] = useGlobal('accepted');
   const [showPanel, setShowPanel] = useGlobal('showPanel');
   const setOver = useGlobal('over')[1];
@@ -264,54 +263,7 @@ function Meeting() {
     );
   }
 
-  function TopBar({ localStream }) {
-    const localVideoRef = useRef(null);
-
-    useEffect(() => {
-      if (!localStream) return;
-      localVideoRef.current.srcObject = localStream;
-    }, [localStream]);
-
-    return (
-      <div className="z-[1000] flex h-[70px] min-h-[70px] w-full max-w-full flex-grow items-center gap-2 border-b border-border/40 bg-card/95 px-3 backdrop-blur-xl max-sm:h-[60px] max-sm:min-h-[60px]">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-          onClick={() => {
-            setShowPanel(true);
-            setOver(false);
-            navigate('/');
-          }}
-          title="Minimize to Picture-in-Picture"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <LittleStreams streams={streams} />
-        <div className="shrink-0">
-          <video
-            hidden={!video && !isScreen}
-            className="mx-0.5 h-[56px] w-[84px] scale-x-[-1] cursor-pointer rounded-xl border border-border/50 bg-black object-cover shadow-md max-sm:h-[48px] max-sm:w-[72px]"
-            onLoadedMetadata={() => localVideoRef.current.play()}
-            ref={localVideoRef}
-            playsInline
-          />
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-          onClick={() => setTopBar(!topBar)}
-          title={topBar ? 'Collapse top bar' : 'Expand top bar'}
-        >
-          {topBar ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-        </Button>
-      </div>
-    );
-  }
-
+  // Floating chevron (minimize to Picture-in-Picture) and your own preview, labelled "You".
   function TopBarTransparent({ localStream }) {
     const localVideoRef = useRef(null);
 
@@ -321,29 +273,35 @@ function Meeting() {
     }, [localStream]);
 
     return (
-      <div className="z-[1000] flex h-0 w-full items-start justify-between p-3">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex items-start justify-between p-2 sm:p-3">
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-10 w-10 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 hover:text-white"
+          className="pointer-events-auto h-10 w-10 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 hover:text-white"
           onClick={() => {
             setShowPanel(true);
             setOver(false);
             navigate('/');
           }}
           title="Minimize to Picture-in-Picture"
+          aria-label="Minimize to Picture-in-Picture"
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
         {(video || isScreen) && (
-          <video
-            hidden={!video && !isScreen}
-            className="h-[105px] w-[140px] scale-x-[-1] cursor-pointer rounded-2xl border border-white/15 bg-black object-cover shadow-2xl"
-            onLoadedMetadata={() => localVideoRef.current.play()}
-            ref={localVideoRef}
-            playsInline
-          />
+          <div className="pointer-events-auto relative h-[72px] w-[96px] overflow-hidden rounded-xl border border-white/15 bg-black shadow-2xl sm:h-[105px] sm:w-[140px] sm:rounded-2xl">
+            <video
+              className={cn('h-full w-full object-cover', !isScreen && 'scale-x-[-1]')}
+              onLoadedMetadata={() => localVideoRef.current.play()}
+              ref={localVideoRef}
+              playsInline
+              muted
+            />
+            <span className="absolute bottom-1 left-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md sm:text-xs">
+              {isScreen ? 'You · presenting' : 'You'}
+            </span>
+          </div>
         )}
       </div>
     );
@@ -363,7 +321,7 @@ function Meeting() {
         title={title}
         aria-label={title}
         className={cn(
-          'h-12 w-12 shrink-0 rounded-full shadow-md transition-transform active:scale-95 sm:h-14 sm:w-14',
+          'h-11 w-11 shrink-0 rounded-full shadow-md transition-transform active:scale-95 sm:h-14 sm:w-14',
           danger
             ? 'bg-destructive text-white hover:bg-destructive/90'
             : active
@@ -388,8 +346,7 @@ function Meeting() {
           Reconnecting…
         </div>
       )}
-      {isGrid && <TopBarTransparent localStream={localStream} />}
-      {!isGrid && topBar && <TopBar localStream={localStream} />}
+      <TopBarTransparent localStream={localStream} />
       <Streams
         isGrid={isGrid}
         streams={streams}
@@ -398,8 +355,8 @@ function Meeting() {
         isScreen={isScreen}
         isMaximized={isMaximized}
       >
-        <div className="absolute bottom-6 z-[1000] flex w-full items-center justify-center px-4 max-sm:bottom-4">
-          <div className="flex items-center gap-2 rounded-full border border-white/15 bg-black/75 p-2 shadow-2xl backdrop-blur-2xl sm:gap-2.5">
+        <div className="absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[1000] flex justify-center px-2 sm:bottom-6 sm:px-4">
+          <div className="flex max-w-full items-center gap-1.5 rounded-full border border-white/15 bg-black/75 p-1.5 shadow-2xl backdrop-blur-2xl sm:gap-2.5 sm:p-2">
             <ControlButton
               icon={video ? Video : VideoOff}
               active={video}
@@ -424,48 +381,74 @@ function Meeting() {
                       .catch(() => {})
               }
             />
-            <ControlButton
-              icon={isScreen ? XOctagon : Monitor}
-              active={isScreen}
-              title={isScreen ? 'Stop sharing screen' : 'Share screen'}
-              onClick={() =>
-                isScreen
-                  ? callManager.stopScreen()
-                  : getScreen()
-                      .then((stream) => callManager.produceScreen(stream))
-                      .catch(() => {})
-              }
-            />
-
-            <div className="mx-0.5 h-8 w-px bg-white/15" />
-
-            <ControlButton icon={PhoneOff} danger title="Leave call" onClick={close} />
-
-            {meetingAiEnabled && (
-              <>
-                <div className="mx-0.5 h-8 w-px bg-white/15" />
-                <MeetingRecorder meetingId={roomID} />
-              </>
+            {canShareScreen && (
+              <ControlButton
+                icon={isScreen ? XOctagon : Monitor}
+                active={isScreen}
+                title={isScreen ? 'Stop sharing screen' : 'Share screen'}
+                onClick={() =>
+                  isScreen
+                    ? callManager.stopScreen()
+                    : getScreen()
+                        .then((stream) => callManager.produceScreen(stream))
+                        .catch(() => {})
+                }
+              />
             )}
 
-            <div className="mx-0.5 h-8 w-px bg-white/15" />
+            {meetingAiEnabled && <MeetingRecorder meetingId={roomID} />}
 
-            <ControlButton icon={UserPlus} title="Add people" onClick={() => setAddPeers(true)} />
-            <ControlButton icon={Share2} title="Share meeting" onClick={() => setShowShareInvite(true)} />
-            <ControlButton
-              icon={isFullscreen ? Minimize : Maximize}
-              title={isFullscreen ? 'Exit fullscreen' : 'Fill screen'}
-              onClick={toggleFullscreen}
-            />
-            <ControlButton
-              icon={isGrid ? Columns2 : Grid3x3}
-              title={isGrid ? 'Switch to spotlight view' : 'Switch to grid view'}
-              onClick={() => setGrid(!isGrid)}
-            />
+            {/* Tablet/desktop: the rest of the controls sit inline. */}
+            <div className="hidden items-center gap-2.5 sm:flex">
+              <div className="mx-0.5 h-8 w-px bg-white/15" />
+              <ControlButton icon={UserPlus} title="Add people" onClick={() => setAddPeers(true)} />
+              <ControlButton icon={Share2} title="Share meeting" onClick={() => setShowShareInvite(true)} />
+              <ControlButton
+                icon={isFullscreen ? Minimize : Maximize}
+                title={isFullscreen ? 'Exit fullscreen' : 'Fill screen'}
+                onClick={toggleFullscreen}
+              />
+              <ControlButton
+                icon={isGrid ? Columns2 : Grid3x3}
+                title={isGrid ? 'Switch to spotlight view' : 'Switch to tiled view'}
+                onClick={() => setGrid(!isGrid)}
+              />
+              <div className="mx-0.5 h-8 w-px bg-white/15" />
+            </div>
+
+            {/* Phone: the rest collapse into a "More" menu so the bar always fits. */}
+            <div className="sm:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    title="More"
+                    aria-label="More"
+                    className="h-11 w-11 shrink-0 rounded-full bg-white/10 text-white shadow-md hover:bg-white/20"
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="end" sideOffset={12} className="z-[1100] min-w-48">
+                  <DropdownMenuItem onSelect={() => setAddPeers(true)}>
+                    <UserPlus className="mr-2 h-4 w-4" /> Add people
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setShowShareInvite(true)}>
+                    <Share2 className="mr-2 h-4 w-4" /> Share meeting
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setGrid(!isGrid)}>
+                    {isGrid ? <Columns2 className="mr-2 h-4 w-4" /> : <Grid3x3 className="mr-2 h-4 w-4" />}
+                    {isGrid ? 'Spotlight view' : 'Tiled view'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <ControlButton icon={PhoneOff} danger title="Leave call" onClick={close} />
           </div>
         </div>
       </Streams>
-      {!isGrid && !topBar && <TopBar localStream={localStream} />}
       {addPeers && <AddPeers onClose={() => setAddPeers(false)} />}
       {showShareInvite && <ShareMeetingInvite meetingId={roomID} onClose={() => setShowShareInvite(false)} />}
     </div>
