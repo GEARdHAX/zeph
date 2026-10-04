@@ -181,7 +181,7 @@ function MediaViewerShell({ messages, initialMessage, onClose }) {
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="flex h-screen w-screen max-w-none flex-col gap-0 rounded-none border-0 bg-black p-0 text-white sm:max-w-none"
+        className="flex h-dvh w-screen max-w-none flex-col gap-0 rounded-none border-0 bg-black p-0 text-white sm:max-w-none"
         onEscapeKeyDown={onClose}
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-3 sm:px-4">
@@ -191,70 +191,73 @@ function MediaViewerShell({ messages, initialMessage, onClose }) {
             size="icon"
             onClick={onClose}
             aria-label="Close"
-            className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white"
+            className="h-9 w-9 shrink-0 rounded-full text-white/80 hover:bg-white/10 hover:text-white"
           >
             <X className="h-4.5 w-4.5" />
           </Button>
 
-          <span className="max-w-[45%] truncate text-xs font-medium text-white/80 sm:max-w-[60%]">{filename}</span>
+          {/* min-w-0 + flex-1 lets the name shrink and truncate instead of pushing the buttons off a narrow screen */}
+          <span className="min-w-0 flex-1 truncate px-2 text-center text-xs font-medium text-white/80">{filename}</span>
 
-          <div className="flex items-center gap-1">
-            {category === 'image' && (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setScale((s) => clampImageScale(s - 0.5))}
-                  aria-label="Zoom out"
-                  className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setScale((s) => clampImageScale(s + 0.5))}
-                  aria-label="Zoom in"
-                  className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setRotation((r) => (r + 90) % 360)}
-                  aria-label="Rotate"
-                  className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-                >
-                  <RotateCw className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={resetTransform}
-                  aria-label="Reset"
-                  className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Download"
-              disabled={mediaLoading || mediaError || !resolvedUrl}
-              className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-              onClick={() => downloadFile(resolvedUrl, filename || 'image.jpg')}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-          </div>
+          {/* Image tools: inline in the top bar from `sm` up; on a phone they float at the bottom within
+              thumb reach (the bar is too narrow for close + name + five buttons). One set of buttons,
+              positioned by screen size. */}
+          {category === 'image' && (
+            <div className="z-20 flex items-center gap-1 max-sm:absolute max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 max-sm:gap-1.5 max-sm:rounded-full max-sm:border max-sm:border-white/15 max-sm:bg-black/75 max-sm:p-1.5 max-sm:shadow-2xl max-sm:backdrop-blur-xl sm:mr-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setScale((s) => clampImageScale(s - 0.5))}
+                aria-label="Zoom out"
+                className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white max-sm:h-11 max-sm:w-11"
+              >
+                <ZoomOut className="h-4 w-4 max-sm:h-5 max-sm:w-5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setScale((s) => clampImageScale(s + 0.5))}
+                aria-label="Zoom in"
+                className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white max-sm:h-11 max-sm:w-11"
+              >
+                <ZoomIn className="h-4 w-4 max-sm:h-5 max-sm:w-5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setRotation((r) => (r + 90) % 360)}
+                aria-label="Rotate"
+                className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white max-sm:h-11 max-sm:w-11"
+              >
+                <RotateCw className="h-4 w-4 max-sm:h-5 max-sm:w-5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={resetTransform}
+                aria-label="Reset"
+                className="h-9 w-9 rounded-full text-white/80 hover:bg-white/10 hover:text-white max-sm:h-11 max-sm:w-11"
+              >
+                <RefreshCw className="h-4 w-4 max-sm:h-5 max-sm:w-5" />
+              </Button>
+            </div>
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Download"
+            disabled={mediaLoading || mediaError || !resolvedUrl}
+            className="h-9 w-9 shrink-0 rounded-full text-white/80 hover:bg-white/10 hover:text-white"
+            onClick={() => downloadFile(resolvedUrl, filename || 'image.jpg')}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
         </div>
 
         <div
