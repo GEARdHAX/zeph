@@ -29,6 +29,9 @@ const fresh = () => ({
   pulled: new Set(), // producerIDs requested/pulled on this connection
   midToProducer: new Map(), // mid -> { producerID, socketID, userID }
   timers: new Map(), // connection -> pending 'disconnected' give-up timer
+  retries: new Map(), // producerID -> pull attempts used
+  retryTimers: new Set(),
+  sendUsed: false, // the send session has carried a track at some point
   failedNotified: false,
 });
 
@@ -67,6 +70,31 @@ const waitConnected = (pc, ms) =>
     timer = setTimeout(done, ms);
     pc.addEventListener('connectionstatechange', onChange);
   });
+
+// A track is only announced to the room once packets are really leaving the browser. When the
+// connection is already up (every on/off after the first), "connected" says nothing about the NEW
+// track: announce it at once and the other side's pull reaches Cloudflare before any media has
+// arrived and is refused (empty_track_error), so the feature seemed to work only once. Best effort:
+// gives up after `ms` and announces anyway (a muted/static source may legitimately send little).
+const waitSending = async (sender, ms) => {
+  if (!sender || typeof sender.getStats !== 'function') return;
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const report = await sender.getStats();
+      let sent = 0;
+      report.forEach((stat) => {
+        if (stat.type === 'outbound-rtp') sent = Math.max(sent, stat.packetsSent || 0);
+      });
+      if (sent > 0) return;
+    } catch (e) {
+      return;
+    }
+    // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+};
 
 // Rolls back a half-applied local offer so the next negotiation starts clean.
 const rollback = async (pc) => {
@@ -216,6 +244,7 @@ const requirePullPc = () => {
 // callManager.releaseAllMedia(), not here.
 export function close() {
   s.timers.forEach((timer) => clearTimeout(timer));
+  s.retryTimers.forEach((timer) => clearTimeout(timer));
   const old = [s.pc, s.pullPc];
   s = fresh();
   old.forEach((pc) => {
@@ -230,6 +259,32 @@ export function close() {
   });
 }
 
+const makePc = () => new RTCPeerConnection({ iceServers: (s.config && s.config.iceServers) || [], bundlePolicy: 'max-bundle' });
+
+// Cloudflare tears down a session's transport when its last track is closed, so anything published on
+// that session afterwards is never received (empty_track_error / transport_unavailable_error for every
+// subscriber): turning the mic, camera or screen off and on again worked only once. Whenever publishing
+// starts and nothing is currently published, swap in a brand new send connection and session. The
+// receive connection is untouched.
+const refreshSendConnection = async () => {
+  const { sessionId } = await ask('cf:session:new', { sendOnly: true });
+  const old = s.pc;
+  s.pc = makePc();
+  s.pc.onconnectionstatechange = onConnectionStateChange(s.pc);
+  s.sessionId = sessionId;
+  s.sendUsed = false;
+  clearTimeout(s.timers.get(old));
+  s.timers.delete(old);
+  if (old) {
+    old.onconnectionstatechange = null;
+    try {
+      old.close();
+    } catch (e) {
+      /* already closed */
+    }
+  }
+};
+
 // Opens the Cloudflare sessions + the two PeerConnections (send / receive). `renew` asks the server to drop
 // this socket's old tracks first (used when only the media connection died).
 export async function start({ roomID, config, renew = false, onFailed = null }) {
@@ -239,10 +294,9 @@ export async function start({ roomID, config, renew = false, onFailed = null }) 
   s.onFailed = onFailed;
 
   const { sessionId } = await ask('cf:session:new', renew ? { renew: true } : {});
-  const make = () => new RTCPeerConnection({ iceServers: config.iceServers || [], bundlePolicy: 'max-bundle' });
   s.sessionId = sessionId;
-  s.pc = make();
-  s.pullPc = make();
+  s.pc = makePc();
+  s.pullPc = makePc();
   s.pullPc.ontrack = onTrack;
   [s.pc, s.pullPc].forEach((pc) => {
     pc.onconnectionstatechange = onConnectionStateChange(pc);
@@ -311,6 +365,7 @@ async function sendOnce(pc, { slot, kind, track, stream, isScreen }) {
 
   // Tell the room only once media can actually flow, so nobody pulls a dead track.
   await waitConnected(pc, 8000);
+  await waitSending(transceiver.sender, 6000);
   await ask('cf:tracks:ready', { producerIDs: res.producerIDs });
   return { producerID: res.producerIDs[0], mid, transceiver };
 }
@@ -323,9 +378,12 @@ export async function produce(slot, stream, { isScreen = false } = {}) {
   if (s.published[slot]) await unpublish(slot);
 
   return enqueue(async () => {
+    requirePc();
+    if (s.sendUsed && !Object.values(s.published).some(Boolean)) await refreshSendConnection();
     const pc = requirePc();
     await improveCapture(track, slot);
     s.published[slot] = await sendOnce(pc, { slot, kind, track, stream, isScreen });
+    s.sendUsed = true;
   });
 }
 
@@ -347,9 +405,30 @@ export async function unpublish(slot) {
   });
 }
 
+// Cloudflare refuses a pull while the publisher's media has not reached it yet (empty_track_error).
+// That is transient, so retry a few times with growing delays instead of giving up for good.
+const RETRY_DELAYS_MS = [500, 1000, 2000, 4000, 8000];
+const scheduleRetry = (producerID) => {
+  const used = s.retries.get(producerID) || 0;
+  if (used >= RETRY_DELAYS_MS.length) return;
+  s.retries.set(producerID, used + 1);
+  const timer = setTimeout(() => {
+    s.retryTimers.delete(timer);
+    // eslint-disable-next-line no-use-before-define
+    onProducersChanged();
+  }, RETRY_DELAYS_MS[used]);
+  s.retryTimers.add(timer);
+};
+
 const pullBatch = async (batch) => {
   const pc = requirePullPc();
   const res = await ask('cf:tracks:pull', { producerIDs: batch.map((p) => p.producerID) });
+  // Tracks Cloudflare could not serve yet: forget them (so the next pass asks again) and retry soon.
+  (res.tracks || []).forEach((t) => {
+    if (!t.error) return;
+    s.pulled.delete(t.producerID);
+    scheduleRetry(t.producerID);
+  });
   // Record mid -> producer BEFORE applying the offer: ontrack fires inside setRemoteDescription.
   (res.tracks || []).forEach((t) => {
     if (t.error) return;
@@ -390,8 +469,11 @@ export function onProducersChanged() {
   const batches = Array.from({ length: Math.ceil(todo.length / 8) }, (_, i) => todo.slice(i * 8, i * 8 + 8));
   batches.forEach((batch) => {
     enqueue(() => pullBatch(batch), true).catch((err) => {
-      // Forget them so the next producers change retries.
-      batch.forEach((p) => s.pulled.delete(p.producerID));
+      // Forget them so the next producers change (or the retry below) asks again.
+      batch.forEach((p) => {
+        s.pulled.delete(p.producerID);
+        scheduleRetry(p.producerID);
+      });
       console.log('cloudflare pull failed', err && err.message);
     });
   });

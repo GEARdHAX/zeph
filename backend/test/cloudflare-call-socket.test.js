@@ -216,6 +216,18 @@ describe('call:config and sessions', () => {
     expect(fakeClient.newSession).toHaveBeenCalledTimes(2);
   });
 
+  it('sendOnly replaces just the send session (an emptied session loses its transport), keeping the receive session', async () => {
+    const { caller, meeting } = await newMeeting();
+    const socket = await joined(caller, meeting); // sess-1 (send), sess-2 (receive)
+    const fresh = await call(socket, 'cf:session:new', { sendOnly: true });
+    expect(fresh).toEqual({ sessionId: 'sess-3', pullSessionId: 'sess-2' });
+    expect(await call(socket, 'cf:session:new', {})).toEqual({ sessionId: 'sess-3', pullSessionId: 'sess-2' }); // sticks
+    // tracks now go to the new send session
+    const push = await call(socket, 'cf:tracks:push', { sessionDescription: 'OFFER', tracks: [audioTrack] });
+    expect(push.producerIDs).toEqual(['sess-3/audio-abc123']);
+    expect(fakeClient.pushTracks).toHaveBeenCalledWith('sess-3', expect.anything());
+  });
+
   it('renews a session: drops the old tracks from the room and starts a fresh Cloudflare session', async () => {
     const { caller, callee, meeting } = await newMeeting();
     const a = await joined(caller, meeting);

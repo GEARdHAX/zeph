@@ -10,7 +10,9 @@
 //
 // Socket events (all acked; error acks are { error: '<code>' }):
 //   call:config      -> { backend, iceServers, limits }
-//   cf:session:new  { renew? }  -> { sessionId, pullSessionId }   (renew: start over after a failed connection)
+//   cf:session:new  { renew?, sendOnly? }  -> { sessionId, pullSessionId }   (renew: start over after a failed connection;
+//                   sendOnly: new SEND session only, used when the old one has no tracks left - Cloudflare tears down a
+//                   session's transport when its last track is closed, so tracks published afterwards never arrive)
 //                   Two Cloudflare sessions per socket: one PeerConnection only SENDS (push/close), the other
 //                   only RECEIVES (pull/renegotiate). Mixing both directions on one connection let Cloudflare's
 //                   answers clash with the receive sections, which Chrome rejects for good (see D-049).
@@ -164,6 +166,18 @@ const initSocket = (socket) => {
     'cf:session:new',
     withMeeting(socket, async (ctx, data, reply) => {
       const existing = sessions.get(socket.id);
+      if (existing && existing.roomId === ctx.roomId && data.sendOnly) {
+        // The browser dropped its (empty) send connection: any track records still on the old send
+        // session are dead, and the receive session stays exactly as it is.
+        const stale = await store.peers.asyncFind({ type: 'producer', socketID: socket.id });
+        if (stale.length) {
+          await store.peers.asyncRemove({ type: 'producer', socketID: socket.id }, { multi: true });
+          stale.forEach((p) => store.io.to(ctx.roomId).emit('remove', { producerID: p.producerID, socketID: socket.id }));
+        }
+        existing.sessionId = await getClient().newSession();
+        reply({ sessionId: existing.sessionId, pullSessionId: existing.pullSessionId });
+        return;
+      }
       if (existing && existing.roomId === ctx.roomId && !data.renew) {
         reply({ sessionId: existing.sessionId, pullSessionId: existing.pullSessionId });
         return;

@@ -60,7 +60,22 @@ Unit tests: backend 69 (Cloudflare client, socket handlers, mediasoup), frontend
 
 **Lesson:** a local pass on one Node version says nothing about a host that floats to the latest. `NODE_VERSION=22` in Render's environment is a reasonable extra pin.
 
-## 7. Still open
+## 7. Every feature worked only once (found after the first successful real call)
+
+**Symptom:** the call connected, but turning the mic, camera or screen share off and on again never worked a second time (screen share not at all).
+
+**Cause:** Cloudflare tears down a session's transport when its last track is closed. Our "off" closes the track, so after it the send session is empty and dead: anything published on it afterwards never arrives. Subscribers' pulls then fail with `empty_track_error`, followed by `transport_unavailable_error`, and the pull code gave up on the first error. The first time worked because the connection was still starting, so there was a pause before the track was announced.
+
+**How it was found:** a live toggle test (`backend/loadtest/call-quality/toggle.cjs`: off and on three times per feature while a second participant checks the bytes). Every cycle after the first failed. A control run that kept a second track published made every cycle pass, which proved the cause.
+
+**Fix:**
+- When publishing starts and nothing is currently published, the browser swaps in a fresh send connection and session (`cf:session:new { sendOnly: true }`); the receive side is untouched (`refreshSendConnection` in `cloudflareCall.js`; server support in `calls/cloudflare/index.js`).
+- A track is announced to the room only once packets are actually leaving the browser (`waitSending`), not merely when the connection is up.
+- A pull Cloudflare refuses because no media arrived yet is retried after 0.5, 1, 2, 4 and 8 seconds instead of being dropped.
+
+**Result:** 9 of 9 off/on cycles deliver media (3 each for mic, camera, screen), and the earlier multi-person scenarios still pass. Unit tests cover the fresh send connection, keeping the connection while another track is published, and the pull retry.
+
+## 8. Still open
 
 - A call between two real devices over the internet through the deployed app.
 - The deployed Render backend has none of this yet (nothing is committed); it also needs the `CF_*` variables and `VAULT_RP_ID`.

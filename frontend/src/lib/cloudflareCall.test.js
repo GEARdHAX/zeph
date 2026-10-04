@@ -135,9 +135,10 @@ const makeIO = () => {
     request: vi.fn(async (event, payload) => {
       requests.push({ event, payload });
       if (failNext && failNext.event === event) {
-        const err = new Error(failNext.code);
+        const scripted = failNext;
         failNext = null;
-        throw err;
+        if (scripted.result) return scripted.result; // a scripted (non-error) reply
+        throw new Error(scripted.code);
       }
       switch (event) {
         case 'cf:session:new':
@@ -354,6 +355,36 @@ describe('publishing', () => {
     expect(events()).toContain('cf:tracks:ready');
   });
 
+  it('gets a fresh send connection and session when publishing restarts after the last track was closed', async () => {
+    const send = await started();
+    const mic = () => new FakeStream([new FakeTrack('audio')]);
+    await engine.produce('audio', mic());
+    await engine.unpublish('audio'); // the send session is now empty: Cloudflare drops its transport
+    const before = pcs.length;
+
+    await engine.produce('audio', mic());
+
+    expect(requests.filter((r) => r.event === 'cf:session:new').map((r) => r.payload)).toEqual([{}, { sendOnly: true }]);
+    expect(pcs.length).toBe(before + 1); // a new send connection (the receive one is untouched)
+    expect(send.closed).toBe(true);
+    expect(send.recv.closed).toBe(false);
+    expect(events().filter((e) => e === 'cf:tracks:ready')).toHaveLength(2);
+  });
+
+  it('keeps the send connection while another track is still published', async () => {
+    const send = await started();
+    await engine.produce('audio', new FakeStream([new FakeTrack('audio')]));
+    await engine.produce('video', new FakeStream([new FakeTrack('video', 720)]));
+    await engine.unpublish('video'); // audio still carries the session
+    const before = pcs.length;
+
+    await engine.produce('video', new FakeStream([new FakeTrack('video', 720)]));
+
+    expect(events().filter((e) => e === 'cf:session:new')).toHaveLength(1);
+    expect(pcs.length).toBe(before);
+    expect(send.closed).toBe(false);
+  });
+
   it('rejects a stream with no usable track', async () => {
     await started();
     await expect(engine.produce('audio', new FakeStream([]))).rejects.toThrow('no_track');
@@ -427,6 +458,27 @@ describe('subscribing', () => {
     h.reduxState.rtc.producers = [remote('sess-9/audio-y')];
     engine.onProducersChanged();
     await vi.waitFor(() => expect(events().filter((e) => e === 'cf:tracks:pull')).toHaveLength(2));
+  });
+
+  it('retries a pull Cloudflare refused because no media had arrived yet (empty_track_error)', async () => {
+    vi.useFakeTimers();
+    try {
+      const send = await started();
+      const recv = send.recv;
+      recv.remoteTracksOnOffer = [{ mid: '10', track: new FakeTrack('audio') }];
+      h.reduxState.rtc.producers = [remote('sess-9/audio-x')];
+      failNext = { event: 'cf:tracks:pull', result: { tracks: [{ producerID: 'sess-9/audio-x', error: 'empty_track_error' }] } };
+
+      engine.onProducersChanged();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(events().filter((e) => e === 'cf:tracks:pull')).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(600); // first retry fires after 500 ms
+      expect(events().filter((e) => e === 'cf:tracks:pull')).toHaveLength(2);
+      expect(h.globalState.streams).toHaveLength(1); // second attempt succeeded
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('retries a failed pull on the next producers change', async () => {

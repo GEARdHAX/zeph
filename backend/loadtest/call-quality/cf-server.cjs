@@ -17,6 +17,7 @@ const cf = createCloudflareClient({
 const sessions = {}; const pullSessions = {}; const registry = {}; const log = [];
 const server = async (client, event, p) => {
   log.push(`${client}:${event}`);
+  if (event === 'cf:session:new' && p && p.sendOnly) { sessions[client] = await cf.newSession(); return { sessionId: sessions[client], pullSessionId: pullSessions[client] }; }
   if (event === 'cf:session:new') { sessions[client] = await cf.newSession(); pullSessions[client] = await cf.newSession(); return { sessionId: sessions[client], pullSessionId: pullSessions[client] }; }
   if (event === 'cf:tracks:push') {
     const out = await cf.pushTracks(sessions[client], { sdp: p.sessionDescription, tracks: p.tracks });
@@ -30,10 +31,10 @@ const server = async (client, event, p) => {
   if (event === 'cf:tracks:pull') {
     const recs = p.producerIDs.map((id) => registry[id]);
     const out = await cf.pullTracks(pullSessions[client], recs.map((r) => ({ sessionId: r.sessionId, trackName: r.trackName })));
-    const errs = (out.tracks || []).filter((t) => t.errorCode);
-    if (errs.length) throw new Error('pull track error: ' + JSON.stringify(errs.map((b) => [b.errorCode, b.errorDescription])));
+    // Like the real server: per-track errors are returned, not thrown.
+    if (process.env.DEBUG_PULL) console.log('  [pull]', JSON.stringify({ asked: recs.map((r) => r && r.trackName), got: (out.tracks || []).map((t) => ({ name: t.trackName, mid: t.mid, err: t.errorCode, desc: (t.errorDescription || '').slice(0, 60) })), sdp: !!out.sessionDescription, reneg: out.requiresImmediateRenegotiation }));
     return { sessionDescription: out.sessionDescription && out.sessionDescription.sdp, requiresImmediateRenegotiation: !!out.requiresImmediateRenegotiation,
-      tracks: out.tracks.map((t) => ({ mid: t.mid, producerID: `${t.sessionId}/${t.trackName}`, socketID: registry[`${t.sessionId}/${t.trackName}`].socketID, kind: registry[`${t.sessionId}/${t.trackName}`].kind })) };
+      tracks: out.tracks.map((t) => { const rec = registry[`${t.sessionId}/${t.trackName}`]; return { mid: t.mid, producerID: `${t.sessionId}/${t.trackName}`, socketID: rec && rec.socketID, kind: rec && rec.kind, error: t.errorCode || undefined }; }) };
   }
   if (event === 'cf:renegotiate') { await cf.renegotiate(pullSessions[client], p.sessionDescription); return { ok: true }; }
   if (event === 'cf:tracks:close') {
@@ -45,4 +46,4 @@ const server = async (client, event, p) => {
 };
 
 
-module.exports = { cf, sessions, registry, log, server };
+module.exports = { cf, sessions, pullSessions, registry, log, server };
