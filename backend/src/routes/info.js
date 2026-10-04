@@ -27,5 +27,7 @@ module.exports = (req, res, next) => {
     directUploadEnabled: storage.useObjectStorage,
     // True when signed Cloudflare CDN URLs can be issued (CDN_BASE_URL + CDN_SIGNING_SECRET set).
     cdnEnabled: cdn.isEnabled(),
+    // Which call engine this server runs: 'cloudflare' | 'mediasoup' | null (calls off: joining a call will time out).
+    callBackend: store.callBackend || null,
   });
 };

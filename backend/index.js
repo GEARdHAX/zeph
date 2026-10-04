@@ -104,6 +104,8 @@ const requestedCallBackend = (process.env.CALL_BACKEND || 'cloudflare').toLowerC
 const mediasoupEnabled = requestedCallBackend === 'mediasoup' && process.env.MEDIASOUP_ENABLED === 'true';
 const cloudflareCallsEnabled = requestedCallBackend === 'cloudflare';
 const callBackend = mediasoupEnabled ? 'mediasoup' : cloudflareCallsEnabled ? 'cloudflare' : null;
+// Exposed by GET /api/info so a misconfigured deploy (calls silently off) is visible without logs.
+store.callBackend = callBackend;
 const mediasoup = mediasoupEnabled ? require('./src/mediasoup') : null;
 const cloudflareCalls = cloudflareCallsEnabled ? require('./src/calls/cloudflare') : null;
 
