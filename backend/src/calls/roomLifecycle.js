@@ -129,7 +129,7 @@ const registerLifecycleHandlers = (socket, hooks = {}) => {
     callback(room);
   });
 
-  socket.on('join', async (data, callback) => {
+  const handleJoin = async (data, callback) => {
     const authz = await authorizeMeetingJoin(data.roomID, socket.decoded_token.id).catch((err) => {
       logger.error(
         { err, meetingId: data.roomID, userId: socket.decoded_token.id },
@@ -221,6 +221,17 @@ const registerLifecycleHandlers = (socket, hooks = {}) => {
       consumers: { content: store.consumerUserIDs[data.roomID], timestamp: Date.now() },
       peers: consumersObjects[data.roomID],
     });
+  };
+
+  // Any failure inside the join must still answer the client (otherwise it waits out its 15 s
+  // request timeout with no clue why) and must be logged with the real error.
+  socket.on('join', async (data, callback) => {
+    try {
+      await handleJoin(data || {}, callback);
+    } catch (err) {
+      logger.error({ err, meetingId: data && data.roomID, userId: socket.decoded_token && socket.decoded_token.id }, 'Meeting join failed');
+      if (typeof callback === 'function') callback({ error: 'join_failed' });
+    }
   });
 
   socket.on('leave', async (data, callback) => {

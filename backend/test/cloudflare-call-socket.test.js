@@ -126,6 +126,20 @@ describe('join admission (beforeJoin hook)', () => {
     expect(store.roomIDs[socket.id]).toBeUndefined();
   });
 
+  it('still answers the client (join_failed) when something inside the join throws, instead of leaving it hanging', async () => {
+    const { caller, meeting } = await newMeeting();
+    const socket = fakeSocket(caller._id.toString());
+    cloudflare.initSocket(socket);
+    const spy = jest.spyOn(Meeting, 'findOneAndUpdate').mockImplementation(() => {
+      throw new Error('simulated database failure');
+    });
+    try {
+      await expect(call(socket, 'join', { roomID: meeting._id.toString() })).resolves.toEqual({ error: 'join_failed' });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('caps the room size', async () => {
     const { caller, callee, meeting } = await newMeeting();
     const third = await createUser();
