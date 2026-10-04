@@ -22,7 +22,13 @@ vi.mock('../../../actions/deleteConversation', () => ({ default: vi.fn() }));
 vi.mock('react-toastify', () => ({ toast: { warn: vi.fn(), error: vi.fn(), success: vi.fn() } }));
 // @emoji-mart/react needs a peer `emoji-mart` package that Vite's browser bundling
 // resolves but Vitest's Node module resolution doesn't — not exercised by this test.
-vi.mock('@emoji-mart/react', () => ({ default: () => null }));
+// It records its props so a test can check how the picker is configured.
+vi.mock('@emoji-mart/react', () => ({
+  default: (props) => {
+    globalThis.__emojiPickerProps = props;
+    return null;
+  },
+}));
 // The real editor drags in react-easy-crop's canvas/drag internals, which
 // aren't under test here — only BottomBar's queue wiring is. A stub that
 // immediately "finishes" with a renamed File stands in for the modal.
@@ -341,6 +347,15 @@ describe('BottomBar phone menu (emoji, photo and file behind a "more" button)', 
     await userEv.click(screen.getByRole('button', { name: 'More options' }));
     await userEv.click(await screen.findByRole('menuitem', { name: /Emoji/ }));
     await waitFor(async () => expect((await import('reactn')).getGlobal().isPicker).toBe(true));
+  });
+
+  it('the emoji picker has no skin-tone selector', async () => {
+    globalThis.__emojiPickerProps = undefined;
+    const userEv = userEvent.setup();
+    renderBar();
+    await userEv.click(screen.getByRole('button', { name: 'Toggle emoji picker' }));
+    await waitFor(() => expect(globalThis.__emojiPickerProps).toBeDefined());
+    expect(globalThis.__emojiPickerProps.skinTonePosition).toBe('none');
   });
 
   it('keeps the Send button out of the menu', () => {

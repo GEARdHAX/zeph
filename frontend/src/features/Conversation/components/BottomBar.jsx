@@ -524,6 +524,8 @@ function BottomBar({ aiEnabled }) {
             onEmojiSelect={(emoji) => setText((prev) => prev + (emoji.native || ''))}
             theme={theme === 'dark' ? 'dark' : 'light'}
             title="Emoji"
+            // No skin-tone swatches in the picker: emojis always use the default tone.
+            skinTonePosition="none"
           />
         </div>
       )}
