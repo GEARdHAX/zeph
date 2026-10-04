@@ -83,6 +83,12 @@ Google refreshes favicons on its own schedule (days to weeks); requesting indexi
 | --- | --- | --- |
 | Sign out on the phone, change the picture on the PC, sign in on the phone: blank avatar | Two things. (1) A browser kept the old picture reference in its stored profile after the picture changed elsewhere, and the old image is now deleted. (2) The **passkey** login loaded the user without populating the picture, so the session token carried a bare ID with no `shieldedID`, and the app requested `/api/images/undefined/...`. Password login already populated it | (1) the change is pushed to the user's other sessions, and the startup check returns the current picture so a stale browser corrects itself (see Part 2c area). (2) `passkey/login-verify.js` now populates the picture; `passkey-login-picture.test.js` fails without that line. A picture that still fails to load falls back to the initials |
 
+## Part 8: Uploads blocked by the browser
+
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| Video/photo uploads failed: the browser's PUT to the presigned R2 link never went through | The R2 bucket had no CORS configuration, so the browser's preflight got a 403 (found by sending the same preflight from Node; the upload itself, with real bytes, returned 200). The direct-to-R2 flow worked in tests only because tests mock storage and Node ignores CORS | A PUT-only CORS rule for the site's origins (`cdn-worker/r2-cors.json`, applied with wrangler). Verified in a real browser: the site's origin uploads (200) and any other origin is blocked. Also set the SDK's checksum option to `WHEN_REQUIRED` so presigned links no longer carry a meaningless empty-body checksum |
+
 ## What worked as a method
 
 1. **Measure before tuning.** The video-quality fix came from `getStats()` numbers, not guesses.
