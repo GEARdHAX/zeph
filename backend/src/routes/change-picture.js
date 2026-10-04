@@ -53,6 +53,9 @@ module.exports = async (req, res, next) => {
         );
       }
 
+      // The user's own other sessions (another tab or device) hold the old picture in their stored profile too.
+      store.io.to(req.user.id.toString()).emit('user-profile-updated', { userId: req.user.id, picture: user.picture || null });
+
       res.status(200).json(user.picture);
 
       // After responding: replacing a picture deletes the old one (see retireImage.js).

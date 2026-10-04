@@ -19,6 +19,8 @@ function TopBar() {
   const [showInviteFriend, setShowInviteFriend] = useState(false);
   const [showRequestToJoin, setShowRequestToJoin] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // A picture that fails to load (stale reference, blocker, outage) falls back to the initials, never a blank circle.
+  const [pictureFailed, setPictureFailed] = useState(false);
 
   const menuRef = useRef(null);
   const navigate = useNavigate();
@@ -26,6 +28,8 @@ function TopBar() {
 
   const isAdmin = user?.level === 'root' || user?.level === 'admin';
   const initials = `${(user?.firstName || 'A').charAt(0)}${(user?.lastName || 'U').charAt(0)}`.toUpperCase();
+  const pictureId = user?.picture?.shieldedID;
+  useEffect(() => setPictureFailed(false), [pictureId]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -77,11 +81,12 @@ function TopBar() {
       {/* Left: User Avatar */}
       <div className="flex items-center">
         <Avatar className="h-9 w-9 border border-border bg-muted text-foreground">
-          {user?.picture && (
+          {user?.picture && !pictureFailed && (
             <img
               src={`${Config.url || ''}/api/images/${user.picture.shieldedID}/256`}
               alt=""
               className="aspect-square size-full object-cover"
+              onError={() => setPictureFailed(true)}
             />
           )}
           <AvatarFallback className="bg-muted text-xs font-bold text-foreground">{initials}</AvatarFallback>

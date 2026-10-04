@@ -523,6 +523,18 @@ const initIO = (token) => (dispatch) => {
   // reopen the conversation. Patches every room this affects in place.
   io.on('user-profile-updated', (data) => {
     store.dispatch({ type: Actions.USER_PROFILE_UPDATED, userId: data.userId, picture: data.picture });
+    // Our own picture changed in another tab or device: update the stored profile used for our avatar.
+    const me = getGlobal().user;
+    if (me && me._id && String(me._id) === String(data.userId)) {
+      const { picture, ...rest } = me;
+      const next = data.picture ? { ...rest, picture: data.picture } : rest;
+      setGlobal({ user: next });
+      try {
+        localStorage.setItem('user', JSON.stringify(next));
+      } catch (e) {
+        /* storage unavailable */
+      }
+    }
   });
 
   io.on('conversation-deleted', (data) => {

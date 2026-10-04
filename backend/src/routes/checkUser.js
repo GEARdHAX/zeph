@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
     if (err) return res.status(200).json({ error: true });
 
     try {
-      const user = await User.findById(decoded.id);
+      const user = await User.findById(decoded.id).populate({ path: 'picture', strictPopulate: false });
       if (!user) return res.status(200).json({ error: true });
 
       if (decoded.deviceId) {
@@ -32,7 +32,12 @@ module.exports = async (req, res) => {
         if (!session || session.revokedAt) return res.status(200).json({ error: true });
       }
 
-      return res.status(200).json({ valid: true });
+      // `picture` lets a browser whose stored profile is stale (the picture was changed on another device, and
+      // the old one deleted) correct it on its next load. Only the public avatar reference, never the document.
+      return res.status(200).json({
+        valid: true,
+        picture: user.picture ? { _id: user.picture._id, shieldedID: user.picture.shieldedID } : null,
+      });
     } catch (e) {
       return res.status(200).json({ error: true });
     }

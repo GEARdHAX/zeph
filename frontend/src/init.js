@@ -47,6 +47,18 @@ const init = async () => {
       userString = localStorage.getItem('user');
       user = userString ? JSON.parse(userString) : null;
     }
+
+    // The server says which picture is current. A browser that was signed in while the picture was changed
+    // elsewhere still holds the old one (now deleted), so correct the stored profile before it is used.
+    if (user && result && result.valid && 'picture' in result) {
+      const serverShield = result.picture ? result.picture.shieldedID : null;
+      const localShield = user.picture ? user.picture.shieldedID : null;
+      if (serverShield !== localShield) {
+        const { picture, ...rest } = user;
+        user = result.picture ? { ...rest, picture: result.picture } : rest;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+    }
   }
 
   if (token) {

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useGlobal } from 'reactn';
 import Picture from '../../components/Picture';
 import ZephWordmark from '../../components/ZephWordmark';
@@ -9,6 +10,10 @@ function Welcome() {
 
   const fullName = `${user.firstName || 'Admin'} ${user.lastName || 'User'}`.trim();
   const initials = `${(user.firstName || 'A').charAt(0)}${(user.lastName || 'U').charAt(0)}`.toUpperCase();
+  // A picture that fails to load falls back to the initials instead of an empty circle.
+  const [pictureFailed, setPictureFailed] = useState(false);
+  const pictureId = user.picture && user.picture.shieldedID;
+  useEffect(() => setPictureFailed(false), [pictureId]);
 
   return (
     <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-background text-foreground">
@@ -27,11 +32,12 @@ function Welcome() {
         <div className="my-8 relative flex items-center justify-center">
           <div className="absolute -inset-2 rounded-full bg-gradient-to-tr from-primary/60 via-rose-600/30 to-transparent opacity-50 blur-md" />
           <div className="relative flex h-36 w-36 items-center justify-center rounded-full border border-border bg-gradient-to-b from-rose-700/80 to-primary/90 text-white shadow-2xl">
-            {user.picture ? (
+            {user.picture && !pictureFailed ? (
               <img
                 src={`${Config.url || ''}/api/images/${user.picture.shieldedID}/512`}
                 alt={fullName}
                 className="h-full w-full rounded-full object-cover"
+                onError={() => setPictureFailed(true)}
               />
             ) : (
               <span className="text-4xl font-extrabold tracking-wider text-white">{initials}</span>
