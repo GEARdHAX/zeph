@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { createStore, combineReducers } from 'redux';
@@ -144,5 +144,65 @@ describe('Streams — spotlight mode', () => {
     renderStreams(makeStore({ consumers: ['me', 'a'], peers: { a: peer('a') } }), { isGrid: false });
     expect(within(screen.getByTestId('stage')).getByText('a Peer')).toBeInTheDocument();
     expect(document.querySelector('button[title^="Focus on"]')).toBeNull();
+  });
+});
+
+describe('Streams — loading states for media that is announced but has not arrived', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const announced = (extra) => ({ roomID: 'r', socketID: 'a', userID: 'user-a', ...extra });
+
+  it("shows a placeholder on a person's tile while their camera is starting, and clears it once it arrives", () => {
+    const store = makeStore({
+      consumers: ['me', 'a'],
+      peers: { a: peer('a') },
+      producers: [announced({ producerID: 'sess/video-1', kind: 'video', isScreen: false })],
+    });
+    const { rerender } = renderStreams(store, { isGrid: true, streams: [] });
+    expect(within(screen.getByTestId('tile-a')).getByRole('status')).toHaveTextContent("Starting a Peer's camera");
+
+    rerender(
+      <Provider store={store}>
+        <Streams streams={[videoStream('a', 'sess/video-1')]} isMaximized isGrid />
+      </Provider>,
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('puts a loading screen tile on the stage as soon as someone starts presenting', () => {
+    const store = makeStore({
+      consumers: ['me', 'a'],
+      peers: { a: peer('a') },
+      producers: [announced({ producerID: 'sess/screen-1', kind: 'video', isScreen: true })],
+    });
+    renderStreams(store, { isGrid: true, streams: [] });
+    const stage = screen.getByTestId('stage');
+    expect(within(stage).getByText("a Peer's screen")).toBeInTheDocument();
+    expect(within(stage).getByRole('status')).toHaveTextContent("Loading a Peer's screen");
+  });
+
+  it('does not show a loading state for audio-only producers', () => {
+    const store = makeStore({
+      consumers: ['me', 'a'],
+      peers: { a: peer('a') },
+      producers: [announced({ producerID: 'sess/audio-1', kind: 'audio', isScreen: false })],
+    });
+    renderStreams(store, { isGrid: true, streams: [] });
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('stops spinning after a while if the media never arrives', () => {
+    vi.useFakeTimers();
+    const store = makeStore({
+      consumers: ['me', 'a'],
+      peers: { a: peer('a') },
+      producers: [announced({ producerID: 'sess/video-1', kind: 'video', isScreen: false })],
+    });
+    renderStreams(store, { isGrid: true, streams: [] });
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(16000);
+    });
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

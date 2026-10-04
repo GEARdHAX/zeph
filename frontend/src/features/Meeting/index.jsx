@@ -13,6 +13,7 @@ import {
   Grid3x3,
   Columns2,
   Share2,
+  Loader2,
   MoreHorizontal,
   ChevronLeft,
 } from 'lucide-react';
@@ -49,6 +50,7 @@ function Meeting() {
   const [video] = useGlobal('video');
   const [audio] = useGlobal('audio');
   const [isScreen] = useGlobal('screen');
+  const [pending] = useGlobal('mediaPending');
   const setScreenStream = useGlobal('screenStream')[1];
   const [callStatus] = useGlobal('callStatus');
   const [callDirection] = useGlobal('callDirection');
@@ -314,7 +316,7 @@ function Meeting() {
   // button controls is currently ON (video/audio/screen-share), which gets
   // a filled/tinted look instead of the flat neutral default, and danger is
   // the one-off hang-up button.
-  function ControlButton({ icon: Icon, onClick, title, active, danger }) {
+  function ControlButton({ icon: Icon, onClick, title, active, danger, loading = false }) {
     return (
       <Button
         type="button"
@@ -322,8 +324,10 @@ function Meeting() {
         onClick={onClick}
         title={title}
         aria-label={title}
+        aria-busy={loading || undefined}
+        disabled={loading}
         className={cn(
-          'h-11 w-11 shrink-0 rounded-full shadow-md transition-transform active:scale-95 sm:h-14 sm:w-14',
+          'h-11 w-11 shrink-0 rounded-full shadow-md transition-transform active:scale-95 disabled:opacity-100 sm:h-14 sm:w-14',
           danger
             ? 'bg-destructive text-white hover:bg-destructive/90'
             : active
@@ -331,7 +335,7 @@ function Meeting() {
               : 'bg-white/10 text-white hover:bg-white/20',
         )}
       >
-        <Icon className="h-5 w-5" />
+        {loading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <Icon className="h-5 w-5" />}
       </Button>
     );
   }
@@ -362,38 +366,47 @@ function Meeting() {
             <ControlButton
               icon={video ? Video : VideoOff}
               active={video}
+              loading={!!pending?.video}
               title={video ? 'Turn off camera' : 'Turn on camera'}
               onClick={() =>
-                video
-                  ? callManager.stopVideo()
-                  : getVideo()
-                      .then((stream) => callManager.produceVideo(stream))
-                      .catch(() => {})
+                callManager.withPending('video', () =>
+                  video
+                    ? callManager.stopVideo()
+                    : getVideo()
+                        .then((stream) => callManager.produceVideo(stream))
+                        .catch(() => {}),
+                )
               }
             />
             <ControlButton
               icon={audio ? Mic : MicOff}
               active={audio}
+              loading={!!pending?.audio}
               title={audio ? 'Mute microphone' : 'Unmute microphone'}
               onClick={() =>
-                audio
-                  ? callManager.stopAudio()
-                  : getAudio()
-                      .then((stream) => callManager.produceAudio(stream))
-                      .catch(() => {})
+                callManager.withPending('audio', () =>
+                  audio
+                    ? callManager.stopAudio()
+                    : getAudio()
+                        .then((stream) => callManager.produceAudio(stream))
+                        .catch(() => {}),
+                )
               }
             />
             {canShareScreen && (
               <ControlButton
                 icon={isScreen ? XOctagon : Monitor}
                 active={isScreen}
+                loading={!!pending?.screen}
                 title={isScreen ? 'Stop sharing screen' : 'Share screen'}
                 onClick={() =>
-                  isScreen
-                    ? callManager.stopScreen()
-                    : getScreen()
-                        .then((stream) => callManager.produceScreen(stream))
-                        .catch(() => {})
+                  callManager.withPending('screen', () =>
+                    isScreen
+                      ? callManager.stopScreen()
+                      : getScreen()
+                          .then((stream) => callManager.produceScreen(stream))
+                          .catch(() => {}),
+                  )
                 }
               />
             )}

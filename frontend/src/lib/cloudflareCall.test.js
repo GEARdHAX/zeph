@@ -417,11 +417,36 @@ describe('publishing', () => {
     const logBefore = [...pc.log];
 
     await engine.unpublish('audio');
-    expect(requests).toHaveLength(1);
     expect(requests[0].event).toBe('cf:tracks:close');
     expect(requests[0].payload).toEqual({ closes: [{ producerID, mid: '0' }] });
     expect(pc.transceivers[0].stop).toHaveBeenCalled();
     expect(pc.log).toEqual(logBefore); // no new SDP exchange
+    // the send session is now empty, so the next one is created in the background (see the next test)
+    await vi.waitFor(() => expect(requests.map((r) => r.event)).toEqual(['cf:tracks:close', 'cf:session:new']));
+  });
+
+  it('creates the next send session in the background once the last track is closed, and reuses it', async () => {
+    await started();
+    await engine.produce('audio', new FakeStream([new FakeTrack('audio')]));
+    requests.length = 0;
+
+    await engine.unpublish('audio');
+    await vi.waitFor(() => expect(requests.filter((r) => r.event === 'cf:session:new')).toHaveLength(1)); // before anyone asks
+
+    await engine.produce('video', new FakeStream([new FakeTrack('video', 720)]));
+    // turning something back on did not create another session: it used the one prepared earlier
+    expect(requests.filter((r) => r.event === 'cf:session:new').map((r) => r.payload)).toEqual([{ sendOnly: true }]);
+    expect(events()).toContain('cf:tracks:ready');
+  });
+
+  it('does not prepare a new send session while another track is still published', async () => {
+    await started();
+    await engine.produce('audio', new FakeStream([new FakeTrack('audio')]));
+    await engine.produce('video', new FakeStream([new FakeTrack('video', 720)]));
+    requests.length = 0;
+    await engine.unpublish('video');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(requests.map((r) => r.event)).toEqual(['cf:tracks:close']);
   });
 
   it('unpublish is a no-op for a slot that was never published', async () => {

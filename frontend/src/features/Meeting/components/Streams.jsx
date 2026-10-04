@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Pin, PinOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -49,17 +49,40 @@ const classify = (peerStreams, producers) => {
 
 // A person always gets a tile (camera or avatar, plus their audio); a screen share adds a second,
 // separate tile labelled with the presenter's name.
+// `pending` says which of a person's streams are announced but whose media has not arrived yet: their
+// tile shows a loading state instead of looking empty or missing.
 const buildTiles = (people) => {
   const tiles = [];
   people.forEach((person) => {
     const name = fullName(person.user);
-    tiles.push({ id: person.socketID, kind: 'person', user: person.user, video: person.camera, audio: person.audio, name, label: name });
-    if (person.screen) {
-      tiles.push({ id: `${person.socketID}:screen`, kind: 'screen', user: person.user, video: person.screen, audio: null, name, label: `${name}'s screen` });
+    tiles.push({
+      id: person.socketID,
+      kind: 'person',
+      user: person.user,
+      video: person.camera,
+      audio: person.audio,
+      name,
+      label: name,
+      loadingLabel: person.pending.camera ? `Starting ${name}'s camera...` : '',
+    });
+    if (person.screen || person.pending.screen) {
+      tiles.push({
+        id: `${person.socketID}:screen`,
+        kind: 'screen',
+        user: person.user,
+        video: person.screen,
+        audio: null,
+        name,
+        label: `${name}'s screen`,
+        loadingLabel: !person.screen ? `Loading ${name}'s screen...` : '',
+      });
     }
   });
   return tiles;
 };
+
+// Stop showing a loading state after this long: a stream that never arrives must not spin forever.
+const PENDING_GIVE_UP_MS = 15000;
 
 function Streams({ streams = [], children, isMaximized, isGrid }) {
   const consumers = useSelector((state) => state.rtc.consumers) || [];
@@ -70,6 +93,22 @@ function Streams({ streams = [], children, isMaximized, isGrid }) {
   const wide = useWide();
   const [pinnedId, setPinnedId] = useState(null);
 
+  // First time each announced-but-missing stream was seen, so the loading state can expire.
+  const firstSeen = useRef(new Map());
+  const [now, setNow] = useState(() => Date.now());
+  const have = new Set(streams.map((st) => st.producerID));
+  const waiting = producers.filter((p) => p.producerID && !have.has(p.producerID) && p.kind === 'video');
+  waiting.forEach((p) => {
+    if (!firstSeen.current.has(p.producerID)) firstSeen.current.set(p.producerID, Date.now());
+  });
+  const stillWaiting = (p) => now - (firstSeen.current.get(p.producerID) || now) < PENDING_GIVE_UP_MS;
+  useEffect(() => {
+    if (!waiting.length) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waiting.map((p) => p.producerID).join(',')]);
+
   let people = consumers
     .filter((c) => c !== socketID)
     .map((consumerID) => ({
@@ -79,12 +118,16 @@ function Streams({ streams = [], children, isMaximized, isGrid }) {
         streams.filter((s) => s.socketID === consumerID),
         producers,
       ),
+      pending: {
+        camera: waiting.some((p) => p.socketID === consumerID && !p.isScreen && stillWaiting(p)),
+        screen: waiting.some((p) => p.socketID === consumerID && p.isScreen && stillWaiting(p)),
+      },
     }));
 
   // 1:1 call where the room's consumer list has not arrived yet: show the other person from the
   // streams we already have.
   if (people.length === 0 && counterpart) {
-    people = [{ socketID: 'counterpart', user: counterpart, ...classify(streams, producers) }];
+    people = [{ socketID: 'counterpart', user: counterpart, ...classify(streams, producers), pending: { camera: false, screen: false } }];
   }
 
   const tiles = buildTiles(people);
@@ -104,6 +147,7 @@ function Streams({ streams = [], children, isMaximized, isGrid }) {
       peer={t.user}
       label={t.label}
       isScreen={t.kind === 'screen'}
+      loadingLabel={t.loadingLabel}
       compact={compact}
     />
   );

@@ -83,7 +83,20 @@ Unit tests: backend 69 (Cloudflare client, socket handlers, mediasoup), frontend
 
 **Result:** 9 of 9 off/on cycles deliver media (3 each for mic, camera, screen), and the earlier multi-person scenarios still pass. Unit tests cover the fresh send and receive connections, keeping them while other tracks are live, the publish retry, the pull retry and the tolerant close.
 
-## 8. Still open
+## 8. The 1-2 second delay after turning something back on
+
+**Where the time goes** (measured with `toggle.cjs`, no server hop): about 0.7 s for the publisher (new Cloudflare session, connection handshake, first packets) plus about 0.6 s for the receiver (pull and renegotiate), and more on a real network with the extra round trips to the server. The handshake and the two Cloudflare calls cannot be skipped.
+
+**What was done:**
+- The next send session is created in the background the moment the last track is turned off, and the next receive session when nothing live is being received any more, so turning something on only has to connect.
+- First-packet detection polls every 40 ms instead of 150 ms, camera tuning runs in parallel with the connection swap, and the first pull retry waits 250 ms instead of 500 ms.
+- Result: publish about 0.6-0.8 s (was 0.7-1.1 s). The rest is network.
+
+**Loading states** (so the remaining wait is visible, not a blank):
+- The mic, camera and screen-share buttons show a spinner and ignore extra clicks while a change is in flight (`callManager.withPending`, global `mediaPending`), including the time spent opening the device.
+- A remote person's tile shows "Starting X's camera..." and a presenter's tile shows "Loading X's screen..." from the moment the stream is announced until its media arrives. The screen placeholder takes the stage immediately. A stream that never arrives stops spinning after 15 seconds.
+
+## 9. Still open
 
 - A call between two real devices over the internet through the deployed app.
 - The deployed Render backend has none of this yet (nothing is committed); it also needs the `CF_*` variables and `VAULT_RP_ID`.

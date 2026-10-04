@@ -37,6 +37,10 @@ The headless test browser never reproduced that last one, so it was found from t
 | After the call connected, mic, camera and screen share worked once; turning them off and on again never worked (screen share not at all) | Cloudflare drops a session's transport when its last track is closed, so tracks published later on that same session are never received. Subscribers got `empty_track_error` then `transport_unavailable_error`, and the pull code gave up | A fresh send connection and session when publishing restarts from empty; a track is announced only after packets are really leaving; refused pulls are retried with backoff. Found by a live off/on test, confirmed by a control run that kept a second track alive |
 | The same happened on the receiving side (`410 Session appears to be disconnected`), and a failed close left the button stuck "on" | A receive session with nothing live is also dropped by Cloudflare; the stop handlers exited before resetting their state when the server call failed | Fresh receive connection when nothing live is being received; the server removes a track even if Cloudflare rejects the close; stop handlers always reset the button; one automatic retry of a refused publish; the console names the failing request |
 
+## Part 2c: The delay after turning a feature back on
+
+About 1-2 s on a real network: a new Cloudflare session, the connection handshake, then the other side pulls and renegotiates. Measured at about 0.7 s (sender) plus 0.6 s (receiver) without the server round trips. Reduced by creating the next send and receive sessions in the background as soon as the previous ones go idle, faster first-packet detection, parallel camera tuning and an earlier first retry; the rest is real network time, so the meeting now shows it: control buttons spin and ignore extra clicks while a change is in flight, and remote tiles show "Starting X's camera..." / "Loading X's screen..." until the media arrives (giving up after 15 s).
+
 ## Part 3: Meeting UI
 
 - **Names**: a tag on every tile; a presenter's screen is labelled "Name's screen"; your own preview says "You".

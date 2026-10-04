@@ -33,6 +33,7 @@ const fresh = () => ({
   retryTimers: new Set(),
   sendUsed: false, // the send session has carried a track at some point
   pullUsed: false, // the receive session has pulled a track at some point
+  nextSendSession: null, // promise of a send session created ahead of time (see prepareNextSendSession)
   pullStale: false, // the last pull failed in a way a fresh receive session may fix
   failedNotified: false,
 });
@@ -101,7 +102,7 @@ const waitSending = async (sender, ms) => {
       return;
     }
     // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 40));
   }
 };
 
@@ -254,6 +255,7 @@ const requirePullPc = () => {
 export function close() {
   s.timers.forEach((timer) => clearTimeout(timer));
   s.retryTimers.forEach((timer) => clearTimeout(timer));
+  if (s.nextSendSession) s.nextSendSession.catch(() => {});
   const old = [s.pc, s.pullPc];
   s = fresh();
   old.forEach((pc) => {
@@ -276,7 +278,9 @@ const makePc = () => new RTCPeerConnection({ iceServers: (s.config && s.config.i
 // starts and nothing is currently published, swap in a brand new send connection and session. The
 // receive connection is untouched.
 const refreshSendConnection = async () => {
-  const { sessionId } = await ask('cf:session:new', { sendOnly: true });
+  const pending = s.nextSendSession;
+  s.nextSendSession = null;
+  const { sessionId } = await (pending || ask('cf:session:new', { sendOnly: true }));
   const old = s.pc;
   s.pc = makePc();
   s.pc.onconnectionstatechange = onConnectionStateChange(s.pc);
@@ -292,6 +296,18 @@ const refreshSendConnection = async () => {
       /* already closed */
     }
   }
+};
+
+// Creating the new send session takes a round trip to our server and one to Cloudflare. Do it as soon
+// as the last track is turned off, while nothing is waiting on it, so turning something back on only
+// has to connect. Best effort: a failure here just means the session is created on demand instead.
+const prepareNextSendSession = () => {
+  if (s.nextSendSession) return;
+  const pending = ask('cf:session:new', { sendOnly: true });
+  s.nextSendSession = pending;
+  pending.catch(() => {
+    if (s.nextSendSession === pending) s.nextSendSession = null;
+  });
 };
 
 // Same problem on the receiving side: a receive session with nothing live on it is disconnected by
@@ -414,8 +430,9 @@ export async function produce(slot, stream, { isScreen = false } = {}) {
 
   return enqueue(async () => {
     requirePc();
-    if (s.sendUsed && !Object.values(s.published).some(Boolean)) await refreshSendConnection();
-    await improveCapture(track, slot);
+    const needsFreshSend = s.sendUsed && !Object.values(s.published).some(Boolean);
+    // Capture tuning and the connection swap are independent: do them together.
+    await Promise.all([improveCapture(track, slot), needsFreshSend ? refreshSendConnection() : null]);
     try {
       s.published[slot] = await sendOnce(requirePc(), { slot, kind, track, stream, isScreen });
     } catch (err) {
@@ -445,12 +462,13 @@ export async function unpublish(slot) {
     } catch (e) {
       /* already stopped */
     }
+    if (!Object.values(s.published).some(Boolean)) prepareNextSendSession();
   });
 }
 
 // Cloudflare refuses a pull while the publisher's media has not reached it yet (empty_track_error).
 // That is transient, so retry a few times with growing delays instead of giving up for good.
-const RETRY_DELAYS_MS = [500, 1000, 2000, 4000, 8000];
+const RETRY_DELAYS_MS = [250, 500, 1000, 2000, 4000, 8000];
 const scheduleRetry = (producerID) => {
   const used = s.retries.get(producerID) || 0;
   if (used >= RETRY_DELAYS_MS.length) return;
@@ -516,6 +534,14 @@ export function onProducersChanged() {
   s.pulled.forEach((id) => {
     if (!live.has(id)) s.pulled.delete(id);
   });
+
+  // Nothing live is being received any more: Cloudflare will drop this receive session, so swap in a new
+  // one now (in the background) rather than at the moment the next remote track needs pulling.
+  if (s.pullUsed && s.pulled.size === 0) {
+    enqueue(() => (s.pullUsed && s.pulled.size === 0 ? refreshPullConnection() : null), true).catch((err) =>
+      console.warn('could not prepare a new receive connection:', err && err.message),
+    );
+  }
 
   const todo = producers.filter((p) => p.roomID === s.roomID && p.socketID !== myId && !s.pulled.has(p.producerID));
   if (!todo.length) return;

@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { Monitor } from 'lucide-react';
+import { Loader2, Monitor } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import Config from '../../../config';
 
 // One participant tile (a person's camera / avatar, or a shared screen). Every tile carries a
 // name tag so you always know who is who; the person tile also owns that person's <audio>.
-function Interface({ audio, video, peer = {}, isMaximized, isScreen, label, compact = false, testId }) {
+function Interface({ audio, video, peer = {}, isMaximized, isScreen, label, compact = false, testId, loadingLabel = '' }) {
   const audioRef = useRef(null);
   const videoRef = useRef(null);
 
@@ -66,6 +66,15 @@ function Interface({ audio, video, peer = {}, isMaximized, isScreen, label, comp
               {initials}
             </AvatarFallback>
           </Avatar>
+        </div>
+      )}
+
+      {loadingLabel && (
+        // Shown while the stream is announced but its media has not arrived yet.
+        <div role="status" aria-live="polite" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2">
+          <div className="absolute inset-0 animate-pulse bg-muted/70 backdrop-blur-sm" />
+          <Loader2 className={cn('relative animate-spin text-primary', compact ? 'h-4 w-4' : 'h-7 w-7')} aria-hidden />
+          {!compact && <span className="relative px-3 text-center text-xs font-medium text-foreground sm:text-sm">{loadingLabel}</span>}
         </div>
       )}
 

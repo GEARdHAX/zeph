@@ -538,6 +538,19 @@ async function produceScreen(stream) {
   }
 }
 
+// Runs a mic / camera / screen-share change while marking it as in flight, so the controls can show a
+// spinner and a second click can't start a conflicting change before the first finished.
+async function withPending(kind, fn) {
+  const current = getGlobal().mediaPending || {};
+  if (current[kind]) return undefined;
+  await setGlobal({ mediaPending: { ...current, [kind]: true } });
+  try {
+    return await fn();
+  } finally {
+    await setGlobal({ mediaPending: { ...(getGlobal().mediaPending || {}), [kind]: false } });
+  }
+}
+
 async function stopAudio() {
   try {
     const io = getIO();
@@ -681,6 +694,7 @@ async function leave({ serverKnowsRoom = true } = {}) {
     audioStream: null,
     videoStream: null,
     screenStream: null,
+    mediaPending: { audio: false, video: false, screen: false },
   });
 
   store.dispatch({ type: Actions.RTC_LEAVE });
@@ -807,6 +821,7 @@ export default {
   produceAudio,
   produceVideo,
   produceScreen,
+  withPending,
   stopAudio,
   stopVideo,
   stopScreen,

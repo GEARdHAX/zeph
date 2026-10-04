@@ -99,6 +99,9 @@ const init = async () => {
     audioStream: null,
     videoStream: null,
     screenStream: null,
+    // Which of mic / camera / screen share is mid-change (opening the device, connecting, closing). The
+    // controls show a spinner and ignore extra clicks while one is in flight. See callManager.withPending.
+    mediaPending: { audio: false, video: false, screen: false },
     // A recorded-but-not-yet-summarized meeting (MeetingRecorder.jsx's
     // recording, finalized by callManager.js's leave() once the meeting has
     // actually ended). { meetingId, blob } or null.

@@ -29,12 +29,13 @@ const CYCLES = Number(process.env.CYCLES || 3);
   const snap = () => Object.keys(registry).map((p) => ({ producerID: p, roomID: 'r', socketID: registry[p].socketID, userID: 'a', kind: registry[p].kind, isScreen: !!registry[p].isScreen }));
 
   const publish = (slot) => A.evaluate(async (slot) => {
+    const t0 = performance.now();
     try {
       const media = slot === 'audio' ? await navigator.mediaDevices.getUserMedia({ audio: true })
         : slot === 'video' ? await navigator.mediaDevices.getUserMedia({ video: true })
           : await navigator.mediaDevices.getDisplayMedia({ video: true, preferCurrentTab: true });
       await window.__engine.produce(slot, media, { isScreen: slot === 'screen' });
-      window.__tracks = window.__tracks || {}; window.__tracks[slot] = media; return 'ok';
+      window.__tracks = window.__tracks || {}; window.__tracks[slot] = media; return 'ok ' + Math.round(performance.now() - t0) + 'ms';
     } catch (e) { return 'ERR ' + e.message; }
   }, slot);
   const stop = async (slot) => {
@@ -49,20 +50,22 @@ const CYCLES = Number(process.env.CYCLES || 3);
   const receive = (kind) => B.evaluate(async ({ producers, kind }) => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const before = window.__g.streams.length;
+    const r0 = performance.now();
     window.__redux.rtc.producers = producers; window.__engine.onProducersChanged();
     const t0 = Date.now(); while (Date.now() - t0 < 15000 && window.__g.streams.length <= before) await wait(200);
     if (window.__g.streams.length <= before) return 'NO NEW STREAM';
+    const streamMs = Math.round(performance.now() - r0);
     const s = window.__g.streams[window.__g.streams.length - 1];
     const track = (s.isVideo ? s.getVideoTracks() : s.getAudioTracks())[0];
     const bytes = async () => { let n = 0; for (const pc of window.__clientPCs) { const st = await pc.getStats(); st.forEach((x) => { if (x.type === 'inbound-rtp' && x.trackIdentifier === track.id) n = x.bytesReceived || 0; }); } return n; };
     await wait(1500); const b1 = await bytes(); await wait(1500); const b2 = await bytes();
-    return `${track.muted ? 'MUTED' : 'live'} bytes ${b1}->${b2} ${b2 > b1 ? 'FLOWING' : 'STALLED'}`;
+    return `stream after ${streamMs}ms, ${b2 > b1 ? 'FLOWING' : 'STALLED'}`;
   }, { producers: snap(), kind });
 
   for (const slot of ['audio', 'video', 'screen']) {
     for (let i = 1; i <= CYCLES; i += 1) {
       const p = await publish(slot);
-      const r = p === 'ok' ? await receive(slot) : 'n/a';
+      const r = p.startsWith('ok') ? await receive(slot) : 'n/a';
       console.log(`${slot.padEnd(6)} on  #${i}: publish ${p}; receiver ${r}`);
       const s = await stop(slot);
       if (s !== 'ok') console.log(`${slot.padEnd(6)} off #${i}: ${s}`);
