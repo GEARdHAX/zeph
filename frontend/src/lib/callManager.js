@@ -9,6 +9,7 @@ import uploadMeetingRecording from '../actions/uploadMeetingRecording';
 import summarizeMeeting from '../actions/summarizeMeeting';
 import getMeetingSummary from '../actions/getMeetingSummary';
 import { getAiErrorMessage } from './aiErrorMessage';
+import * as cloudflareCall from './cloudflareCall';
 
 // Owns the mediasoup call session (Device, transports, producers) as
 // module-level state instead of component-local state — this is what makes
@@ -31,8 +32,33 @@ let roomID = null;
 let unsubscribeFromProducers = null;
 let unsubscribeFromClosingState = null;
 let rejoinInFlight = false;
+// Which engine carries the current call ('mediasoup' | 'cloudflare'). The SERVER
+// decides (call:config) so one frontend build works with either backend.
+let backend = null;
+let lastCallConfig = null;
 
 const getIO = () => store.getState().io.io;
+
+const CALL_ERROR_MESSAGES = {
+  room_full: 'This call is full. Group calls are limited to a few people.',
+  calls_not_configured: "Calling isn't set up on this server yet.",
+  monthly_limit_reached: 'Calling is paused for now because the monthly usage limit was reached.',
+  unauthorized: "You can't join this call.",
+};
+
+// Ends a call that failed to start. Known server refusals get a friendly toast
+// and resolve quietly; anything else rethrows so the caller's generic handler
+// shows its message. serverKnowsRoom=false skips the server-side leave/summary
+// work for a join the server never accepted.
+async function failCall(err, serverKnowsRoom) {
+  const message = CALL_ERROR_MESSAGES[err && err.message];
+  await leave({ serverKnowsRoom });
+  if (message) {
+    toast.error(message);
+    return;
+  }
+  throw err;
+}
 
 // STRICT camera/mic release: stop every getUserMedia()/getDisplayMedia()
 // track this tab could be holding — the join-screen preview streams
@@ -95,6 +121,10 @@ const consume = async (recvTransport, producer) => {
 // is browsing a different chat, using the always-current module-level
 // `device` rather than a component's stale/null useState.
 const onProducersChanged = async () => {
+  if (backend === 'cloudflare') {
+    cloudflareCall.onProducersChanged();
+    return;
+  }
   if (!device || !window.transport) return;
   const { producers } = store.getState().rtc;
   if (!window.consumers) window.consumers = [];
@@ -153,37 +183,10 @@ const subscribe = async (deviceInstance, socketID) => {
   window.transport = recvTransport;
 };
 
-const join = async (targetRoomID) => {
-  const io = getIO();
-  roomID = targetRoomID;
-
-  await setGlobal({ callStatus: 'in-call' });
-
-  window.consumers = [];
-  await setGlobal({ streams: [] });
-
-  store.dispatch({ type: Actions.RTC_ROOM_ID, roomID });
-
-  const { producers, consumers, peers } = await io.request('join', { roomID });
-  store.dispatch({ type: Actions.RTC_CONSUMERS, consumers, peers });
-
-  const routerRtpCapabilities = await io.request('getRouterRtpCapabilities');
-  device = new mediasoup.Device();
-  await device.load({ routerRtpCapabilities });
-
-  await subscribe(device);
-
-  // Register both store subscriptions BEFORE dispatching RTC_PRODUCERS —
-  // store.subscribe() only fires on subsequent changes after registration,
-  // unlike a component's useEffect([producers]) which always runs at least
-  // once on mount regardless of ordering. Dispatching first meant the
-  // initial batch of producers already in the room at join time (i.e. the
-  // other participant's already-active camera/mic) was recorded in Redux
-  // but never actually consumed — this callManager module has been
-  // running strictly reactively since, seeing only producers that changed
-  // AFTER it started listening. Registering the subscriptions first, then
-  // dispatching, ensures this dispatch itself is what onProducersChanged
-  // reacts to.
+// Both store subscriptions must exist BEFORE RTC_PRODUCERS is dispatched at join:
+// store.subscribe() only fires on later changes, so dispatching first would record
+// the producers already in the room without ever acting on them. Idempotent.
+function registerSubscriptions() {
   if (!unsubscribeFromProducers) {
     let previousProducers = store.getState().rtc.producers;
     unsubscribeFromProducers = store.subscribe(() => {
@@ -205,6 +208,135 @@ const join = async (targetRoomID) => {
       previousClosingState = current;
     });
   }
+}
+
+// Cloudflare path of join(): the server already admitted this socket and picked
+// the engine; open the Cloudflare session, then publish whatever we have.
+async function joinCloudflare(config, producers) {
+  lastCallConfig = config;
+  registerSubscriptions();
+  try {
+    await cloudflareCall.start({ roomID, config, onFailed: reconnectCloudflareMedia });
+    store.dispatch({ type: Actions.RTC_PRODUCERS, producers: producers || [] });
+    // Only what the join screen actually captured (the toggles may both be off).
+    if (getGlobal().audioStream) await produceAudio();
+    if (getGlobal().videoStream) await produceVideo();
+  } catch (err) {
+    await failCall(err, true);
+  }
+}
+
+// The socket reconnected mid-call (new socket id): the server dropped our meeting
+// membership, so re-join it and rebuild the media connection from scratch.
+async function rejoinCloudflare() {
+  rejoinInFlight = true;
+  let rejoinFailed = false;
+  const targetRoomID = roomID;
+  try {
+    store.dispatch({ type: Actions.RTC_RECONNECTING, reconnecting: true });
+    await setGlobal({ streams: [] });
+    cloudflareCall.close();
+    const io = getIO();
+    const { producers } = await io.request('join', { roomID: targetRoomID });
+    const config = await io.request('call:config', {});
+    lastCallConfig = config;
+    await cloudflareCall.start({ roomID: targetRoomID, config, onFailed: reconnectCloudflareMedia });
+    store.dispatch({ type: Actions.RTC_PRODUCERS, producers: producers || [], replace: true });
+    // Local tracks survive a network drop; just publish them on the new session.
+    const { audioStream, videoStream } = getGlobal();
+    if (audioStream) await produceAudio(audioStream);
+    if (videoStream) await produceVideo(videoStream);
+  } catch (err) {
+    console.log('rejoin failed', err);
+    rejoinFailed = true;
+  } finally {
+    rejoinInFlight = false;
+    store.dispatch({ type: Actions.RTC_RECONNECTING, reconnecting: false });
+  }
+  if (rejoinFailed) await leave();
+}
+
+// Only the media connection died (ICE failed) while the socket is fine: no
+// re-join needed, just a fresh Cloudflare session. The server drops our old
+// tracks from the room; remote producers in Redux are still valid and re-pulled.
+async function reconnectCloudflareMedia() {
+  if (rejoinInFlight || !roomID || backend !== 'cloudflare') return;
+  rejoinInFlight = true;
+  let failed = false;
+  try {
+    store.dispatch({ type: Actions.RTC_RECONNECTING, reconnecting: true });
+    await setGlobal({ streams: [] });
+    await cloudflareCall.start({ roomID, config: lastCallConfig, renew: true, onFailed: reconnectCloudflareMedia });
+    cloudflareCall.onProducersChanged();
+    const { audioStream, videoStream } = getGlobal();
+    if (audioStream) await produceAudio(audioStream);
+    if (videoStream) await produceVideo(videoStream);
+  } catch (err) {
+    console.log('media reconnect failed', err);
+    failed = true;
+  } finally {
+    rejoinInFlight = false;
+    store.dispatch({ type: Actions.RTC_RECONNECTING, reconnecting: false });
+  }
+  if (failed) await leave();
+}
+
+const join = async (targetRoomID) => {
+  const io = getIO();
+  roomID = targetRoomID;
+
+  await setGlobal({ callStatus: 'in-call' });
+
+  window.consumers = [];
+  await setGlobal({ streams: [] });
+
+  store.dispatch({ type: Actions.RTC_ROOM_ID, roomID });
+
+  let joinRes;
+  try {
+    joinRes = await io.request('join', { roomID });
+  } catch (err) {
+    await failCall(err, false);
+    return;
+  }
+  const { producers, consumers, peers } = joinRes;
+  store.dispatch({ type: Actions.RTC_CONSUMERS, consumers, peers });
+
+  let callConfig;
+  try {
+    callConfig = await io.request('call:config', {});
+  } catch (err) {
+    // A backend older than call:config never acks it: it can only be mediasoup.
+    if (/^Timed out/.test(err.message)) callConfig = { backend: 'mediasoup' };
+    else {
+      await failCall(err, true);
+      return;
+    }
+  }
+  backend = callConfig.backend;
+  if (backend === 'cloudflare') {
+    await joinCloudflare(callConfig, producers);
+    return;
+  }
+
+  const routerRtpCapabilities = await io.request('getRouterRtpCapabilities');
+  device = new mediasoup.Device();
+  await device.load({ routerRtpCapabilities });
+
+  await subscribe(device);
+
+  // Register both store subscriptions BEFORE dispatching RTC_PRODUCERS —
+  // store.subscribe() only fires on subsequent changes after registration,
+  // unlike a component's useEffect([producers]) which always runs at least
+  // once on mount regardless of ordering. Dispatching first meant the
+  // initial batch of producers already in the room at join time (i.e. the
+  // other participant's already-active camera/mic) was recorded in Redux
+  // but never actually consumed — this callManager module has been
+  // running strictly reactively since, seeing only producers that changed
+  // AFTER it started listening. Registering the subscriptions first, then
+  // dispatching, ensures this dispatch itself is what onProducersChanged
+  // reacts to.
+  registerSubscriptions();
 
   store.dispatch({ type: Actions.RTC_PRODUCERS, producers: producers || [] });
 
@@ -259,7 +391,12 @@ const join = async (targetRoomID) => {
 // already discarded, so leaving them up would show frozen/dead tiles
 // instead of the honest brief gap the `reconnecting` banner already covers.
 const rejoin = async () => {
-  if (rejoinInFlight || !roomID || !device) return;
+  if (rejoinInFlight || !roomID) return;
+  if (backend === 'cloudflare') {
+    await rejoinCloudflare();
+    return;
+  }
+  if (!device) return;
   rejoinInFlight = true;
   let rejoinFailed = false;
   const targetRoomID = roomID;
@@ -358,8 +495,12 @@ async function produceAudio(stream) {
   // lit after hang-up.
   await setGlobal({ audio: true, audioStream: useStream });
   try {
-    const track = useStream.getAudioTracks()[0];
-    audioProducer = await sendTransport.produce({ track });
+    if (backend === 'cloudflare') {
+      await cloudflareCall.produce('audio', useStream);
+    } else {
+      const track = useStream.getAudioTracks()[0];
+      audioProducer = await sendTransport.produce({ track });
+    }
   } catch (err) {
     console.log('getusermedia produce failed', err);
     await setGlobal({ audio: false });
@@ -370,8 +511,12 @@ async function produceVideo(stream) {
   const useStream = stream || getGlobal().videoStream;
   await setGlobal({ video: true, videoStream: useStream, localStream: useStream });
   try {
-    const track = useStream.getVideoTracks()[0];
-    videoProducer = await sendTransport.produce({ track, appData: { isScreen: false } });
+    if (backend === 'cloudflare') {
+      await cloudflareCall.produce('video', useStream);
+    } else {
+      const track = useStream.getVideoTracks()[0];
+      videoProducer = await sendTransport.produce({ track, appData: { isScreen: false } });
+    }
   } catch (err) {
     console.log('getusermedia produce failed', err);
     await setGlobal({ video: false });
@@ -380,9 +525,13 @@ async function produceVideo(stream) {
 
 async function produceScreen(stream) {
   try {
-    const track = stream.getVideoTracks()[0];
     await setGlobal({ localStream: stream });
-    screenProducer = await sendTransport.produce({ track, appData: { isScreen: true } });
+    if (backend === 'cloudflare') {
+      await cloudflareCall.produce('screen', stream, { isScreen: true });
+    } else {
+      const track = stream.getVideoTracks()[0];
+      screenProducer = await sendTransport.produce({ track, appData: { isScreen: true } });
+    }
     await setGlobal({ screen: true });
   } catch (err) {
     console.log('getusermedia produce failed', err);
@@ -398,9 +547,13 @@ async function stopAudio() {
     // the track itself is stopped (same class of bug as leave(), see
     // there for the full explanation).
     if (audioStream) audioStream.getAudioTracks().forEach((track) => track.stop());
-    await io.request('remove', { producerID: audioProducer.id, roomID });
-    audioProducer.close();
-    audioProducer = null;
+    if (backend === 'cloudflare') {
+      await cloudflareCall.unpublish('audio');
+    } else {
+      await io.request('remove', { producerID: audioProducer.id, roomID });
+      audioProducer.close();
+      audioProducer = null;
+    }
     await setGlobal({ audio: false, audioStream: null });
   } catch (e) {
     console.log(e);
@@ -410,13 +563,18 @@ async function stopAudio() {
 async function stopVideo() {
   try {
     const io = getIO();
-    const { localStream, videoStream } = getGlobal();
-    if (localStream) localStream.getVideoTracks().forEach((track) => track.stop());
+    const { localStream, videoStream, screenStream, screen } = getGlobal();
+    // localStream may currently be the screen share: only stop the camera's own tracks.
     if (videoStream) videoStream.getVideoTracks().forEach((track) => track.stop());
-    await io.request('remove', { producerID: videoProducer.id, roomID });
-    videoProducer.close();
-    videoProducer = null;
-    await setGlobal({ video: false, localStream: null, videoStream: null });
+    if (localStream && localStream !== screenStream) localStream.getVideoTracks().forEach((track) => track.stop());
+    if (backend === 'cloudflare') {
+      await cloudflareCall.unpublish('video');
+    } else {
+      await io.request('remove', { producerID: videoProducer.id, roomID });
+      videoProducer.close();
+      videoProducer = null;
+    }
+    await setGlobal({ video: false, localStream: screen ? screenStream : null, videoStream: null });
   } catch (e) {
     console.log(e);
   }
@@ -425,13 +583,17 @@ async function stopVideo() {
 async function stopScreen() {
   try {
     const io = getIO();
-    const { localStream, screenStream } = getGlobal();
-    if (localStream) localStream.getVideoTracks().forEach((track) => track.stop());
+    const { screenStream, videoStream, video } = getGlobal();
     if (screenStream) screenStream.getVideoTracks().forEach((track) => track.stop());
-    await io.request('remove', { producerID: screenProducer.id, roomID });
-    screenProducer.close();
-    screenProducer = null;
-    await setGlobal({ screen: false, localStream: null, screenStream: null });
+    if (backend === 'cloudflare') {
+      await cloudflareCall.unpublish('screen');
+    } else {
+      await io.request('remove', { producerID: screenProducer.id, roomID });
+      screenProducer.close();
+      screenProducer = null;
+    }
+    // Hand the local preview back to the camera if it is still on.
+    await setGlobal({ screen: false, localStream: video ? videoStream : null, screenStream: null });
   } catch (e) {
     console.log(e);
   }
@@ -448,7 +610,7 @@ async function stopScreen() {
 // server, reset every call-related global, tell the counterpart via
 // postClose) so it works correctly regardless of which component (if any)
 // invoked it.
-async function leave() {
+async function leave({ serverKnowsRoom = true } = {}) {
   const io = getIO();
   const endingRoomID = roomID;
   const { counterpart } = store.getState().rtc;
@@ -458,6 +620,8 @@ async function leave() {
   // the user hangs up, before the slower server round-trip below.
   await releaseAllMedia();
 
+  cloudflareCall.close();
+
   try {
     if (sendTransport) sendTransport.close();
   } catch (e) {
@@ -465,7 +629,7 @@ async function leave() {
   }
 
   try {
-    if (io && endingRoomID) await io.request('leave', { roomID: endingRoomID });
+    if (io && endingRoomID && serverKnowsRoom) await io.request('leave', { roomID: endingRoomID });
   } catch (e) {
     /* best-effort notify */
   }
@@ -474,7 +638,7 @@ async function leave() {
   // once the ack above confirms the server has processed this leave (see
   // finalizeMeetingRecording's comment). Fire-and-forget — must not block
   // the rest of teardown/navigation on an upload+AI round trip.
-  if (endingRoomID) finalizeMeetingRecording(endingRoomID).catch(() => {});
+  if (endingRoomID && serverKnowsRoom) finalizeMeetingRecording(endingRoomID).catch(() => {});
 
   if (unsubscribeFromProducers) {
     unsubscribeFromProducers();
@@ -491,10 +655,12 @@ async function leave() {
   videoProducer = null;
   screenProducer = null;
   roomID = null;
+  backend = null;
+  lastCallConfig = null;
   window.transport = null;
   window.consumers = [];
 
-  if (counterpart && endingRoomID) {
+  if (counterpart && endingRoomID && serverKnowsRoom) {
     postClose({ meetingID: endingRoomID, userID: counterpart._id }).catch(() => {});
   }
 

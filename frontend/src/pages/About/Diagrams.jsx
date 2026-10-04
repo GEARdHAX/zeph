@@ -61,8 +61,8 @@ export function Architecture() {
   return (
     <div>
       <div className="grid gap-3 md:grid-cols-3">
-        <Group title="CLIENT" items={['React + Redux', 'Socket.IO client', 'mediasoup client', 'IndexedDB outbox']} />
-        <Group title="REAL-TIME" items={['Socket.IO', 'Redis adapter', 'mediasoup (WebRTC)']} />
+        <Group title="CLIENT" items={['React + Redux', 'Socket.IO client', 'WebRTC', 'IndexedDB outbox']} />
+        <Group title="REAL-TIME" items={['Socket.IO', 'Redis adapter', 'Cloudflare Realtime SFU', 'mediasoup (self-hosted option)']} />
         <Group title="AI" items={['Provider gateway', 'BullMQ workers', 'Local or hosted models']} />
       </div>
       <Rail />
