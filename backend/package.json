@@ -11,7 +11,10 @@
     "test": "jest",
     "test:serial": "jest --runInBand",
     "bench": "node scripts/bench.js",
-    "bench:reconnect": "node scripts/bench-reconnect.js"
+    "bench:reconnect": "node scripts/bench-reconnect.js",
+    "calls:check": "node scripts/check-cloudflare-realtime.js",
+    "r2:check": "node scripts/check-r2.js",
+    "cdn:check": "node scripts/check-cdn.js"
   },
   "author": "",
   "dependencies": {

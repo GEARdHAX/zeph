@@ -5,6 +5,118 @@ Format: `D-NNN: Title — Date`
 
 ---
 
+## D-050: Signed-URL CDN for uploaded media: Cloudflare Worker in front of the private R2 bucket - 2026-10-04
+
+**Problem:** R2 holds uploads, but every download still streamed through the Render backend
+(`media.js`, `images.js`, `files.js`): no caching headers, no Range (video could not seek), all
+bytes through Node. Making the bucket public would have fixed speed but dropped the room-membership
+check on chat media.
+
+**Existing limitation:** uploads were already direct-to-R2 (presign, PUT, `complete` validation),
+so only the download side needed work. `/api/images|files` are unauthenticated by design
+(unguessable 120-char id, accepted earlier); `/api/media/:id` is JWT + room membership.
+
+**Alternatives:** (1) public bucket / `r2.dev` (rejected: no authorization, private chat media);
+(2) presigned R2 GET URLs (private, but no edge caching, and exposes the S3 endpoint to clients);
+(3) Cloudflare Worker with an R2 binding verifying HMAC-signed URLs (chosen).
+
+**Decision:** the backend keeps authentication/authorization and mints signed links; a Worker
+(`cdn-worker/`) verifies the signature and serves from R2 through a binding. Two visibilities, fixed by
+the key prefix and enforced on both sides: `public/` (deterministic signature, immutable, edge-cached)
+and `private/` (expiring signature, `private` caching only, default 1 h). New keys:
+`public/users/{id}/avatar/{shieldedId}.jpg`, `private/users/{id}/attachments/{uuid}{ext}`. Old objects
+keep old keys and keep streaming through Node, so nothing existing changes. CDN off
+(`CDN_BASE_URL`/`CDN_SIGNING_SECRET` unset) means the old behaviour everywhere.
+
+**Trade-offs:** a signed private link is a bearer credential until it expires (1 h so long videos keep
+playing; `CDN_PRIVATE_URL_TTL` lowers it). Edge caching of public files needs the domain on a Cloudflare
+zone (the Cache API is a no-op on `*.workers.dev`), so until then only browsers cache them. Avatars
+still pass one tiny 302 hop through Render. A `chat/{conversation}/{message}` key layout is impossible
+because the object exists before the message does. Avatar uploads still go through Node (they need
+server-side resizing).
+
+**Implementation:** `backend/src/cdn.js` (signing), `storageKeys.js` (key scheme), `storage.js`
+(`getObjectMetadata`, `objectExists`), `media.js` (`/:id/url`, `/:id/thumbnail/url`), `images.js`
+(302 to the edge), `info.js` (`cdnEnabled`), `cdn-worker/` (Worker), `useAuthorizedMediaUrl.js` (signed
+URL first, blob fallback). Also hardened on the way: `upload-media-complete` now HEADs the real object
+and rejects one over the category limit (the declared size was never checked), and stores an exact
+`mimeType` (direct uploads were served as `application/octet-stream`). Test runs no longer inherit real
+R2/CDN credentials from `backend/.env` (`test/helpers/env.js`); before, upload tests would have written
+into the real bucket.
+
+**Tests:** backend `cdn.test.js` (signing, authorization, fallbacks, redirect, `info`) plus updated
+upload tests; `cdn-worker/test` (12: signature parity with the backend signer, tampering, expiry,
+prefixes, traversal, Range, CORS, no R2 read on rejected requests); frontend hook (9).
+
+**Measured result / open item:** Worker logic is verified against a fake R2 bucket and the real backend
+signer. Not yet verified live: deploy the Worker, set the two variables, run `npm run cdn:check`
+(`docs/CDN-ARCHITECTURE.md` section 6). Full design: `docs/CDN-ARCHITECTURE.md`.
+
+---
+
+## D-049: Calls run on Cloudflare Realtime by default; mediasoup kept behind CALL_BACKEND — 2026-10-04
+
+**Problem:** No deployment has ever had working calls. mediasoup needs a raw UDP/TCP port range,
+which no PaaS host (Render) can expose (D-048), and a VM is not provisioned. For a portfolio project
+the goal is simply that someone can open Zeph, join a meeting and have a real call.
+
+**Existing limitation:** `backend/src/mediasoup` fused two jobs: meeting lifecycle (authorization,
+join/leave, presence, call history) and the mediasoup media plane. It also `require`s the native
+module at the top, so the lifecycle could not run anywhere mediasoup can't.
+
+**Alternatives:** (1) self-hosted mediasoup on a VM (works, costs money, needs ops); (2) P2P WebRTC
+mesh with TURN only (free, but breaks past ~3 people and drops the SFU); (3) a hosted SFU: LiveKit
+Cloud, Daily, Cloudflare Realtime; (4) Cloudflare Realtime SFU (chosen).
+
+**Decision:** `CALL_BACKEND=cloudflare|mediasoup|none`, default `cloudflare`. Cloudflare Realtime is
+plain HTTPS, so it runs on Render with no card needed to start (1,000 GB/month free, then $0.05/GB).
+mediasoup is not deleted; it is the self-hosted alternative.
+
+**Trade-offs:** a managed dependency instead of owning the media plane (less to show for engineering
+depth, so mediasoup stays in the tree); Cloudflare gives no rooms or server-side media access (rooms
+and authorization stay in Zeph; recordings are captured client-side as before); a usage guard
+approximates egress with participant-minutes instead of measuring it.
+
+**Implementation:** meeting lifecycle extracted to `backend/src/calls/roomLifecycle.js` (shared,
+hook-based: `beforeJoin`, `afterLeave`, `onMediaCleanup`); `backend/src/calls/cloudflare/` (HTTPS
+client, socket handlers, usage guard); each Cloudflare track is exposed as a "producer" with the same
+socket events the mediasoup path emits, so Redux, `initIO` and the Meeting UI are unchanged;
+`frontend/src/lib/cloudflareCall.js` (two `RTCPeerConnection`s per participant, one send-only and one receive-only, each with its own Cloudflare session and its own serialized negotiation queue) selected by
+`call:config` at join. Security: every call event re-runs `authorizeMeetingJoin` against the
+server's own room record; pulls resolve from Zeph's registry scoped to the caller's meeting; a
+track is announced only after the publisher confirms media; Cloudflare error text never reaches the
+client. 720p (1.5 Mbps) / 4-person defaults tunable by env, a higher start bitrate (a live measurement showed video stuck at 640x360 / ~250 kbps by WebRTC's slow bandwidth ramp-up), TURN credentials minted server-side.
+
+**Tests:** backend 11 (client) + 32 (socket handlers incl. cross-meeting pull, foreign-track close,
+input validation); frontend 21 (engine with a fake `RTCPeerConnection`); all 26 existing mediasoup
+tests still pass. The extraction also surfaced and fixed a stranded module variable that would have
+crashed any successful `join`. A headless-Chromium run of the real engine against a stand-in SFU
+verified negotiation order, sender caps (720p camera -> 360p), pull/track mapping, inactive-close and
+rollback-after-failure.
+
+**Measured result / open item:** verified against a live Cloudflare account with the real client code
+and two headless-Chromium clients (session, publish audio+video, subscribe with media flowing, close,
+republish). That run found two issues no mock could: Cloudflare rejects `{}` on session creation, and
+renegotiating a track close is rejected by Chrome (RTP extension ID reassignment), so closes are now
+forced without renegotiation. Still open: a two-device call over the internet through the full app and
+the deployed Render backend (`infra/cloudflare-realtime.md`).
+
+**Follow-up (2026-10-04), one connection for both directions failed in real Chrome:** with the first
+design (one connection that both published and subscribed) a participant who was already receiving
+someone's camera and screen could not start their own share: Chrome rejected Cloudflare's answer with
+"Failed to set remote video description send parameters" and the connection stayed in a sticky
+`ERROR_CONTENT` state, so every later publish and pull failed too (seen live, two Chrome tabs; the
+headless-Chromium runs never hit it). Two attempts that did not fix it: scoping the start-bitrate SDP
+edit to the published section, and retrying the publish with simpler settings (a rejected answer cannot
+be retried on the same connection). Decision: separate send and receive connections and sessions
+(`cf:session:new` now returns `sessionId` and `pullSessionId`; push/close use the first, pull/renegotiate
+the second), so Cloudflare never has to answer a send section on a connection that also carries receive
+sections. Re-verified live: 4 participants each publishing audio, camera and screen concurrently and
+receiving everyone else's (9 of 9 tracks flowing, both connections `connected`); quality unchanged
+(1280x720 at ~660 kbps). Not re-verified in real Chrome with two real machines yet.
+
+---
+
 ## D-048: Supersede D-009 — modest paid hosting budget approved, AWS no longer excluded — 2026-10-02
 
 **Context:** D-009 (2026-07-18) set a hard "₹0 forever, no credit card,
