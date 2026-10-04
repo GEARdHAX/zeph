@@ -6,6 +6,12 @@
 jest.mock('../src/queues/connection', () => ({
   getQueueConnection: () => ({}),
   closeQueueConnection: jest.fn(),
+  // Same shape as the real createQueue (a bullmq Queue), minus the error listener.
+  createQueue: (name, connection) => {
+    // eslint-disable-next-line global-require
+    const { Queue } = require('bullmq');
+    return new Queue(name, { connection });
+  },
 }));
 jest.mock('bullmq', () => {
   const add = jest.fn().mockResolvedValue(undefined);

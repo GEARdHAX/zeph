@@ -233,4 +233,23 @@ module.exports = {
   rtcMinPort: 10000,
   rtcMaxPort: 12000,
   mediasoupLogLevel: 'warn',
+
+  // Which engine carries calls: 'cloudflare' (default; managed SFU over HTTPS,
+  // runs anywhere) | 'mediasoup' (self-hosted SFU; needs MEDIASOUP_ENABLED=true,
+  // a native build and open UDP/TCP ports) | 'none'.
+  callBackend: (process.env.CALL_BACKEND || 'cloudflare').toLowerCase(),
+  // Group call size cap. A free-tier-friendly default: 360p x 4 people.
+  callMaxParticipants: Number(process.env.CALL_MAX_PARTICIPANTS) || 4,
+  // Per-sender video caps. 720p / 1.5 Mbps looks clearly good in a normal-sized tile;
+  // lower them (CALL_MAX_VIDEO_HEIGHT=360, CALL_MAX_VIDEO_KBPS=600) to stretch the free allowance.
+  callMaxVideoHeight: Number(process.env.CALL_MAX_VIDEO_HEIGHT) || 720,
+  callMaxVideoBitrate: (Number(process.env.CALL_MAX_VIDEO_KBPS) || 1500) * 1000,
+  // Safety net only (see calls/cloudflare/usageGuard.js) - normal use never nears it.
+  callMonthlyParticipantMinutes: Number(process.env.CF_MONTHLY_PARTICIPANT_MINUTES) || 25000,
+  cloudflareRealtime: {
+    appId: process.env.CF_REALTIME_APP_ID || null,
+    appSecret: process.env.CF_REALTIME_APP_SECRET || null,
+    turnKeyId: process.env.CF_TURN_KEY_ID || null,
+    turnApiToken: process.env.CF_TURN_API_TOKEN || null,
+  },
 };

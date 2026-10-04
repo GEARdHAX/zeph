@@ -97,8 +97,15 @@ const init = require('./src/init');
 // Set to 'true' only on servers that have native build tools (gcc, python3, make).
 // Glitch / shared hosts: leave unset or 'false' — API + Socket.IO still fully functional.
 // Local Docker / VPS with Dockerfile: set to 'true'.
-const mediasoupEnabled = process.env.MEDIASOUP_ENABLED === 'true';
+// CALL_BACKEND selects the calling engine. 'cloudflare' (default) is plain HTTPS to
+// Cloudflare Realtime and loads anywhere; 'mediasoup' additionally needs
+// MEDIASOUP_ENABLED=true (native build + open media ports). Only the active one is required.
+const requestedCallBackend = (process.env.CALL_BACKEND || 'cloudflare').toLowerCase();
+const mediasoupEnabled = requestedCallBackend === 'mediasoup' && process.env.MEDIASOUP_ENABLED === 'true';
+const cloudflareCallsEnabled = requestedCallBackend === 'cloudflare';
+const callBackend = mediasoupEnabled ? 'mediasoup' : cloudflareCallsEnabled ? 'cloudflare' : null;
 const mediasoup = mediasoupEnabled ? require('./src/mediasoup') : null;
+const cloudflareCalls = cloudflareCallsEnabled ? require('./src/calls/cloudflare') : null;
 
 Config = require('./config');
 
@@ -159,12 +166,18 @@ let meetingAiWorker = null;
 
 const startServer = async () => {
   await setupRedisAdapter(store.io, Config.redisUrl);
-  init(mediasoupEnabled);
-  if (mediasoupEnabled && mediasoup) {
+  init(callBackend);
+  if (callBackend === 'mediasoup') {
     mediasoup.init();
-    logger.info('Mediasoup SFU enabled');
+    logger.info('Call backend: mediasoup SFU');
+  } else if (callBackend === 'cloudflare') {
+    cloudflareCalls.init();
+    logger.info('Call backend: Cloudflare Realtime SFU');
   } else {
-    logger.info('Mediasoup SFU disabled (MEDIASOUP_ENABLED != true) — API-only mode');
+    logger.info(
+      { requested: requestedCallBackend },
+      'Calls disabled (CALL_BACKEND=none, or mediasoup requested without MEDIASOUP_ENABLED=true) — API-only mode',
+    );
   }
   // Best-effort, same posture as the Redis adapter above — no worker means
   // enqueued cleanup jobs simply wait in Redis until a worker process picks
@@ -321,6 +334,9 @@ const gracefulShutdown = async (signal) => {
     // cascades to close every router/transport/producer/consumer it owns.
     if (mediasoupEnabled && mediasoup && mediasoup.close) {
       await mediasoup.close();
+    }
+    if (cloudflareCalls && cloudflareCalls.close) {
+      await cloudflareCalls.close();
     }
 
     clearTimeout(forceExitTimer);

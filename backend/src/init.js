@@ -13,8 +13,9 @@ const argon2 = require('argon2');
 const passport = require('passport');
 const { Strategy, ExtractJwt } = require('passport-jwt');
 const { AsyncNedb } = require('nedb-async');
-// mediasoup is NOT imported here — it is passed in as a flag from index.js
-// so that Glitch deployments (no native build tools) never attempt to load it.
+// The call backends are NOT imported at the top of this file — the active one is
+// passed in from index.js ('mediasoup' | 'cloudflare' | falsy) and required lazily,
+// so hosts without native build tools (Render, Glitch) never try to load mediasoup.
 const Meeting = require('./models/Meeting');
 const Room = require('./models/Room');
 const GroupMember = require('./models/GroupMember');
@@ -23,7 +24,7 @@ const { broadcastPresence } = require('./presence');
 // Wires the Socket.IO connection/auth lifecycle onto store.io. Split out from the default
 // export so tests can boot just the socket layer without also connecting to Mongo / mounting
 // the full HTTP router (see test/socket-auth.test.js).
-const initSocketAuth = (mediasoupEnabled) => {
+const initSocketAuth = (callBackend) => {
   store.rooms = new AsyncNedb();
   store.peers = new AsyncNedb();
   store.onlineUsers = new Map();
@@ -45,9 +46,10 @@ const initSocketAuth = (mediasoupEnabled) => {
     const { email, id } = socket.decoded_token;
     logger.info({ socketId: socket.id, userId: id }, `Socket connected: ${email}`);
 
-    if (mediasoupEnabled) {
-      const mediasoup = require('./mediasoup');
-      mediasoup.initSocket(socket);
+    if (callBackend === 'mediasoup') {
+      require('./mediasoup').initSocket(socket);
+    } else if (callBackend === 'cloudflare') {
+      require('./calls/cloudflare').initSocket(socket);
     }
 
     socket.join(id);
@@ -133,8 +135,8 @@ const initSocketAuth = (mediasoupEnabled) => {
   });
 };
 
-module.exports = (mediasoupEnabled) => {
-  initSocketAuth(mediasoupEnabled);
+module.exports = (callBackend) => {
+  initSocketAuth(callBackend);
 
   // Mounted before CORS/rate-limiting/body-parsing so a monitor/load-balancer
   // probe is never blocked by any of that, and before Mongo connects so it

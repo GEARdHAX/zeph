@@ -90,6 +90,10 @@ services:
       # Set PUBLIC_IP_ADDRESS in backend/.env to your machine/server IP
       PUBLIC_IP_ADDRESS: ${PUBLIC_IP_ADDRESS:-127.0.0.1}
       MAPPED_IP: ${MAPPED_IP:-false}
+      # This stack publishes the media ports below, so it runs the self-hosted mediasoup
+      # engine by default. For Cloudflare Realtime instead: CALL_BACKEND=cloudflare.
+      CALL_BACKEND: ${CALL_BACKEND:-mediasoup}
+      MEDIASOUP_ENABLED: ${MEDIASOUP_ENABLED:-true}
     ports:
       - "${PORT:-4002}:${PORT:-4002}"
       # Mediasoup RTC UDP/TCP port range — must match config.rtcMinPort/rtcMaxPort
