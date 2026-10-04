@@ -3,8 +3,9 @@ const Room = require('../models/Room');
 const store = require('../store');
 const logger = require('../logger');
 const { invalidateProfileCache } = require('../userProfileCache');
+const { retireImage } = require('../retireImage');
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   let { imageID } = req.fields;
 
   logger.info({ userId: req.user.id }, 'Changing profile picture');
@@ -16,6 +17,9 @@ module.exports = (req, res, next) => {
   // optimistically cleared its own local copy. $unset is what's needed to
   // actually clear the field.
   const update = imageID ? { $set: { picture: imageID } } : { $unset: { picture: 1 } };
+
+  // The picture being replaced (or removed), so it can be deleted once the change has succeeded.
+  const previous = await User.findById(req.user.id).select('picture').lean().catch(() => null);
 
   User.findOneAndUpdate({ _id: req.user.id }, update, { new: true })
     .populate([{ path: 'picture', strictPopulate: false }])
@@ -50,5 +54,8 @@ module.exports = (req, res, next) => {
       }
 
       res.status(200).json(user.picture);
+
+      // After responding: replacing a picture deletes the old one (see retireImage.js).
+      retireImage(previous && previous.picture, imageID, req.user.id);
     });
 };
