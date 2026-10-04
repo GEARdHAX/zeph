@@ -26,6 +26,10 @@ const getS3 = () => {
     s3Client = new S3Client({
       region: 'auto',
       endpoint: process.env.R2_ENDPOINT,
+      // Newer SDKs add a CRC32 checksum to every request by default. For a presigned upload that is the checksum of an
+      // EMPTY body (the bytes are unknown when signing), a trap if R2 ever enforces it. Cloudflare's recommended setting.
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
       credentials: {
         accessKeyId: process.env.R2_ACCESS_KEY_ID,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,

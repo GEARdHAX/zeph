@@ -64,6 +64,7 @@ Edge caching needs a **custom domain on a Cloudflare zone**: Cloudflare's Cache 
 3. Edit `wrangler.toml` `ALLOWED_ORIGINS` (your frontend origins) if needed, then `npx wrangler deploy`. Note the `https://zeph.<you>.workers.dev` URL.
 4. Optional, enables edge caching: move `zephchat.tech` to Cloudflare DNS (copy every existing record first: `www` to Vercel, `api` to Render, any MX/TXT mail records), then add a Worker route/custom domain `cdn.zephchat.tech`.
 5. R2 bucket stays private: do **not** enable `r2.dev` or a public custom domain on the bucket.
+6. **Bucket CORS (required for uploads).** Browsers upload straight to R2 with a presigned link, and without a CORS rule on the bucket the browser blocks it before it starts (the preflight gets a 403). Apply `cdn-worker/r2-cors.json` once: `cd cdn-worker && npx wrangler r2 bucket cors set zeph-uploads --file r2-cors.json`. It allows only `PUT`, only from the site's origins (`https://www.zephchat.tech`, `https://zephchat.tech`, `http://localhost:5173`); add any new frontend origin to that file and re-run the command. Downloads never touch R2 directly (they go through the Worker), so no GET rule is needed.
 
 ## 7. Backend changes
 
