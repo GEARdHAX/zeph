@@ -67,7 +67,9 @@ module.exports = async (req, res) => {
   credential.lastUsedAt = new Date();
   await credential.save().catch(() => {});
 
-  const user = await User.findById(credential.user);
+  // The picture must be populated: the session token embeds it and the app builds the avatar URL from
+  // picture.shieldedID. A bare ObjectId has none, which made the avatar blank after a passkey login.
+  const user = await User.findById(credential.user).populate([{ path: 'picture', strictPopulate: false }]);
   if (!user) return fail(req, res, 'user_gone');
 
   try {

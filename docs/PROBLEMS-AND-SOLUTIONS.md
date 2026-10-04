@@ -77,6 +77,12 @@ About 1-2 s on a real network: a new Cloudflare session, the connection handshak
 
 Google refreshes favicons on its own schedule (days to weeks); requesting indexing of the home page in Search Console speeds it up.
 
+## Part 7: Blank avatar after signing back in
+
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| Sign out on the phone, change the picture on the PC, sign in on the phone: blank avatar | Two things. (1) A browser kept the old picture reference in its stored profile after the picture changed elsewhere, and the old image is now deleted. (2) The **passkey** login loaded the user without populating the picture, so the session token carried a bare ID with no `shieldedID`, and the app requested `/api/images/undefined/...`. Password login already populated it | (1) the change is pushed to the user's other sessions, and the startup check returns the current picture so a stale browser corrects itself (see Part 2c area). (2) `passkey/login-verify.js` now populates the picture; `passkey-login-picture.test.js` fails without that line. A picture that still fails to load falls back to the initials |
+
 ## What worked as a method
 
 1. **Measure before tuning.** The video-quality fix came from `getStats()` numbers, not guesses.
