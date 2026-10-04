@@ -17,6 +17,7 @@ const cf = createCloudflareClient({
 const sessions = {}; const pullSessions = {}; const registry = {}; const log = [];
 const server = async (client, event, p) => {
   log.push(`${client}:${event}`);
+  if (event === 'cf:session:new' && p && p.pullOnly) { pullSessions[client] = await cf.newSession(); return { sessionId: sessions[client], pullSessionId: pullSessions[client] }; }
   if (event === 'cf:session:new' && p && p.sendOnly) { sessions[client] = await cf.newSession(); return { sessionId: sessions[client], pullSessionId: pullSessions[client] }; }
   if (event === 'cf:session:new') { sessions[client] = await cf.newSession(); pullSessions[client] = await cf.newSession(); return { sessionId: sessions[client], pullSessionId: pullSessions[client] }; }
   if (event === 'cf:tracks:push') {

@@ -557,6 +557,8 @@ async function stopAudio() {
     await setGlobal({ audio: false, audioStream: null });
   } catch (e) {
     console.log(e);
+    // The mic is already stopped locally: never leave the button stuck on.
+    await setGlobal({ audio: false, audioStream: null });
   }
 }
 
@@ -577,6 +579,8 @@ async function stopVideo() {
     await setGlobal({ video: false, localStream: screen ? screenStream : null, videoStream: null });
   } catch (e) {
     console.log(e);
+    const { screen: sharing, screenStream: shared } = getGlobal();
+    await setGlobal({ video: false, localStream: sharing ? shared : null, videoStream: null });
   }
 }
 
@@ -596,6 +600,8 @@ async function stopScreen() {
     await setGlobal({ screen: false, localStream: video ? videoStream : null, screenStream: null });
   } catch (e) {
     console.log(e);
+    const { video: cameraOn, videoStream: camera } = getGlobal();
+    await setGlobal({ screen: false, localStream: cameraOn ? camera : null, screenStream: null });
   }
 }
 

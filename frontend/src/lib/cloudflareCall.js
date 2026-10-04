@@ -32,6 +32,8 @@ const fresh = () => ({
   retries: new Map(), // producerID -> pull attempts used
   retryTimers: new Set(),
   sendUsed: false, // the send session has carried a track at some point
+  pullUsed: false, // the receive session has pulled a track at some point
+  pullStale: false, // the last pull failed in a way a fresh receive session may fix
   failedNotified: false,
 });
 
@@ -48,7 +50,14 @@ const enqueue = (fn, receiving = false) => {
 };
 
 // io.request rejects with Error(code) when the server acks { error: code }.
-const ask = (event, payload) => getIO().request(event, payload);
+const ask = (event, payload) =>
+  getIO()
+    .request(event, payload)
+    .catch((err) => {
+      // The server only sends a short code; the console names which request failed.
+      console.warn('call request failed:', event, err && err.message);
+      throw err;
+    });
 
 const randomId = () => Math.random().toString(36).slice(2, 10);
 
@@ -285,6 +294,32 @@ const refreshSendConnection = async () => {
   }
 };
 
+// Same problem on the receiving side: a receive session with nothing live on it is disconnected by
+// Cloudflare (410 "Session appears to be disconnected"), after which every pull on it fails. Before a
+// pull, if nothing is currently being received (or the last pull failed), use a new receive connection.
+const refreshPullConnection = async () => {
+  const { pullSessionId } = await ask('cf:session:new', { pullOnly: true });
+  const old = s.pullPc;
+  s.pullPc = makePc();
+  s.pullPc.ontrack = onTrack;
+  s.pullPc.onconnectionstatechange = onConnectionStateChange(s.pullPc);
+  s.midToProducer.clear();
+  s.pullUsed = false;
+  s.pullStale = false;
+  if (old) {
+    clearTimeout(s.timers.get(old));
+    s.timers.delete(old);
+    old.ontrack = null;
+    old.onconnectionstatechange = null;
+    try {
+      old.close();
+    } catch (e) {
+      /* already closed */
+    }
+  }
+  return pullSessionId;
+};
+
 // Opens the Cloudflare sessions + the two PeerConnections (send / receive). `renew` asks the server to drop
 // this socket's old tracks first (used when only the media connection died).
 export async function start({ roomID, config, renew = false, onFailed = null }) {
@@ -380,9 +415,17 @@ export async function produce(slot, stream, { isScreen = false } = {}) {
   return enqueue(async () => {
     requirePc();
     if (s.sendUsed && !Object.values(s.published).some(Boolean)) await refreshSendConnection();
-    const pc = requirePc();
     await improveCapture(track, slot);
-    s.published[slot] = await sendOnce(pc, { slot, kind, track, stream, isScreen });
+    try {
+      s.published[slot] = await sendOnce(requirePc(), { slot, kind, track, stream, isScreen });
+    } catch (err) {
+      // Cloudflare refusing the publish usually means the send session went stale (idle, or its
+      // transport was dropped). Start over on a brand new send connection and session, once.
+      if (!err || (err.message !== 'call_request_failed' && !/^Timed out/.test(err.message))) throw err;
+      console.warn('publish failed; retrying on a fresh send connection');
+      await refreshSendConnection();
+      s.published[slot] = await sendOnce(requirePc(), { slot, kind, track, stream, isScreen });
+    }
     s.sendUsed = true;
   });
 }
@@ -421,8 +464,19 @@ const scheduleRetry = (producerID) => {
 };
 
 const pullBatch = async (batch) => {
+  requirePullPc();
+  const batchIds = new Set(batch.map((p) => p.producerID));
+  const liveElsewhere = [...s.pulled].some((id) => !batchIds.has(id));
+  if (s.pullStale || (s.pullUsed && !liveElsewhere)) await refreshPullConnection();
   const pc = requirePullPc();
-  const res = await ask('cf:tracks:pull', { producerIDs: batch.map((p) => p.producerID) });
+  let res;
+  try {
+    res = await ask('cf:tracks:pull', { producerIDs: batch.map((p) => p.producerID) });
+  } catch (err) {
+    // Cloudflare errors (as opposed to our own validation codes) may mean the receive session died.
+    if (err && err.message === 'call_request_failed') s.pullStale = true;
+    throw err;
+  }
   // Tracks Cloudflare could not serve yet: forget them (so the next pass asks again) and retry soon.
   (res.tracks || []).forEach((t) => {
     if (!t.error) return;
@@ -445,6 +499,7 @@ const pullBatch = async (batch) => {
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await ask('cf:renegotiate', { sessionDescription: answer.sdp });
+    s.pullUsed = true; // a track is now really flowing on this receive session
   } catch (err) {
     await rollback(pc);
     throw err;

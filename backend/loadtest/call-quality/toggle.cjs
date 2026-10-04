@@ -54,7 +54,7 @@ const CYCLES = Number(process.env.CYCLES || 3);
     if (window.__g.streams.length <= before) return 'NO NEW STREAM';
     const s = window.__g.streams[window.__g.streams.length - 1];
     const track = (s.isVideo ? s.getVideoTracks() : s.getAudioTracks())[0];
-    const bytes = async () => { let n = 0; const st = await window.__clientPCs[1].getStats(); st.forEach((x) => { if (x.type === 'inbound-rtp' && x.trackIdentifier === track.id) n = x.bytesReceived || 0; }); return n; };
+    const bytes = async () => { let n = 0; for (const pc of window.__clientPCs) { const st = await pc.getStats(); st.forEach((x) => { if (x.type === 'inbound-rtp' && x.trackIdentifier === track.id) n = x.bytesReceived || 0; }); } return n; };
     await wait(1500); const b1 = await bytes(); await wait(1500); const b2 = await bytes();
     return `${track.muted ? 'MUTED' : 'live'} bytes ${b1}->${b2} ${b2 > b1 ? 'FLOWING' : 'STALLED'}`;
   }, { producers: snap(), kind });

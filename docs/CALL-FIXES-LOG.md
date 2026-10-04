@@ -73,7 +73,15 @@ Unit tests: backend 69 (Cloudflare client, socket handlers, mediasoup), frontend
 - A track is announced to the room only once packets are actually leaving the browser (`waitSending`), not merely when the connection is up.
 - A pull Cloudflare refuses because no media arrived yet is retried after 0.5, 1, 2, 4 and 8 seconds instead of being dropped.
 
-**Result:** 9 of 9 off/on cycles deliver media (3 each for mic, camera, screen), and the earlier multi-person scenarios still pass. Unit tests cover the fresh send connection, keeping the connection while another track is published, and the pull retry.
+**Same thing on the receiving side (found by the next live run):** Cloudflare also disconnects a *receive* session that has nothing live on it (`410: Session appears to be disconnected`), after which every pull on it fails. The browser now swaps in a fresh receive connection and session (`cf:session:new { pullOnly: true }`) when a pull starts and nothing live is being received, or after a pull Cloudflare rejected outright.
+
+**Hardening against getting stuck (the stop buttons):**
+- The server removes a track from the room even if Cloudflare rejects the close, so a failed close can no longer block turning the feature back on.
+- The mic, camera and screen stop handlers always reset their button state, even when the server call fails.
+- If a publish is refused by Cloudflare, it is retried once on a brand new send connection and session.
+- The browser console now prints `call request failed: <event> <code>` so the failing request is named.
+
+**Result:** 9 of 9 off/on cycles deliver media (3 each for mic, camera, screen), and the earlier multi-person scenarios still pass. Unit tests cover the fresh send and receive connections, keeping them while other tracks are live, the publish retry, the pull retry and the tolerant close.
 
 ## 8. Still open
 

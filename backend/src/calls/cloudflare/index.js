@@ -10,7 +10,7 @@
 //
 // Socket events (all acked; error acks are { error: '<code>' }):
 //   call:config      -> { backend, iceServers, limits }
-//   cf:session:new  { renew?, sendOnly? }  -> { sessionId, pullSessionId }   (renew: start over after a failed connection;
+//   cf:session:new  { renew?, sendOnly?, pullOnly? }  -> { sessionId, pullSessionId }   (renew: start over after a failed connection;
 //                   sendOnly: new SEND session only, used when the old one has no tracks left - Cloudflare tears down a
 //                   session's transport when its last track is closed, so tracks published afterwards never arrive)
 //                   Two Cloudflare sessions per socket: one PeerConnection only SENDS (push/close), the other
@@ -178,6 +178,14 @@ const initSocket = (socket) => {
         reply({ sessionId: existing.sessionId, pullSessionId: existing.pullSessionId });
         return;
       }
+      if (existing && existing.roomId === ctx.roomId && data.pullOnly) {
+        // Same idea for receiving: a receive session with nothing live on it gets disconnected by Cloudflare
+        // (410 "Session appears to be disconnected"). Start a new one; the send session is untouched.
+        existing.pullSessionId = await getClient().newSession();
+        existing.pulled = new Set();
+        reply({ sessionId: existing.sessionId, pullSessionId: existing.pullSessionId });
+        return;
+      }
       if (existing && existing.roomId === ctx.roomId && !data.renew) {
         reply({ sessionId: existing.sessionId, pullSessionId: existing.pullSessionId });
         return;
@@ -328,7 +336,13 @@ const initSocket = (socket) => {
         throw bad('unauthorized');
       }
 
-      await getClient().closeTracks(session.sessionId, { mids: closes.map((c) => c.mid) });
+      // The track is going away whatever Cloudflare says (its media has already stopped), so a failed close
+      // must not leave it announced in the room or block the user from turning the feature back on.
+      try {
+        await getClient().closeTracks(session.sessionId, { mids: closes.map((c) => c.mid) });
+      } catch (err) {
+        logger.warn({ err, socketId: socket.id }, 'Cloudflare track close failed; removing the track from the room anyway');
+      }
       await store.peers.asyncRemove({ type: 'producer', socketID: socket.id, producerID: { $in: ids } }, { multi: true });
       ids.forEach((producerID) => store.io.to(ctx.roomId).emit('remove', { producerID, socketID: socket.id }));
       reply({ ok: true });

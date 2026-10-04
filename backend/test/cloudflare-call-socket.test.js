@@ -228,6 +228,22 @@ describe('call:config and sessions', () => {
     expect(fakeClient.pushTracks).toHaveBeenCalledWith('sess-3', expect.anything());
   });
 
+  it('pullOnly replaces just the receive session and forgets what it had pulled, keeping the send session', async () => {
+    const { caller, callee, meeting } = await newMeeting();
+    const a = await joined(caller, meeting); // sess-1 / sess-2
+    const b = await joined(callee, meeting); // sess-3 / sess-4
+    const push = await call(a, 'cf:tracks:push', { sessionDescription: 'OFFER', tracks: [audioTrack] });
+    await call(a, 'cf:tracks:ready', { producerIDs: push.producerIDs });
+    await call(b, 'cf:tracks:pull', { producerIDs: push.producerIDs });
+    expect(fakeClient.pullTracks).toHaveBeenLastCalledWith('sess-4', expect.anything());
+
+    const fresh = await call(b, 'cf:session:new', { pullOnly: true });
+    expect(fresh).toEqual({ sessionId: 'sess-3', pullSessionId: 'sess-5' });
+    // the same track can be pulled again, on the NEW receive session
+    await call(b, 'cf:tracks:pull', { producerIDs: push.producerIDs });
+    expect(fakeClient.pullTracks).toHaveBeenLastCalledWith('sess-5', expect.anything());
+  });
+
   it('renews a session: drops the old tracks from the room and starts a fresh Cloudflare session', async () => {
     const { caller, callee, meeting } = await newMeeting();
     const a = await joined(caller, meeting);
@@ -338,6 +354,19 @@ describe('publish -> announce -> subscribe', () => {
     expect(fakeClient.closeTracks).toHaveBeenCalledWith('sess-1', { mids: ['0'] });
     expect(await store.peers.asyncFind({ type: 'producer', producerID: push.producerIDs[0] })).toHaveLength(0);
     expect(emitted.find((e) => e.event === 'remove').payload).toEqual({ producerID: push.producerIDs[0], socketID: a.id });
+  });
+
+  it('still removes the track from the room when Cloudflare rejects the close (the user must never get stuck)', async () => {
+    const { caller, callee, meeting } = await newMeeting();
+    const a = await joined(caller, meeting);
+    await joined(callee, meeting);
+    const push = await call(a, 'cf:tracks:push', { sessionDescription: 'OFFER', tracks: [audioTrack] });
+    await call(a, 'cf:tracks:ready', { producerIDs: push.producerIDs });
+    fakeClient.closeTracks.mockRejectedValueOnce(new Error('Cloudflare PUT -> 500'));
+
+    await expect(call(a, 'cf:tracks:close', { closes: [{ producerID: push.producerIDs[0], mid: '0' }] })).resolves.toEqual({ ok: true });
+    expect(await store.peers.asyncFind({ type: 'producer', producerID: push.producerIDs[0] })).toHaveLength(0);
+    expect(emitted.some((e) => e.event === 'remove' && e.payload.producerID === push.producerIDs[0])).toBe(true);
   });
 });
 

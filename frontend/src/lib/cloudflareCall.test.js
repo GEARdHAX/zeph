@@ -385,6 +385,25 @@ describe('publishing', () => {
     expect(send.closed).toBe(false);
   });
 
+  it('retries a publish Cloudflare refused on a brand new send connection and session', async () => {
+    const send = await started();
+    failNext = { event: 'cf:tracks:push', code: 'call_request_failed' };
+
+    await engine.produce('audio', new FakeStream([new FakeTrack('audio')]));
+
+    expect(requests.filter((r) => r.event === 'cf:session:new').map((r) => r.payload)).toEqual([{}, { sendOnly: true }]);
+    expect(events().filter((e) => e === 'cf:tracks:push')).toHaveLength(2);
+    expect(events()).toContain('cf:tracks:ready');
+    expect(send.closed).toBe(true); // the stale send connection was replaced
+  });
+
+  it('does not retry a refusal that a fresh session cannot fix (e.g. too many tracks)', async () => {
+    await started();
+    failNext = { event: 'cf:tracks:push', code: 'too_many_tracks' };
+    await expect(engine.produce('audio', new FakeStream([new FakeTrack('audio')]))).rejects.toThrow('too_many_tracks');
+    expect(events().filter((e) => e === 'cf:session:new')).toHaveLength(1);
+  });
+
   it('rejects a stream with no usable track', async () => {
     await started();
     await expect(engine.produce('audio', new FakeStream([]))).rejects.toThrow('no_track');
@@ -476,6 +495,60 @@ describe('subscribing', () => {
       await vi.advanceTimersByTimeAsync(600); // first retry fires after 500 ms
       expect(events().filter((e) => e === 'cf:tracks:pull')).toHaveLength(2);
       expect(h.globalState.streams).toHaveLength(1); // second attempt succeeded
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses a fresh receive connection when nothing live is being received any more', async () => {
+    const send = await started();
+    const firstRecv = send.recv;
+    firstRecv.remoteTracksOnOffer = [{ mid: '10', track: new FakeTrack('audio') }];
+    h.reduxState.rtc.producers = [remote('sess-9/audio-x')];
+    engine.onProducersChanged();
+    await vi.waitFor(() => expect(events()).toContain('cf:renegotiate'));
+
+    // the only thing we were receiving is turned off by its owner: Cloudflare drops an idle receive session
+    h.reduxState.rtc.producers = [];
+    engine.onProducersChanged();
+    h.reduxState.rtc.producers = [remote('sess-9/audio-y')];
+    const before = pcs.length;
+    engine.onProducersChanged();
+    await vi.waitFor(() => expect(events().filter((e) => e === 'cf:tracks:pull')).toHaveLength(2));
+
+    expect(requests.filter((r) => r.event === 'cf:session:new').map((r) => r.payload)).toEqual([{}, { pullOnly: true }]);
+    expect(pcs.length).toBe(before + 1); // a new receive connection; the send one is untouched
+    expect(firstRecv.closed).toBe(true);
+    expect(send.closed).toBe(false);
+  });
+
+  it('keeps the receive connection while something else is still being received', async () => {
+    const send = await started();
+    send.recv.remoteTracksOnOffer = [{ mid: '10', track: new FakeTrack('audio') }];
+    h.reduxState.rtc.producers = [remote('sess-9/audio-x')];
+    engine.onProducersChanged();
+    await vi.waitFor(() => expect(events()).toContain('cf:renegotiate'));
+
+    h.reduxState.rtc.producers = [remote('sess-9/audio-x'), remote('sess-9/video-y', { kind: 'video' })]; // x is still live
+    engine.onProducersChanged();
+    await vi.waitFor(() => expect(events().filter((e) => e === 'cf:tracks:pull')).toHaveLength(2));
+
+    expect(events().filter((e) => e === 'cf:session:new')).toHaveLength(1);
+    expect(send.recv.closed).toBe(false);
+  });
+
+  it('starts over on a fresh receive session after a pull Cloudflare rejected outright', async () => {
+    vi.useFakeTimers();
+    try {
+      const send = await started();
+      h.reduxState.rtc.producers = [remote('sess-9/audio-x')];
+      failNext = { event: 'cf:tracks:pull', code: 'call_request_failed' };
+      engine.onProducersChanged();
+      await vi.advanceTimersByTimeAsync(700); // the first retry (500 ms) runs on a new receive connection
+
+      expect(requests.filter((r) => r.event === 'cf:session:new').map((r) => r.payload)).toEqual([{}, { pullOnly: true }]);
+      expect(events().filter((e) => e === 'cf:tracks:pull')).toHaveLength(2);
+      expect(send.recv.closed).toBe(true);
     } finally {
       vi.useRealTimers();
     }
