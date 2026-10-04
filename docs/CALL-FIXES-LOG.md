@@ -50,7 +50,17 @@ Unit tests: backend 69 (Cloudflare client, socket handlers, mediasoup), frontend
 - **Record-meeting button:** icon changed from a microphone to Sparkles (it looked like the mute button).
 - **TURN not configured:** `CF_TURN_KEY_ID` / `CF_TURN_API_TOKEN` are empty, so calls between different networks may fail on strict NATs. Create a TURN key in the Cloudflare dashboard.
 
-## 6. Still open
+## 6. Found only on Render: calls timed out on `join`
+
+**Symptom:** on the deployed site every call ended with "Could not connect to the call", console `Timed out waiting for a response to "join"`. Everything worked locally.
+
+**Cause:** Render's log had `TypeError: util.isDate is not a function` at `nedb/lib/datastore.js`, logged as an uncaught exception. Render runs a newer Node than a laptop on Node 22, and Node 23 removed `util.isDate` and its siblings. `nedb` (the in-memory store for call producers and rooms) still calls them. The throw happens inside nedb's own callbacks, so no try/catch around the caller sees it and the `join` handler never answered.
+
+**Fix:** `backend/src/compat/utilPolyfill.js` restores the missing `util.is*` helpers (and does nothing where they exist), loaded first in `backend/index.js`. `test/util-polyfill.test.js` deletes the helpers in a fresh process to prove nedb fails without the shim and works with it, on any Node version. Separately, the `join` handler now always answers (`join_failed`) and logs the real error.
+
+**Lesson:** a local pass on one Node version says nothing about a host that floats to the latest. `NODE_VERSION=22` in Render's environment is a reasonable extra pin.
+
+## 7. Still open
 
 - A call between two real devices over the internet through the deployed app.
 - The deployed Render backend has none of this yet (nothing is committed); it also needs the `CF_*` variables and `VAULT_RP_ID`.

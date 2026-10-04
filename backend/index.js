@@ -1,3 +1,5 @@
+// First: restores util.is* helpers newer Node removed; nedb (call/room state) needs them. See the file.
+require('./src/compat/utilPolyfill');
 require('colors');
 require('dotenv').config();
 
