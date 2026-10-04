@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, lazy, Suspense } from 'react';
-import { Send, Image, Smile, Paperclip, Sparkles, ShieldOff, Trash2, Wand2 } from 'lucide-react';
+import { Send, Image, Smile, Paperclip, Sparkles, ShieldOff, Trash2, Wand2, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useGlobal } from 'reactn';
 import moment from 'moment';
 import { useDispatch, useSelector } from 'react-redux';
@@ -527,7 +528,31 @@ function BottomBar({ aiEnabled }) {
         </div>
       )}
 
-      <div className="flex items-center gap-0.5 text-muted-foreground shrink-0 pb-1">
+      {/* The file pickers live outside the (responsive) buttons so both the inline buttons and the phone menu share them. */}
+      <input
+        className="hidden"
+        type="file"
+        ref={imageInput}
+        accept="image/*"
+        multiple
+        onChange={(e) => {
+          selectImages(e.target.files);
+          e.target.value = ''; // allow re-selecting the same file(s) again later
+        }}
+      />
+      <input
+        className="hidden"
+        type="file"
+        ref={fileInput}
+        multiple
+        onChange={(e) => {
+          selectAttachments(e.target.files);
+          e.target.value = ''; // allow re-selecting the same file(s) again later
+        }}
+      />
+
+      {/* Tablet / desktop: emoji and attachments inline, as before. */}
+      <div className="hidden items-center gap-0.5 text-muted-foreground shrink-0 pb-1 sm:flex">
         <Button
           data-tour="emoji-button"
           variant="ghost"
@@ -538,18 +563,6 @@ function BottomBar({ aiEnabled }) {
         >
           <Smile className="h-4 w-4" />
         </Button>
-
-        <input
-          className="hidden"
-          type="file"
-          ref={imageInput}
-          accept="image/*"
-          multiple
-          onChange={(e) => {
-            selectImages(e.target.files);
-            e.target.value = ''; // allow re-selecting the same file(s) again later
-          }}
-        />
         <Button
           data-tour="attachment-button"
           variant="ghost"
@@ -560,17 +573,6 @@ function BottomBar({ aiEnabled }) {
         >
           <Image className="h-4 w-4" />
         </Button>
-
-        <input
-          className="hidden"
-          type="file"
-          ref={fileInput}
-          multiple
-          onChange={(e) => {
-            selectAttachments(e.target.files);
-            e.target.value = ''; // allow re-selecting the same file(s) again later
-          }}
-        />
         <Button
           variant="ghost"
           size="icon"
@@ -580,6 +582,28 @@ function BottomBar({ aiEnabled }) {
         >
           <Paperclip className="h-4 w-4" />
         </Button>
+      </div>
+
+      {/* Phone: the same three actions behind one "more" button, leaving the text box room. */}
+      <div className="shrink-0 pb-1 text-muted-foreground sm:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:text-foreground" aria-label="More options">
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" sideOffset={8} className="min-w-44">
+            <DropdownMenuItem onSelect={() => showPicker(true)}>
+              <Smile className="mr-2 h-4 w-4" /> Emoji
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => imageInput?.current?.click()}>
+              <Image className="mr-2 h-4 w-4" /> Photo
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => fileInput?.current?.click()}>
+              <Paperclip className="mr-2 h-4 w-4" /> File
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Text input with clean rounded container — WhatsApp style multi-line auto-expanding input */}

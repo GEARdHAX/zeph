@@ -289,6 +289,66 @@ describe('BottomBar offline-retry send flow', () => {
   });
 });
 
+describe('BottomBar phone menu (emoji, photo and file behind a "more" button)', () => {
+  const renderBar = () =>
+    render(
+      <Provider store={makeStore()}>
+        <MemoryRouter>
+          <BottomBar />
+        </MemoryRouter>
+      </Provider>,
+    );
+
+  it('offers Emoji, Photo and File from one "More options" button', async () => {
+    const userEv = userEvent.setup();
+    renderBar();
+
+    await userEv.click(screen.getByRole('button', { name: 'More options' }));
+
+    expect(await screen.findByRole('menuitem', { name: /Emoji/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Photo/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /File/ })).toBeInTheDocument();
+  });
+
+  it('Photo opens the same image picker the inline button uses, and the editor opens for the chosen image', async () => {
+    const userEv = userEvent.setup();
+    const { container } = renderBar();
+    const imageInput = container.querySelector('input[type="file"][accept="image/*"]');
+    const clicked = vi.spyOn(imageInput, 'click');
+
+    await userEv.click(screen.getByRole('button', { name: 'More options' }));
+    await userEv.click(await screen.findByRole('menuitem', { name: /Photo/ }));
+    expect(clicked).toHaveBeenCalledTimes(1);
+
+    await userEv.upload(imageInput, new File(['x'], 'phone.png', { type: 'image/png' }));
+    expect(await screen.findByText('Editing phone.png')).toBeInTheDocument();
+  });
+
+  it('File opens the general file picker', async () => {
+    const userEv = userEvent.setup();
+    const { container } = renderBar();
+    const fileInput = container.querySelector('input[type="file"]:not([accept])');
+    const clicked = vi.spyOn(fileInput, 'click');
+
+    await userEv.click(screen.getByRole('button', { name: 'More options' }));
+    await userEv.click(await screen.findByRole('menuitem', { name: /File/ }));
+    expect(clicked).toHaveBeenCalledTimes(1);
+  });
+
+  it('Emoji opens the emoji picker', async () => {
+    const userEv = userEvent.setup();
+    renderBar();
+    await userEv.click(screen.getByRole('button', { name: 'More options' }));
+    await userEv.click(await screen.findByRole('menuitem', { name: /Emoji/ }));
+    await waitFor(async () => expect((await import('reactn')).getGlobal().isPicker).toBe(true));
+  });
+
+  it('keeps the Send button out of the menu', () => {
+    renderBar();
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeInTheDocument();
+  });
+});
+
 describe('BottomBar image editor queue', () => {
   function getImageInput(container) {
     return container.querySelector('input[type="file"][accept="image/*"]');
