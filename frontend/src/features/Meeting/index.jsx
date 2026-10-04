@@ -104,7 +104,9 @@ function Meeting() {
     setConnecting(true);
     callManager
       .join(roomID)
-      .catch(() => {
+      .catch((err) => {
+        // The toast is deliberately generic; the real reason (e.g. call_request_failed) goes to the console.
+        console.error('call join failed:', err && err.message);
         toast.error('Could not connect to the call. Check your connection and try again.');
       })
       .finally(() => setConnecting(false));
