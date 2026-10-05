@@ -90,6 +90,7 @@ const io = require('socket.io');
 const mongoose = require('mongoose');
 const setupRedisAdapter = require('./src/setupRedisAdapter');
 const { startGroupCleanupWorker } = require('./src/queues/groupCleanupWorker');
+const { startMediaCleanupWorker } = require('./src/queues/mediaCleanup');
 const { startSecurityAiWorker } = require('./src/queues/securityAiWorker');
 const { startAiWorker } = require('./src/queues/aiWorker');
 const { startMeetingAiWorker } = require('./src/queues/meetingAiWorker');
@@ -164,6 +165,7 @@ store.io = io(server, { cors: { origin: Config.corsOrigin, credentials: true } }
 // function-locals) for the same reason setupRedisAdapter.js's pubClient/
 // subClient were just promoted to module scope: shutdown needs to reach them.
 let groupCleanupWorker = null;
+let mediaCleanupWorker = null;
 let securityAiWorker = null;
 let aiWorker = null;
 let meetingAiWorker = null;
@@ -187,6 +189,7 @@ const startServer = async () => {
   // enqueued cleanup jobs simply wait in Redis until a worker process picks
   // them up, never a boot crash or lost job.
   groupCleanupWorker = startGroupCleanupWorker();
+  mediaCleanupWorker = startMediaCleanupWorker();
   securityAiWorker = startSecurityAiWorker();
   aiWorker = startAiWorker();
   meetingAiWorker = startMeetingAiWorker();
@@ -301,6 +304,7 @@ const gracefulShutdown = async (signal) => {
     // than killing it mid-processing.
     await Promise.all([
       groupCleanupWorker ? groupCleanupWorker.close() : Promise.resolve(),
+      mediaCleanupWorker ? mediaCleanupWorker.close() : Promise.resolve(),
       securityAiWorker ? securityAiWorker.close() : Promise.resolve(),
       aiWorker ? aiWorker.close() : Promise.resolve(),
       meetingAiWorker ? meetingAiWorker.close() : Promise.resolve(),

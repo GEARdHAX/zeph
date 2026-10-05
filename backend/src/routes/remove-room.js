@@ -5,6 +5,7 @@ const groupPolicy = require('../authorization/groupPolicy');
 const forceLeaveGroupRoom = require('../utils/forceLeaveGroupRoom');
 const broadcastToGroup = require('../utils/broadcastToGroup');
 const logger = require('../logger');
+const { enqueueMediaCleanup } = require('../queues/mediaCleanup');
 
 module.exports = async (req, res, next) => {
   let { id } = req.fields;
@@ -74,7 +75,12 @@ module.exports = async (req, res, next) => {
   }
 
   try {
+    const withMedia = await Message.find({ room: id, media: { $ne: null } })
+      .select('media')
+      .lean();
     await Message.deleteMany({ room: id });
+    // The messages are gone, so nothing references these attachments any more: reclaim their storage.
+    await Promise.all(withMedia.map((m) => enqueueMediaCleanup(m.media)));
   } catch (e) {
     return res.status(404).json({ status: 'error', message: 'error while deleting messages' });
   }

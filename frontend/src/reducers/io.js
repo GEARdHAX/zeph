@@ -84,6 +84,15 @@ const reducer = (state = initialState, action) => {
         ...state,
         messages: state.messages.filter((m) => m._id !== action.messageID),
       };
+    // Undo of an optimistic MESSAGE_DELETE whose request failed: put the original message back exactly where it was
+    // (in place if it was only tombstoned, re-inserted by date if it had been removed from the list).
+    case Actions.MESSAGE_RESTORE: {
+      const exists = state.messages.some((m) => m._id === action.message._id);
+      const messages = exists
+        ? state.messages.map((m) => (m._id === action.message._id ? action.message : m))
+        : [...state.messages, action.message].sort((a, b) => new Date(a.date) - new Date(b.date));
+      return { ...state, messages };
+    }
     // Delivery/read receipts patch deliveredTo/readBy in place on the
     // affected message(s) — same $addToSet-idempotent shape the server
     // already uses, so a duplicate/replayed event is a harmless no-op here

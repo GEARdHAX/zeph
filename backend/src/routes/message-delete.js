@@ -7,6 +7,7 @@ const logger = require('../logger');
 const groupPolicy = require('../authorization/groupPolicy');
 const SecurityEventService = require('../services/securityEventService');
 const securityEventContext = require('../utils/securityEventContext');
+const { enqueueMediaCleanup } = require('../queues/mediaCleanup');
 
 module.exports = async (req, res, next) => {
   const { roomID, messageID, forEveryone } = req.fields;
@@ -87,6 +88,10 @@ module.exports = async (req, res, next) => {
       message.deletedAt = new Date();
       message.content = null;
       message.file = null;
+      // Detach the attachment first: with no message referencing it, the media route (canAccessMedia) stops serving it
+      // immediately, and the purge job below can safely delete the stored bytes.
+      const detachedMedia = message.media;
+      message.media = null;
       try {
         await message.save();
       } catch (err) {
@@ -95,6 +100,7 @@ module.exports = async (req, res, next) => {
       }
 
       logger.info({ userId: userID, messageId: messageID, roomId: roomID }, 'Message deleted for everyone');
+      await enqueueMediaCleanup(detachedMedia);
 
       // Audit-logged only on the moderator-override path — an author
       // deleting their own message isn't a moderation action.

@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 import BioText from '../../../components/BioText';
 import MessageContent from './MessageContent';
 import parseBio, { tokensToHtml } from '../../../lib/parseBio';
-import deleteMessage from '../../../actions/deleteMessage';
+import useDeleteMessage from '../../../lib/useDeleteMessage';
 import createRoom from '../../../actions/createRoom';
 import translateMessage from '../../../actions/translateMessage';
 import Actions from '../../../constants/Actions';
@@ -61,7 +61,8 @@ function Message({ message, previous, next, onOpen, roomID, aiEnabled }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [confirmDeleteForEveryone, setConfirmDeleteForEveryone] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const deleteMutation = useDeleteMessage(roomID, message);
+  const deleting = deleteMutation.isPending;
   const [menuOpen, setMenuOpen] = useState(false);
   const [previewUsername, setPreviewUsername] = useState(null);
   const [translating, setTranslating] = useState(false);
@@ -315,19 +316,8 @@ function Message({ message, previous, next, onOpen, roomID, aiEnabled }) {
     }
     setMenuOpen(false);
     if (deleting) return;
-    setDeleting(true);
-    try {
-      await deleteMessage({ roomID, messageID: message._id, forEveryone: false });
-      dispatch({
-        type: Actions.MESSAGE_DELETE,
-        messageID: message._id,
-        forEveryone: false,
-      });
-    } catch (err) {
-      toast.error('Could not delete message. Please try again.');
-    } finally {
-      setDeleting(false);
-    }
+    // Optimistic: the row is gone immediately and comes back (with an error toast) only if the request fails.
+    deleteMutation.mutate({ forEveryone: false });
   };
 
   const handleDeleteForEveryone = async (e) => {
@@ -336,26 +326,8 @@ function Message({ message, previous, next, onOpen, roomID, aiEnabled }) {
       e.stopPropagation();
     }
     if (deleting) return;
-    setDeleting(true);
-    try {
-      const res = await deleteMessage({ roomID, messageID: message._id, forEveryone: true });
-      dispatch({
-        type: Actions.MESSAGE_DELETE,
-        messageID: message._id,
-        forEveryone: true,
-        deletedAt: res.data?.deletedAt,
-      });
-    } catch (err) {
-      const reason = err?.response?.data?.reason;
-      if (reason === 'deletion_window_expired') {
-        toast.error('Too late to delete this for everyone.');
-      } else {
-        toast.error('Could not delete message. Please try again.');
-      }
-    } finally {
-      setDeleting(false);
-      setConfirmDeleteForEveryone(false);
-    }
+    setConfirmDeleteForEveryone(false);
+    deleteMutation.mutate({ forEveryone: true });
   };
 
   const getBubbleRadius = () => {
