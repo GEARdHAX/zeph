@@ -86,7 +86,7 @@ describe('VideoEditorModal', () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
-  it('Done produces a trimmed file and a poster blob, passed to onDone', async () => {
+  it('Done on a muted clip re-records it: a WebM file and a poster blob are passed to onDone', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
     render(<VideoEditorModal file={FILE} onCancel={vi.fn()} onDone={onDone} />);
@@ -103,6 +103,7 @@ describe('VideoEditorModal', () => {
     // at least one dispatch lands after the component's listener is
     // actually attached, however many microtasks handleDone awaits first —
     // a fixed number of manual ticks would be fragile against that.
+    await user.click(screen.getByRole('button', { name: /mute audio/i }));
     user.click(screen.getByRole('button', { name: 'Done' }));
 
     await waitFor(() => {
@@ -115,6 +116,55 @@ describe('VideoEditorModal', () => {
     expect(trimmedFile).toBeInstanceOf(File);
     expect(trimmedFile.type).toBe('video/webm');
     expect(poster).toBeInstanceOf(Blob);
+  });
+
+  it('Done on an untouched clip uploads the ORIGINAL file at once, with no re-recording', async () => {
+    const user = userEvent.setup();
+    const onDone = vi.fn();
+    const recorderSpy = vi.fn();
+    global.MediaRecorder = function SpyRecorder() {
+      recorderSpy();
+    };
+    render(<VideoEditorModal file={FILE} onCancel={vi.fn()} onDone={onDone} />);
+    triggerLoadedMetadata(60);
+    const video = document.querySelector('video');
+    Object.defineProperty(video, 'currentTime', { value: 0, configurable: true, writable: true });
+
+    user.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => {
+      fireEvent(video, new Event('seeked')); // the poster frame seek
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
+    expect(onDone.mock.calls[0][0]).toBe(FILE);
+    expect(onDone.mock.calls[0][1]).toBeInstanceOf(Blob);
+    expect(recorderSpy).not.toHaveBeenCalled();
+  });
+
+  it('play/pause toggles and resumes where it paused instead of restarting', async () => {
+    const user = userEvent.setup();
+    render(<VideoEditorModal file={FILE} onCancel={vi.fn()} onDone={vi.fn()} />);
+    triggerLoadedMetadata(60);
+    const video = document.querySelector('video');
+    Object.defineProperty(video, 'currentTime', { value: 25, configurable: true, writable: true });
+    Object.defineProperty(video, 'paused', { value: true, configurable: true, writable: true });
+
+    await user.click(screen.getByRole('button', { name: 'Play' }));
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
+    expect(video.currentTime).toBe(25); // resumed, not reset to the start
+
+    video.paused = false;
+    fireEvent(video, new Event('play'));
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(window.HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+  });
+
+  it('playback is stopped at the trim end', () => {
+    render(<VideoEditorModal file={FILE} onCancel={vi.fn()} onDone={vi.fn()} />);
+    triggerLoadedMetadata(60);
+    const video = document.querySelector('video');
+    Object.defineProperty(video, 'currentTime', { value: 60, configurable: true, writable: true });
+    fireEvent(video, new Event('timeupdate'));
+    expect(window.HTMLMediaElement.prototype.pause).toHaveBeenCalled();
   });
 
   it('mute toggle switches label between "Mute audio" and "Muted"', async () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Pause, Play, Volume2, VolumeX } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -18,7 +18,9 @@ function VideoEditorModal({ file, onCancel, onDone }) {
   const [duration, setDuration] = useState(0);
   const [range, setRange] = useState([0, 0]);
   const [muted, setMuted] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
   const recorderState = useRef(null);
@@ -35,53 +37,112 @@ function VideoEditorModal({ file, onCancel, onDone }) {
     setRange([0, total]);
   };
 
-  // Preview only the selected [start,end] range, looping back to start
-  // rather than continuing past `end` into untrimmed footage.
-  const playPreview = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    const [start] = range;
-    video.currentTime = start;
-    video.muted = muted;
-    video.play();
-    setPreviewing(true);
-  };
-
+  // Playhead + range guard. Runs always (not only while "previewing") so the scrubber stays in sync and playback
+  // can never run past the trim end into untrimmed footage.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !previewing) return undefined;
+    if (!video) return undefined;
     const onTimeUpdate = () => {
-      if (video.currentTime >= range[1]) {
-        video.pause();
-        setPreviewing(false);
-      }
+      setCurrent(video.currentTime);
+      if (!processing && video.currentTime >= range[1]) video.pause();
     };
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
     video.addEventListener('timeupdate', onTimeUpdate);
-    return () => video.removeEventListener('timeupdate', onTimeUpdate);
-  }, [previewing, range]);
+    video.addEventListener('play', onPlay);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('ended', onPause);
+    return () => {
+      video.removeEventListener('timeupdate', onTimeUpdate);
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('ended', onPause);
+    };
+  }, [range, processing, objectUrl]);
 
-  // Grabs a single frame at the trim start as a JPEG blob — used as the
-  // video message's poster/thumbnail, the same <canvas>-to-blob approach
-  // getCroppedImageBlob.js already uses for images (reused technique, not
-  // a new one).
-  const capturePoster = () =>
+  // Play/pause toggle. Resumes from where it paused; only restarts from the trim start when the playhead is outside
+  // the range (first play, or it already reached the end).
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video || processing) return;
+    if (!video.paused) {
+      video.pause();
+      return;
+    }
+    if (video.currentTime < range[0] || video.currentTime >= range[1] - 0.05) video.currentTime = range[0];
+    video.muted = muted;
+    video.play();
+  };
+
+  // Dragging a handle shows that exact frame, so the trim points can be chosen by eye.
+  const onRangeChange = (next) => {
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      const moved = next[0] !== range[0] ? next[0] : next[1];
+      video.currentTime = moved;
+      setCurrent(moved);
+    }
+    setRange(next);
+  };
+
+  const seekTo = (value) => {
+    const video = videoRef.current;
+    if (!video || processing) return;
+    video.currentTime = value[0];
+    setCurrent(value[0]);
+  };
+
+  const seekedAt = (video, time) =>
     new Promise((resolve) => {
-      const video = videoRef.current;
+      const onSeeked = () => {
+        video.removeEventListener('seeked', onSeeked);
+        resolve();
+      };
+      video.addEventListener('seeked', onSeeked);
+      video.currentTime = time;
+    });
+
+  // Grabs a single frame at the trim start as a JPEG blob: the video message's poster/thumbnail. Seeks there first
+  // (it used to draw whatever frame the preview had left on screen).
+  const capturePoster = async (start) => {
+    const video = videoRef.current;
+    await seekedAt(video, start);
+    return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
     });
+  };
+
+  const stopRecording = () => {
+    const recorder = recorderState.current?.recorder;
+    if (recorder && recorder.state !== 'inactive') {
+      recorderState.current.cancelled = true;
+      recorder.stop();
+    }
+  };
+  useEffect(() => () => stopRecording(), []);
 
   const handleDone = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
     setProcessing(true);
     setError(null);
+    video.pause();
 
     try {
-      const poster = await capturePoster();
+      const [trimStart, trimEnd] = range;
+      const poster = await capturePoster(trimStart);
+
+      // Nothing trimmed and audio kept: send the ORIGINAL file. Re-recording it would take as long as the video, lose
+      // quality and turn every upload into WebM for no reason.
+      if (trimStart <= 0.05 && trimEnd >= duration - 0.05 && !muted) {
+        onDone(file, poster);
+        return;
+      }
 
       const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
       const tracks = muted ? stream.getVideoTracks() : stream.getTracks();
@@ -97,35 +158,31 @@ function VideoEditorModal({ file, onCancel, onDone }) {
         recorder.onerror = (e) => reject(e.error || new Error('Recording failed'));
       });
 
-      const [trimStart, trimEnd] = range;
-      video.currentTime = trimStart;
       video.muted = muted;
-      recorderState.current = { recorder };
-
-      await new Promise((resolve) => {
-        const onSeeked = () => {
-          video.removeEventListener('seeked', onSeeked);
-          resolve();
-        };
-        video.addEventListener('seeked', onSeeked);
-      });
+      recorderState.current = { recorder, cancelled: false };
+      await seekedAt(video, trimStart);
 
       recorder.start();
       video.play();
 
       await new Promise((resolve) => {
-        const onTimeUpdate = () => {
-          if (video.currentTime >= trimEnd) {
-            video.removeEventListener('timeupdate', onTimeUpdate);
-            video.pause();
-            recorder.stop();
-            resolve();
-          }
+        const finish = () => {
+          video.removeEventListener('timeupdate', onTick);
+          video.removeEventListener('ended', finish);
+          video.pause();
+          if (recorder.state !== 'inactive') recorder.stop();
+          resolve();
         };
-        video.addEventListener('timeupdate', onTimeUpdate);
+        const onTick = () => {
+          setProgress(Math.min(1, (video.currentTime - trimStart) / Math.max(0.1, trimEnd - trimStart)));
+          if (video.currentTime >= trimEnd) finish();
+        };
+        video.addEventListener('timeupdate', onTick);
+        video.addEventListener('ended', finish); // the last timeupdate can land just short of the end
       });
 
       await recordingDone;
+      if (recorderState.current?.cancelled) return;
 
       const blob = new Blob(chunks, { type: 'video/webm' });
       const trimmedFile = new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.webm`, { type: 'video/webm' });
@@ -134,8 +191,9 @@ function VideoEditorModal({ file, onCancel, onDone }) {
       setError('Could not process this video. Please try again.');
     } finally {
       setProcessing(false);
+      setProgress(0);
     }
-  }, [file, muted, range, onDone]);
+  }, [file, muted, range, duration, onDone]);
 
   const formatTime = (seconds) => {
     if (!Number.isFinite(seconds)) return '0:00';
@@ -163,7 +221,7 @@ function VideoEditorModal({ file, onCancel, onDone }) {
               ref={videoRef}
               src={objectUrl}
               onLoadedMetadata={onLoadedMetadata}
-              onClick={playPreview}
+              onClick={togglePlay}
               className="max-h-full max-w-full cursor-pointer"
               playsInline
             />
@@ -172,9 +230,35 @@ function VideoEditorModal({ file, onCancel, onDone }) {
 
         {duration > 0 && (
           <>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label={playing ? 'Pause' : 'Play'}
+                className="h-9 w-9 shrink-0 rounded-full bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                onClick={togglePlay}
+                disabled={processing}
+              >
+                {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </Button>
+              <Slider
+                aria-label="Playback position"
+                value={[Math.min(Math.max(current, 0), duration)]}
+                min={0}
+                max={duration}
+                step={0.1}
+                onValueChange={seekTo}
+                disabled={processing}
+                className="flex-1"
+              />
+              <span className="w-20 shrink-0 text-right text-xs tabular-nums text-white/70">
+                {formatTime(current)} / {formatTime(duration)}
+              </span>
+            </div>
             <div className="flex items-center justify-between text-xs text-white/70">
               <span>{formatTime(range[0])}</span>
-              <span>Trim range — click video to preview</span>
+              <span>Trim range — drag a handle to pick the frame</span>
               <span>{formatTime(range[1])}</span>
             </div>
             <Slider
@@ -182,7 +266,8 @@ function VideoEditorModal({ file, onCancel, onDone }) {
               min={0}
               max={duration}
               step={0.1}
-              onValueChange={(next) => setRange(next)}
+              onValueChange={onRangeChange}
+              disabled={processing}
               className="flex-1"
             />
           </>
@@ -201,10 +286,15 @@ function VideoEditorModal({ file, onCancel, onDone }) {
           </Button>
         </div>
 
+        {processing && progress > 0 && (
+          <div className="text-xs text-white/70" role="status">
+            {`Processing ${Math.round(progress * 100)}% (trimmed or muted clips are re-encoded at normal speed)`}
+          </div>
+        )}
         {error && <div className="text-xs text-destructive">{error}</div>}
 
         <div className="flex items-center justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>
+          <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
           <Button
