@@ -12,9 +12,7 @@ const SIGNATURES = [
   { category: 'image', bytes: [0x47, 0x49, 0x46, 0x38] }, // GIF87a/89a
   { category: 'image', bytes: [0x52, 0x49, 0x46, 0x46], offset: 0, riffType: 'WEBP' }, // RIFF....WEBP
   { category: 'video', bytes: [0x1a, 0x45, 0xdf, 0xa3] }, // WebM/Matroska (EBML)
-  { category: 'video', ftyp: true }, // MP4/MOV — ISO base media, detected via 'ftyp' at offset 4
-  { category: 'audio', bytes: [0x49, 0x44, 0x33] }, // MP3 (ID3)
-  { category: 'audio', bytes: [0xff, 0xfb] }, // MP3 (no ID3 tag)
+  { category: 'audio', bytes: [0x49, 0x44, 0x33] }, // MP3 / AAC with an ID3 tag
   { category: 'audio', bytes: [0x52, 0x49, 0x46, 0x46], offset: 0, riffType: 'WAVE' }, // RIFF....WAVE
   { category: 'audio', bytes: [0x4f, 0x67, 0x67, 0x53] }, // OGG
   { category: 'pdf', bytes: [0x25, 0x50, 0x44, 0x46] }, // %PDF
@@ -27,14 +25,36 @@ const SIGNATURES = [
 
 const matches = (header, bytes) => bytes.every((byte, i) => header[i] === byte);
 
+// ISO base media (MP4/MOV/M4A): the brand after 'ftyp' tells audio from video.
+const AUDIO_BRANDS = ['M4A ', 'M4B ', 'M4P ', 'F4A '];
+
+// MPEG audio frame sync (11 set bits): layer bits 00 are AAC in ADTS framing, anything else is MP1/MP2/MP3. The old
+// check only knew `FF FB`, so most MP3s without an ID3 tag and every raw .aac were rejected.
+const isAudioFrameSync = (header) => header[0] === 0xff && (header[1] & 0xe0) === 0xe0;
+
+const isEbml = (header) => matches(header, [0x1a, 0x45, 0xdf, 0xa3]);
+
+const hasAudioContainerHeader = (filePath, extension) => {
+  const fd = fs.openSync(filePath, 'r');
+  const head = Buffer.alloc(12);
+  fs.readSync(fd, head, 0, 12, 0);
+  fs.closeSync(fd);
+  if (extension === '.weba') return isEbml(head);
+  if (extension === '.m4a') return head.slice(4, 8).toString('ascii') === 'ftyp';
+  return false;
+};
+
 const sniffCategory = (filePath) => {
   const fd = fs.openSync(filePath, 'r');
-  const header = Buffer.alloc(32);
-  fs.readSync(fd, header, 0, 32, 0);
+  // 512 bytes: the POSIX tar magic ('ustar') lives at offset 257, not at the start.
+  const header = Buffer.alloc(512);
+  fs.readSync(fd, header, 0, 512, 0);
   fs.closeSync(fd);
 
   const ftyp = header.slice(4, 8).toString('ascii');
-  if (ftyp === 'ftyp') return 'video';
+  if (ftyp === 'ftyp') return AUDIO_BRANDS.includes(header.slice(8, 12).toString('ascii')) ? 'audio' : 'video';
+  if (isAudioFrameSync(header)) return 'audio';
+  if (header.slice(257, 262).toString('ascii') === 'ustar') return 'archive';
 
   const riffType = header.slice(8, 12).toString('ascii');
   for (const sig of SIGNATURES) {
@@ -82,10 +102,14 @@ const looksExecutable = (filePath) => {
 // number (plain .txt/.csv/.rtf/.json/etc) — for those, consistency means
 // "not a disguised executable and not some OTHER category's binary format",
 // not "matched a positive signature for its own category".
-const isConsistentWithCategory = (filePath, claimedCategory) => {
+const isConsistentWithCategory = (filePath, claimedCategory, extension = '') => {
   if (looksExecutable(filePath)) return false;
 
   const sniffed = sniffCategory(filePath);
+  // Some audio formats share a container with video and cannot be told apart from the header alone: audio-only WebM
+  // (`.weba`, EBML) and `.m4a` (ISO base media, with brands such as `isom` or `mp42` as well as `M4A `). For those
+  // the audio extension is accepted on a valid container header.
+  if (claimedCategory === 'audio' && sniffed === 'video' && hasAudioContainerHeader(filePath, extension)) return true;
   if (!sniffed) {
     // No recognized binary signature at all — acceptable for text/document
     // categories (plain text has none), but SAFE_PREVIEW categories

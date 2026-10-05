@@ -19,25 +19,40 @@ function fakeBucket(objects = {}) {
   const store = { [PRIVATE_KEY]: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), [PUBLIC_KEY]: new Uint8Array([9, 9, 9]), ...objects };
   return {
     calls: [],
+    async head(key) {
+      const data = store[key];
+      return data ? { size: data.length } : null;
+    },
+    // Behaves like R2: a satisfiable range comes back normalised to { offset, length }, an unsatisfiable one throws.
     async get(key, options) {
       this.calls.push(key);
       const data = store[key];
       if (!data) return null;
-      const rangeHeader = options.range && options.range.get && options.range.get('range');
       let body = data;
       let range;
+      const rangeHeader = options.range && options.range.get && options.range.get('range');
       if (rangeHeader) {
-        const [, start, end] = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
-        const offset = Number(start);
-        const last = end ? Number(end) : data.length - 1;
-        body = data.slice(offset, last + 1);
+        const [, first, last] = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+        let offset;
+        let end;
+        if (first === '') {
+          offset = Math.max(0, data.length - Number(last)); // suffix: the last N bytes
+          end = data.length - 1;
+        } else {
+          offset = Number(first);
+          end = last === '' ? data.length - 1 : Math.min(Number(last), data.length - 1);
+        }
+        if (offset >= data.length) throw new Error('The requested range is not satisfiable (10039)');
+        body = data.slice(offset, end + 1);
         range = { offset, length: body.length };
       }
+      const etag = '"etag1"';
+      const conditional = options.onlyIf && options.onlyIf.get && options.onlyIf.get('if-none-match') === etag;
       return {
         size: data.length,
-        body: new Blob([body]).stream(),
+        body: conditional ? undefined : new Blob([body]).stream(),
         range,
-        httpEtag: '"etag1"',
+        httpEtag: etag,
         writeHttpMetadata(headers) {
           headers.set('content-type', 'application/octet-stream');
         },
@@ -166,6 +181,57 @@ test('handler: Range requests return 206 with a correct Content-Range', async ()
   assert.equal(res.headers.get('content-range'), 'bytes 2-5/10');
   assert.equal(res.headers.get('content-length'), '4');
   assert.deepEqual([...new Uint8Array(await res.arrayBuffer())], [3, 4, 5, 6]);
+});
+
+test('handler: suffix and open-ended ranges are honoured', async () => {
+  const { url } = backend.createSignedDownloadUrl(PRIVATE_KEY);
+  const suffix = await call(url, env(), { headers: { range: 'bytes=-3' } });
+  assert.equal(suffix.status, 206);
+  assert.equal(suffix.headers.get('content-range'), 'bytes 7-9/10');
+  assert.deepEqual([...new Uint8Array(await suffix.arrayBuffer())], [8, 9, 10]);
+
+  const open = await call(url, env(), { headers: { range: 'bytes=7-' } });
+  assert.equal(open.status, 206);
+  assert.equal(open.headers.get('content-range'), 'bytes 7-9/10');
+});
+
+test('handler: a range past the end of the object is 416 with the real size, not a 502', async () => {
+  const { url } = backend.createSignedDownloadUrl(PRIVATE_KEY);
+  const res = await call(url, env(), { headers: { range: 'bytes=500-' } });
+  assert.equal(res.status, 416);
+  assert.equal(res.headers.get('content-range'), 'bytes */10');
+  assert.equal(res.headers.get('accept-ranges'), 'bytes');
+});
+
+test('handler: a malformed or multi-part Range header is ignored and the whole object is served with 200', async () => {
+  const { url } = backend.createSignedDownloadUrl(PRIVATE_KEY);
+  for (const range of ['bytes=abc', 'bytes=', 'items=0-1', 'bytes=0-1,5-6', 'bytes=-']) {
+    const res = await call(url, env(), { headers: { range } });
+    assert.equal(res.status, 200, range);
+    assert.equal(res.headers.get('content-range'), null, range);
+    assert.equal(res.headers.get('content-length'), '10', range);
+  }
+});
+
+test('handler: HEAD returns the headers with no body, and a conditional request gets 304', async () => {
+  const { url } = backend.createSignedDownloadUrl(PRIVATE_KEY, { contentType: 'video/mp4' });
+  const head = await call(url, env(), { method: 'HEAD' });
+  assert.equal(head.status, 200);
+  assert.equal(head.headers.get('content-length'), '10');
+  assert.equal(head.headers.get('content-type'), 'video/mp4');
+  assert.equal((await head.arrayBuffer()).byteLength, 0);
+
+  const cached = await call(url, env(), { headers: { 'if-none-match': '"etag1"' } });
+  assert.equal(cached.status, 304);
+});
+
+test('handler: download-only types are forced to download with the signed filename, and the signed type wins', async () => {
+  const docx = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const { url } = backend.createSignedDownloadUrl(PRIVATE_KEY, { filename: 'report.docx', attachment: true, contentType: docx });
+  const res = await call(url);
+  assert.equal(res.headers.get('content-disposition'), "attachment; filename*=UTF-8''report.docx");
+  assert.equal(res.headers.get('content-type'), docx);
+  assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
 });
 
 test('handler: a missing object is a 404', async () => {

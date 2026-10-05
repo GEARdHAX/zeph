@@ -7,6 +7,8 @@ const { avatarKey } = require('../storageKeys');
 const logger = require('../logger');
 const randomstring = require('randomstring');
 
+// Every picture gets a new key, so a stored avatar never changes: safe to cache for a year.
+const AVATAR_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
@@ -48,14 +50,14 @@ module.exports = async (req, res) => {
 
   try {
     const mainBuffer = await sharp(path).rotate().toBuffer();
-    await storage.putObject(baseKey, Readable.from(mainBuffer), 'image/jpeg');
+    await storage.putObject(baseKey, Readable.from(mainBuffer), 'image/jpeg', { cacheControl: AVATAR_CACHE_CONTROL });
 
     await Promise.all(
       store.config.sizes.map(async (size) => {
         const sizedKey = `${baseKey.slice(0, -4)}-${size}.jpg`;
         const dimensions = crop === 'square' ? { width: size, height: size } : { width: size };
         const resizedBuffer = await sharp(path).rotate().resize(dimensions).toBuffer();
-        await storage.putObject(sizedKey, Readable.from(resizedBuffer), 'image/jpeg');
+        await storage.putObject(sizedKey, Readable.from(resizedBuffer), 'image/jpeg', { cacheControl: AVATAR_CACHE_CONTROL });
       }),
     );
   } catch (err) {

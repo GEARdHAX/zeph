@@ -23,6 +23,32 @@ const { inspectArchive } = require('../utils/inspectArchive');
 // client's PUT finishing and this route running where an unvalidated object
 // exists in R2, but it is never referenced by any Message until this route
 // marks it READY, so nothing in the app can render/serve it in that window.
+const readHead = async (key, bytes) => {
+  const stream = await storage.getObjectStream(key);
+  const chunks = [];
+  let length = 0;
+  // eslint-disable-next-line no-restricted-syntax
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+    length += chunk.length;
+    if (length >= bytes) break;
+  }
+  if (typeof stream.destroy === 'function') stream.destroy();
+  return Buffer.concat(chunks).slice(0, bytes);
+};
+
+const posterIsValid = async (key) => {
+  try {
+    const meta = await storage.getObjectMetadata(key);
+    if (!meta || !meta.size || meta.size > mediaPolicy.MAX_POSTER_SIZE) return false;
+    if (meta.contentType && meta.contentType.toLowerCase() !== 'image/jpeg') return false;
+    const head = await readHead(key, 3);
+    return head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+  } catch (err) {
+    return false;
+  }
+};
+
 module.exports = async (req, res) => {
   const { mediaId } = req.params;
 
@@ -43,6 +69,8 @@ module.exports = async (req, res) => {
   const fail = async (reason, statusCode) => {
     await storage.deleteObject(media.storageKey).catch(() => {});
     if (media.thumbnailKey) await storage.deleteObject(media.thumbnailKey).catch(() => {});
+    // A poster the client may already have uploaded next to a rejected file must not be left behind.
+    await storage.deleteObject(`${media.storageKey}-thumb.jpg`).catch(() => {});
     media.status = 'FAILED';
     await media.save().catch(() => {});
     fs.promises.unlink(tempPath).catch(() => {});
@@ -63,6 +91,10 @@ module.exports = async (req, res) => {
   if (!metadata) return fail('OBJECT_NOT_FOUND', 404);
   if (metadata.size > mediaPolicy.getMaxSize(media.category)) return fail('FILE_TOO_LARGE', 413);
   media.size = metadata.size;
+  // The signed upload bound the type, so R2 should hold exactly what the extension implies. Anything else means the
+  // object did not come through the signed path.
+  const expectedType = mediaPolicy.mimeForFile(originalExtension, media.category);
+  if (metadata.contentType && metadata.contentType.toLowerCase() !== expectedType) return fail('CONTENT_TYPE_MISMATCH', 415);
 
   let stream;
   try {
@@ -84,7 +116,7 @@ module.exports = async (req, res) => {
     return fail('DOWNLOAD_FAILED', 500);
   }
 
-  if (!isConsistentWithCategory(tempPath, media.category)) {
+  if (!isConsistentWithCategory(tempPath, media.category, originalExtension)) {
     return fail('FILE_CONTENT_MISMATCH', 415);
   }
 
@@ -105,7 +137,7 @@ module.exports = async (req, res) => {
     try {
       const thumbKey = `${media.storageKey}-thumb.jpg`;
       const thumbBuffer = await sharp(tempPath).rotate().resize({ width: 256 }).jpeg().toBuffer();
-      await storage.putObject(thumbKey, Readable.from(thumbBuffer), 'image/jpeg');
+      await storage.putObject(thumbKey, Readable.from(thumbBuffer), 'image/jpeg', { cacheControl: 'private, no-store' });
       media.thumbnailKey = thumbKey;
       const dimensions = await sharp(tempPath).metadata();
       media.width = dimensions.width;
@@ -114,11 +146,18 @@ module.exports = async (req, res) => {
       logger.warn({ err, mediaId }, 'Failed to generate image thumbnail (non-fatal)');
     }
   }
-  // Video poster frames are uploaded directly by the client to
-  // posterStorageKey (see upload-media-presign.js) — if that upload
-  // happened, the key is already known; just confirm it and record it.
+  // Video poster frames are uploaded directly by the client (see upload-media-presign.js). The key is DERIVED here and
+  // the client's value is only a flag: taking it as given would let a client point its thumbnail at any object,
+  // including another user's private file, and then read it through the thumbnail route. The poster is also
+  // validated (size cap, JPEG content) before it is kept.
   if (media.category === 'video' && req.fields.posterStorageKey) {
-    media.thumbnailKey = req.fields.posterStorageKey;
+    const posterKey = `${media.storageKey}-thumb.jpg`;
+    if (req.fields.posterStorageKey === posterKey && (await posterIsValid(posterKey))) {
+      media.thumbnailKey = posterKey;
+    } else {
+      logger.warn({ mediaId }, 'Ignored an invalid or foreign video poster');
+      await storage.deleteObject(posterKey).catch(() => {});
+    }
   }
 
   // Served with this type by the CDN / media route; derived from the validated extension.

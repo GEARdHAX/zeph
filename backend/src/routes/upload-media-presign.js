@@ -56,8 +56,11 @@ module.exports = async (req, res) => {
   media.storageKey = storageKey;
   await media.save();
 
-  const contentType = mediaPolicy.MEDIA_CATEGORIES[category].mimes[0];
-  const uploadUrl = await storage.getPresignedUploadUrl(storageKey, contentType);
+  // The type and cache/disposition headers are chosen HERE, from the validated extension, and bound into the
+  // signature: the browser must send exactly these (it gets them back in `uploadHeaders`), so it cannot store the
+  // object under a different type, and the stored metadata is correct without a second pass.
+  const uploadHeaders = mediaPolicy.uploadHeadersFor(category, originalExtension);
+  const uploadUrl = await storage.getPresignedUploadUrl(storageKey, uploadHeaders);
   if (!uploadUrl) {
     // R2 isn't actually configured — the frontend shouldn't have called
     // this route at all (see GET /api/info's directUploadEnabled), but
@@ -75,15 +78,17 @@ module.exports = async (req, res) => {
   let posterStorageKey = null;
   if (poster === 'true' && category === 'video') {
     posterStorageKey = `${storageKey}-thumb.jpg`;
-    posterUploadUrl = await storage.getPresignedUploadUrl(posterStorageKey, 'image/jpeg');
+    posterUploadUrl = await storage.getPresignedUploadUrl(posterStorageKey, mediaPolicy.POSTER_UPLOAD_HEADERS);
   }
 
   res.status(200).json({
     status: 200,
     mediaId: media._id,
     uploadUrl,
+    uploadHeaders,
     storageKey,
     posterUploadUrl,
+    posterUploadHeaders: posterUploadUrl ? mediaPolicy.POSTER_UPLOAD_HEADERS : null,
     posterStorageKey,
   });
 };

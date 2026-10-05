@@ -180,22 +180,77 @@ const isAllowedMime = (category, mimetype) => {
   return !!def && def.mimes.includes(mimetype);
 };
 
-// Exact MIME type for an extension that already passed the allowlist. Direct (presigned) uploads
-// never see a browser-supplied type, and a category's `mimes` list is not aligned with its
-// extensions, so the type served to viewers comes from here (falling back to the category's first).
+// The ONE place that ties an extension to its MIME type. Every allowed extension has an entry (a test fails if one
+// is missing, or if the type is not in its category's `mimes` list), so the type a file is stored and served with
+// never depends on what the browser claims. `.webm` means video/webm; audio-only WebM must use `.weba`.
 const MIME_BY_EXTENSION = {
+  // image
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif',
+  // video
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+  // audio
   '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.ogg': 'audio/ogg',
   '.opus': 'audio/opus', '.weba': 'audio/webm',
+  // pdf
   '.pdf': 'application/pdf',
+  // document
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.csv': 'text/csv',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.txt': 'text/plain',
+  '.rtf': 'application/rtf',
+  '.odt': 'application/vnd.oasis.opendocument.text',
+  '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+  '.odp': 'application/vnd.oasis.opendocument.presentation',
+  // archive
+  '.zip': 'application/zip', '.7z': 'application/x-7z-compressed', '.rar': 'application/vnd.rar',
+  '.tar': 'application/x-tar', '.gz': 'application/gzip',
+  // text / source (never rendered: always downloaded)
+  '.json': 'application/json', '.xml': 'application/xml', '.yaml': 'text/yaml', '.yml': 'text/yaml',
+  '.md': 'text/markdown', '.log': 'text/x-log', '.sql': 'application/sql', '.css': 'text/css',
+  '.html': 'text/html', '.htm': 'text/html', '.js': 'application/javascript', '.ts': 'application/x-typescript',
+  '.tsx': 'application/x-typescript', '.jsx': 'text/javascript', '.py': 'text/x-python',
+  '.java': 'text/x-java-source', '.cpp': 'text/x-c++', '.c': 'text/x-c', '.h': 'text/x-c',
 };
 
-const mimeForFile = (extension, category) =>
-  MIME_BY_EXTENSION[(extension || '').toLowerCase()] || (MEDIA_CATEGORIES[category] && MEDIA_CATEGORIES[category].mimes[0]) || 'application/octet-stream';
+// Where the category, not just the extension, decides the type: the meeting-audio route stores recordings that
+// are audio even though the container extension (.webm / .mp4) is shared with video.
+const MIME_BY_CATEGORY_EXTENSION = {
+  audio: { '.webm': 'audio/webm', '.mp4': 'audio/mp4' },
+};
+
+const mimeForFile = (extension, category) => {
+  const ext = (extension || '').toLowerCase();
+  return (MIME_BY_CATEGORY_EXTENSION[category] && MIME_BY_CATEGORY_EXTENSION[category][ext]) || MIME_BY_EXTENSION[ext] || 'application/octet-stream';
+};
+
+// The headers a presigned upload binds into the signature, and that the browser must send exactly. Binding
+// Content-Type means a client cannot store a file under a type the server did not choose (a wrong header is
+// refused by R2 with 403). Private media is never cached by a shared cache; download-only types are stored with
+// `attachment` so even a direct fetch of the object cannot render them in the page.
+const uploadHeadersFor = (category, extension) => {
+  const headers = {
+    'Content-Type': mimeForFile(extension, category),
+    'Cache-Control': 'private, no-store',
+  };
+  if (getSecurityLevel(category) === SecurityLevel.DOWNLOAD_ONLY) headers['Content-Disposition'] = 'attachment';
+  return headers;
+};
+
+// A video poster (thumbnail) is a small client-captured JPEG uploaded next to the video.
+const POSTER_UPLOAD_HEADERS = { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, no-store' };
+const MAX_POSTER_SIZE = 2 * MB;
 
 module.exports = {
+  POSTER_UPLOAD_HEADERS,
+  MAX_POSTER_SIZE,
+  MIME_BY_EXTENSION,
   mimeForFile,
+  uploadHeadersFor,
   MEDIA_CATEGORIES,
   BLOCKED_EXTENSIONS,
   SecurityLevel,

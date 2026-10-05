@@ -70,7 +70,7 @@ module.exports = async (req, res) => {
 
   // Never trust the client's declared MIME type — verify the actual header
   // bytes match what the extension/category claims.
-  if (!isConsistentWithCategory(file.path, category)) {
+  if (!isConsistentWithCategory(file.path, category, originalExtension)) {
     recordRejection('FILE_CONTENT_MISMATCH', { extension: originalExtension, category });
     return res.status(415).json({ status: 415, error: 'FILE_CONTENT_MISMATCH' });
   }
@@ -95,7 +95,7 @@ module.exports = async (req, res) => {
   const media = new Media({
     uploaderId: req.user.id,
     originalName: sanitizedName,
-    mimeType: file.type,
+    mimeType: mediaPolicy.mimeForFile(originalExtension, category),
     category,
     size: file.size,
     status: 'UPLOADING',
@@ -106,7 +106,10 @@ module.exports = async (req, res) => {
   const storageKey = attachmentKey(req.user.id, safeExtension);
 
   try {
-    await storage.putObject(storageKey, fs.createReadStream(file.path), file.type);
+    await storage.putObject(storageKey, fs.createReadStream(file.path), mediaPolicy.mimeForFile(originalExtension, category), {
+      cacheControl: 'private, no-store',
+      contentDisposition: mediaPolicy.uploadHeadersFor(category, originalExtension)['Content-Disposition'],
+    });
   } catch (err) {
     logger.error({ err, mediaId: media._id }, 'Failed to write media object to storage');
     media.status = 'FAILED';

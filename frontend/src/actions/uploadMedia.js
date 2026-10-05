@@ -28,6 +28,35 @@ const uploadViaProxy = (file, onProgress, poster) => {
   return axios.post(url, data, { onUploadProgress: onProgress }).then((res) => res.data);
 };
 
+// The upload to R2 is a plain XMLHttpRequest on purpose, NOT axios. axios attaches the user's login token
+// (`Authorization: Bearer ...`) to every request by default, and R2 treats a request with an Authorization header as
+// header-signed: it ignores the presigned link and answers 400 "Missing x-amz-content-sha256", without CORS headers
+// (so the page only sees a CORS error while DevTools shows the 400). This request must carry nothing but the headers
+// the server signed.
+const putToStorage = (url, body, headers, onProgress) =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    Object.entries(headers || {}).forEach(([name, value]) => xhr.setRequestHeader(name, value));
+    if (onProgress) xhr.upload.onprogress = (event) => onProgress(event);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      const error = new Error(`Upload to storage failed (${xhr.status})`);
+      // Same shape the axios-based error handling already reads.
+      error.response = { status: xhr.status, data: { error: 'STORAGE_UPLOAD_FAILED', detail: String(xhr.responseText || '').slice(0, 300) } };
+      reject(error);
+    };
+    xhr.onerror = () => {
+      const error = new Error('Upload to storage failed (network or CORS)');
+      error.response = { status: 0, data: { error: 'STORAGE_UPLOAD_FAILED' } };
+      reject(error);
+    };
+    xhr.send(body);
+  });
+
 // Direct-to-R2 flow: presign -> PUT straight to R2 (bypasses this Node
 // process entirely for the actual bytes) -> tell the server to validate/
 // finalize it. See backend/src/routes/upload-media-presign.js and
@@ -40,19 +69,15 @@ const uploadViaPresignedUrl = async (file, onProgress, poster) => {
     size: file.size,
     poster: poster ? 'true' : undefined,
   });
-  const { mediaId, uploadUrl, posterUploadUrl, posterStorageKey } = presignRes.data;
+  const { mediaId, uploadUrl, uploadHeaders, posterUploadUrl, posterUploadHeaders, posterStorageKey } = presignRes.data;
 
-  // Plain XHR (not axios) for the actual R2 PUT — onUploadProgress needs to
-  // track this request specifically, and axios.put's own progress hook
-  // works the same way, but a bare fetch() has no upload-progress event at
-  // all, so this stays on axios for parity with the proxy flow's progress bar.
-  await axios.put(uploadUrl, file, {
-    headers: { 'Content-Type': file.type },
-    onUploadProgress: onProgress,
-  });
+  // The headers the server signed (Content-Type chosen from the validated extension, plus cache/disposition) must be
+  // sent exactly; they are NOT taken from the browser's own idea of the file's type (`file.type` is often empty or
+  // carries codec parameters).
+  await putToStorage(uploadUrl, file, uploadHeaders || { 'Content-Type': file.type }, onProgress);
 
   if (poster && posterUploadUrl) {
-    await axios.put(posterUploadUrl, poster, { headers: { 'Content-Type': 'image/jpeg' } });
+    await putToStorage(posterUploadUrl, poster, posterUploadHeaders || { 'Content-Type': 'image/jpeg' });
   }
 
   const completeUrl = `${Config.url || ''}/api/upload/media/${mediaId}/complete`;

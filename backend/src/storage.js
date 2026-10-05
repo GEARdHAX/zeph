@@ -45,7 +45,8 @@ const localPathFor = (key) => path.join(store.config.dataFolder, key);
 // readStream: a Node Readable (e.g. fs.createReadStream on formidable's temp
 // file). contentType: sniffed/categorized mimetype, never the raw client
 // header — callers are responsible for having already validated it.
-const putObject = async (key, readStream, contentType) => {
+// options: { cacheControl, contentDisposition } stored as the object's own metadata.
+const putObject = async (key, readStream, contentType, options = {}) => {
   if (useObjectStorage) {
     const { client, commands } = getS3();
     // R2/S3 need a fully-buffered body or a stream with a known length for
@@ -61,6 +62,8 @@ const putObject = async (key, readStream, contentType) => {
         Key: key,
         Body: body,
         ContentType: contentType,
+        CacheControl: options.cacheControl,
+        ContentDisposition: options.contentDisposition,
       }),
     );
     return;
@@ -104,16 +107,30 @@ const getObjectStream = async (key) => {
 // NOT trusted until the caller re-fetches and validates it afterward
 // (content-sniff, archive-bomb scan) — this only gets the bytes into R2,
 // it doesn't establish that they're safe. See routes/upload-media-complete.js.
-const getPresignedUploadUrl = async (key, contentType, expiresInSeconds = 300) => {
+// `headers` is either a bare Content-Type string, or the header object from mediaPolicy.uploadHeadersFor()
+// ({ 'Content-Type', 'Cache-Control', 'Content-Disposition' }). Every header given is BOUND INTO THE SIGNATURE: the
+// browser must send exactly these values, and R2 refuses (403) anything else. That is what stops a client from
+// storing a file under a type the server did not choose. Headers that are not signed are not enforced by R2 at all.
+const SIGNED_HEADER_INPUTS = {
+  'content-type': 'ContentType',
+  'cache-control': 'CacheControl',
+  'content-disposition': 'ContentDisposition',
+};
+
+const getPresignedUploadUrl = async (key, headers, expiresInSeconds = 300) => {
   if (!useObjectStorage) return null;
   const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
   const { client, commands } = getS3();
-  const command = new commands.PutObjectCommand({
-    Bucket: process.env.R2_BUCKET,
-    Key: key,
-    ContentType: contentType,
+  const given = typeof headers === 'string' ? { 'Content-Type': headers } : headers || {};
+  const input = { Bucket: process.env.R2_BUCKET, Key: key };
+  const signable = new Set();
+  Object.entries(given).forEach(([name, value]) => {
+    const field = SIGNED_HEADER_INPUTS[name.toLowerCase()];
+    if (!field || value === undefined) return;
+    input[field] = value;
+    signable.add(name.toLowerCase());
   });
-  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+  return getSignedUrl(client, new commands.PutObjectCommand(input), { expiresIn: expiresInSeconds, signableHeaders: signable });
 };
 
 const deleteObject = async (key) => {
@@ -142,7 +159,12 @@ const getObjectMetadata = async (key) => {
     const { client, commands } = getS3();
     try {
       const res = await client.send(new commands.HeadObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }));
-      return { size: res.ContentLength, contentType: res.ContentType };
+      return {
+        size: res.ContentLength,
+        contentType: res.ContentType,
+        cacheControl: res.CacheControl,
+        contentDisposition: res.ContentDisposition,
+      };
     } catch (err) {
       if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) return null;
       throw err;

@@ -87,7 +87,7 @@ module.exports = async (req, res) => {
     uploaderId: req.user.id,
     // eslint-disable-next-line no-control-regex -- same sanitization as upload-media.js: strip control chars, never used as a path
     originalName: (file.name || 'recording').replace(/[\x00-\x1f/\\]/g, '').slice(0, 255),
-    mimeType: file.type,
+    mimeType: mediaPolicy.mimeForFile(originalExtension, 'audio'),
     category: 'audio',
     size: file.size,
     status: 'UPLOADING',
@@ -96,7 +96,9 @@ module.exports = async (req, res) => {
 
   const storageKey = `${req.user.id}/${shield}${media._id}${originalExtension}`;
   try {
-    await storage.putObject(storageKey, fs.createReadStream(file.path), file.type);
+    await storage.putObject(storageKey, fs.createReadStream(file.path), mediaPolicy.mimeForFile(originalExtension, 'audio'), {
+      cacheControl: 'private, no-store',
+    });
   } catch (err) {
     logger.error({ err, mediaId: media._id }, 'Failed to write meeting recording to storage');
     media.status = 'FAILED';

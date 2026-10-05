@@ -63,7 +63,11 @@ export default {
     const { visibility } = check;
 
     const disposition = url.searchParams.get('d') || '';
-    const hasRange = request.headers.has('range');
+    // One well-formed byte range (`bytes=0-99`, `bytes=500-`, `bytes=-5`) is honoured. Anything else (garbage, or several
+    // ranges at once) is IGNORED and the whole object is served with a plain 200, as HTTP says to do with a Range header
+    // that cannot be understood; it must not become a 206 for the full body.
+    const rangeMatch = /^bytes=(\d*)-(\d*)$/.exec((request.headers.get('range') || '').trim());
+    const hasRange = !!rangeMatch && (rangeMatch[1] !== '' || rangeMatch[2] !== '');
     // Cloudflare's Cache API is a no-op on *.workers.dev: only use it on a custom domain.
     const edgeCacheable =
       visibility === 'public' && request.method === 'GET' && !hasRange && !disposition && !url.hostname.endsWith('.workers.dev') && typeof caches !== 'undefined';
@@ -75,8 +79,17 @@ export default {
 
     let object;
     try {
-      object = await env.BUCKET.get(key, { range: request.headers, onlyIf: request.headers });
+      object = await env.BUCKET.get(key, hasRange ? { range: request.headers, onlyIf: request.headers } : { onlyIf: request.headers });
     } catch (err) {
+      // A range that starts past the end of the object is a client error (416), not an upstream failure.
+      if (hasRange && /range|10039/i.test((err && err.message) || '')) {
+        const meta = await env.BUCKET.head(key).catch(() => null);
+        if (!meta) return plain(404, 'not found');
+        return new Response(null, {
+          status: 416,
+          headers: { 'content-range': `bytes */${meta.size}`, 'accept-ranges': 'bytes', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' },
+        });
+      }
       console.error(JSON.stringify({ event: 'cdn_r2_error', message: err && err.message }));
       return plain(502, 'upstream error');
     }
