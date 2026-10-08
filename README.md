@@ -1,429 +1,566 @@
-# zeph. — Real-time Conferencing & Collaboration Platform
+<p align="center">
+  <img src="frontend/public/og-zeph-v2.png" alt="Zeph" width="720" />
+</p>
 
-zeph. is a real-time messaging, audio, and video conferencing platform, engineered with a full-stack JavaScript architecture using Express, React, Socket.IO, and Mediasoup (WebRTC SFU).
+# Zeph
 
-> **Attribution:** The original application layer (chat, calling, and WebRTC functionality)
-> is built on a commercial template ("Clover" by Honeyside, via CodeCanyon). All security
-> hardening, real-time architecture work, low-network optimization, testing, CI/CD,
-> observability, the AI assistant, and this rebrand are original engineering work on top of
-> that foundation — see [`DECISIONS.md`](DECISIONS.md) for the full record of what changed
-> and why.
+**A real-time messaging, calling and AI-assisted collaboration platform, engineered for unreliable mobile networks.**
 
----
+[Live Demo](https://www.zephchat.tech/) · [GitHub](https://github.com/GEARdHAX/zeph) · [Architecture](#architecture) · Demo Video _(coming soon)_
 
-## 📋 Table of Contents
-1. [Project Overview](#1-project-overview)
-2. [Technology Stack](#2-technology-stack)
-3. [Repository Structure](#3-repository-structure)
-4. [Backend Architecture](#4-backend-architecture)
-5. [Frontend Architecture](#5-frontend-architecture)
-6. [Messaging Architecture](#6-messaging-architecture)
-7. [Audio & Video (WebRTC) Architecture](#7-audio--video-webrtc-architecture)
-8. [Authentication & Authorization Flow](#8-authentication--authorization-flow)
-9. [Admin Panel](#9-admin-panel)
-10. [Database Design](#10-database-design)
-11. [API Reference](#11-api-reference)
-12. [Socket Events](#12-socket-events)
-13. [Environment Variables](#13-environment-variables)
-14. [Scripts & Automation](#14-scripts--automation)
-15. [Documentation Summaries](#15-documentation-summaries)
-16. [Deployment Guide](#16-deployment-guide)
-17. [Performance Optimizations](#17-performance-optimizations)
-18. [Security Features](#18-security-features)
-19. [Complete Architecture Visualizations](#19-complete-architecture-visualizations)
-20. [Codebase Findings & Recommendations](#20-codebase-findings--recommendations)
+> **Attribution.** The original application layer (chat, calling and WebRTC foundations) is built on a commercial template ("Clover" by Honeyside, via CodeCanyon). Everything listed under [Key Engineering Highlights](#key-engineering-highlights) is original engineering work on top of that foundation: security hardening, the real-time architecture, Redis/BullMQ, the AI layer, the storage/CDN pipeline, Cloudflare-based calling, testing, CI, and the design-system migration. The full record of what changed and why is in [`DECISIONS.md`](DECISIONS.md).
 
 ---
 
-## 1. Project Overview
+## What is Zeph?
 
-*   **Purpose**: To provide a self-hosted, ultra-low latency platform for real-time chat, file sharing, and high-performance WebRTC multi-party audio/video rooms.
-*   **Business Goal**: Open-source alternative to Slack/Teams/Zoom, featuring an automated zero-configuration launcher for cloud servers.
-*   **Intended Users**: Remote-first teams, organizations requiring private messaging infrastructure, and developers looking for a reference WebRTC implementation.
-*   **Supported Platforms**: Modern web browsers (Chrome, Firefox, Safari, Edge) and mobile web interfaces.
-*   **Overall Architecture**:
-    *   **Frontend**: Single Page Application (SPA) driven by React, Redux, SASS, and `reactn` (global state).
-    *   **Backend**: Node.js/Express REST server, Socket.IO messaging gateway, and Mediasoup SFU (Selective Forwarding Unit) media router.
-    *   **Databases**: MongoDB (persistent application state) and NeDB (high-speed, in-memory SQLite-like document database for real-time room/peer mappings).
+Zeph is a full-stack communication platform: direct messages and groups, voice/video meetings, file and media sharing, and an optional AI assistant that can summarize a conversation, translate a message, or draft a reply. It runs as a React single-page app talking to a Node.js/Express/Socket.IO backend backed by MongoDB and Redis.
 
----
+It is built around one constraint that most chat demos ignore: **real networks are bad.** Phones drop to 2G, switch between Wi-Fi and cellular mid-send, and sit behind data caps. Zeph treats that as the normal case. Messages are idempotent and queued locally when offline, history is fetched with cursor pagination, heavy screens are lazy-loaded, uploads go straight to object storage, and AI is never required for anything core.
 
-## 2. Technology Stack
+Zeph is a portfolio engineering project. It is deployed and usable at [zephchat.tech](https://www.zephchat.tech/), but it is not presented as having the scale of a commercial messenger. The goal is to show how the hard parts of such a product are designed, secured and tested.
 
-### Frontend
-*   **Core**: React 18 (Vite-bundler), HTML5, JavaScript (ES Modules).
-*   **Styling**: SASS, Vanilla CSS, UIKit, Styled-Components.
-*   **State Management**: Redux, Redux Thunk, Reactn (simplified global state management).
-*   **Realtime**: Socket.io Client (`v2.5.0`), Mediasoup Client (`v3.7.2`).
-*   **UI Helpers**: React Icons, React Toastify, React Modal Image, Emoji Mart.
+## Why I Built It
 
-### Backend
-*   **Core**: Node.js 18/20, Express (`v4.18.2`).
-*   **Realtime**: Socket.IO (`v2.5.0`), Socketio-JWT.
-*   **Media Routing (SFU)**: Mediasoup (`v3.13.19`) compiled with C++ native workers.
-*   **Authentication**: Passport.js, Passport-JWT, jsonwebtoken, Argon2.
-*   **Utilities**: Express Formidable, Sharp, Mongoose, NeDB-Async, Node-Schedule.
-
-### Database
-*   **Persistent**: MongoDB (`v6.x.x`), Mongoose ODM.
-*   **Volatile/Session**: AsyncNeDB (In-memory file-based document DB).
-
-### Infrastructure & Operations
-*   **Web Server / Proxy**: Nginx (Reverse Proxy with SSL certificates via Let's Encrypt).
-*   **Process Management**: PM2.
-*   **Containerization**: Docker (Configurable via Dockerfiles, if needed).
+I wanted a project where the interesting problems were real ones: delivering a message exactly once over a flaky connection, authorizing every read and write on a multi-user system, handling untrusted file uploads safely, keeping AI features cost-bounded and optional, and running video calls on a small budget. Starting from a working template let me spend my time on the engineering around it (the security model, the delivery guarantees, the storage pipeline, the test suite and the operational concerns) rather than on scaffolding.
 
 ---
 
-## 3. Repository Structure
+## Key Engineering Highlights
 
-```
-/
-├── backend/                  # Express REST API, Socket.IO & Mediasoup SFU media server
-├── frontend/                 # React frontend application built with Vite & SASS
-├── documentation/            # Static deployment guides and online documentation portal redirects
-├── scripts/                  # Multi-node automation installers and configuration scripts
-├── launcher                  # Root bash shell entry-point script for Ubuntu deployment setup
-├── package.json              # Root workspace metadata
-├── documentation.pdf         # Original template manual (Honeyside/Clover, kept for reference)
-├── README.md                 # Project documentation
-├── .gitignore                # Global git ignore filters
-└── .honeyignore              # Target exclusion rules for specific build/package processes
-```
+1. **Idempotent, resilient message delivery.** Every outgoing message carries a client-generated ID enforced by a database uniqueness guarantee, so retries after a timeout can never create duplicates. A durable IndexedDB outbox holds unsent messages across reloads and flushes them on reconnect with backoff, and a resync call fills any gap after a disconnect.
+2. **Layered security model.** Server-side session revocation, passkeys, a PIN/WebAuthn "private vault", risk-based step-up for sensitive actions, role-based group authorization, ownership checks on every media read, and a Redis-backed rate limiter that fails closed.
+3. **Hardened upload pipeline.** Direct-to-object-storage uploads with server-signed headers, one source of truth for type/extension/size policy, content sniffing instead of trusting the browser, archive inspection, and server-generated storage keys. Verified with a test matrix covering all 56 supported file extensions.
+4. **Signed-URL CDN on a Cloudflare Worker.** Private media is served through short-lived signed links with range-request support, correct download behaviour for risky types, and no direct storage exposure.
+5. **Calls on Cloudflare Realtime.** An SFU-based calling engine selectable at runtime (Cloudflare Realtime by default, self-hosted mediasoup as an alternative), with a monthly usage guard to keep cost bounded. Measured live: a 4x increase in delivered pixels at the same stability.
+6. **Governed, optional AI.** A provider-agnostic gateway (cloud or self-hosted model) with eligibility rules, per-user quotas, request de-duplication, bounded context, cached summaries and background jobs. The product works fully with AI switched off.
+7. **Storage lifecycle correctness.** Deleting a message removes its stored file, with retries and a shared-media check, while the UI updates optimistically and rolls back if the server rejects the delete.
 
 ---
 
-## 4. Backend Architecture
+## Architecture
 
-### Folder Architecture
-*   `backend/src/init.js`: Core initialization script mounting database hookups, Passport JWT auth policies, CORS filters, multi-part form handlers, Socket.IO listeners.
-*   `backend/src/store.js`: Singleton in-memory application context hosting references to active WebRTC peers, Socket.IO server hooks, database connections.
-*   `backend/src/mediasoup/index.js`: SFU lifecycle orchestrator handling Worker threads, WebRtcTransport allocations, Producers, Consumers.
-*   `backend/src/models/`: MongoDB ODM schemas (Users, Rooms, Messages, Meetings, Emails, AuthCodes).
-*   `backend/src/routes/`: Express controller handlers structured by concerns (Authentication, Meeting sessions, Media uploads, Chat channels).
-*   `backend/src/events/`: Real-time Socket.IO handler routing (status syncing, pagination offsets).
-*   `backend/src/utils/`: Common helpers (mailing templates, validator utils).
+Five diagrams cover the core of the system. The full set (calls, rate limiting, trust boundaries, resilience, CI and more) lives in [`docs/architecture/`](docs/architecture/).
 
-### HTTP Request Pipeline Flow
-```
-Client Request
-      ↓
-[Express Middleware] (CORS, Express-Formidable)
-      ↓
-[Passport JWT Strategy] (Token Validation & User Context binding)
-      ↓
-[Router Mapper] (Routes selection under /api/...)
-      ↓
-[Controller Actions] (Business Logic inside specific endpoint)
-      ↓
-[Mongoose ODM / MongoDB] (Persistent storage reads/writes)
-      ↓
-JSON Response
+### 1. System architecture
+
+```mermaid
+flowchart LR
+  Browser["Browser<br/>React SPA"]
+
+  subgraph Hosting["Application hosting"]
+    Vercel["Vercel<br/>static frontend"]
+    API["Backend API<br/>Express + Socket.IO<br/>(Render)"]
+    Workers["BullMQ workers"]
+  end
+
+  subgraph Data["Data"]
+    Mongo[("MongoDB Atlas")]
+    Redis[("Redis (Upstash)")]
+  end
+
+  subgraph Cloudflare["Cloudflare"]
+    R2[("R2 storage")]
+    Worker["CDN Worker<br/>signed URLs"]
+    RT["Realtime SFU<br/>calls"]
+  end
+
+  subgraph AI["AI providers (optional)"]
+    Router["Provider router"]
+    Cloud["Gemini / Groq"]
+    Ollama["Ollama<br/>self-hosted"]
+  end
+
+  Browser -- "HTTPS" --> Vercel
+  Browser -- "HTTPS REST" --> API
+  Browser <-- "WebSocket" --> API
+  Browser -- "signed upload" --> R2
+  Browser -- "signed link" --> Worker
+  Browser <-- "WebRTC" --> RT
+  API --> Mongo
+  API <-- "adapter, limits,<br/>cache, queues" --> Redis
+  API --> R2
+  API -- "session control" --> RT
+  API --> Router
+  Router --> Cloud
+  Router --> Ollama
+  Workers <--> Redis
+  Workers --> Mongo
+  Workers --> R2
+  Worker --> R2
 ```
 
----
+_Legend:_ solid arrows are real calls; browsers talk to storage and the CDN only through server-signed requests; Redis holds coordination state, MongoDB is the system of record. Not shown because not active: end-to-end encryption, media edge caching, and the self-hosted mediasoup call option.
 
-## 5. Frontend Architecture
+**Why this design?** Heavy bytes (uploads, downloads, call media) bypass the API server, so it spends its capacity on authorization and business logic. More in [`system-overview.md`](docs/architecture/system-overview.md).
 
-### Folder Structure
-*   `frontend/src/main.jsx`: Vite application startup mounting the React virtual DOM.
-*   `frontend/src/App.jsx`: Global router layout, theme injection, active notifications, away-state timers.
-*   `frontend/src/init.js`: Application setup script reading stored token, verifying authenticity with `/check-user`, and initializing Reactn store.
-*   `frontend/src/store.js`: Redux store instantiation using Redux-Thunk middleware.
-*   `frontend/src/actions/` & `frontend/src/reducers/`: Socket.IO actions, session state.
-*   `frontend/src/features/`: Component modules segregated by functional domain:
-    *   `Admin/`: Management screens for moderating users.
-    *   `Conversation/`: Main text chat UI, file uploads, emojis.
-    *   `Details/`: User metadata profile panels.
-    *   `Group/`: Creation dialogues for group channels.
-    *   `Meeting/`: Video/Audio conferencing rooms, screensharing tracks.
-    *   `Panel/`: Workspace navigation bar.
-    *   `Welcome/`: New user onboard state.
-*   `frontend/src/pages/`: Page containers (`Login`, `ForgotPassword`, `Home`).
+### 2. Message flow (idempotent persistence, reliable recovery)
 
-### React Component Hierarchy
-```
-App (Routes, Theme Manager, ToastContainer)
-      ↓
-BrowserRouter (React Router DOM)
-      ↓
-Home Page (Main Dashboard Context)
-      ├── Panel Feature (Sidebar channels list & user details)
-      ├── Conversation Feature (Chat log, message input, upload attachments)
-      └── Meeting Feature (WebRTC conference window, grid tiles of audio/video streams)
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Sender
+  participant UI as Sender UI
+  participant API as REST API
+  participant DB as MongoDB
+  participant IO as Socket.IO
+  actor Recipient
+
+  Sender->>UI: send
+  UI->>UI: optimistic bubble + client ID
+  UI->>API: POST /api/message
+  API->>API: authenticate, authorize, sanitize
+  API->>DB: insert (unique on room, author, client ID)
+  DB-->>API: stored, or existing message if a retry
+  API-->>UI: stored message
+  API->>IO: emit to members' user rooms
+  IO-->>Recipient: message-in (Redis adapter across instances)
+  Recipient->>IO: delivered
+  Recipient->>API: read
+  Note over UI,API: On network failure the message waits in an IndexedDB outbox,<br/>retries with backoff, resends with the SAME client ID after reconnect,<br/>then the client syncs everything newer than its last known message.
 ```
 
----
+**Why this design?** Messages are persisted over HTTP, not trusted to a socket. A client ID plus a database uniqueness constraint makes retries idempotent, and Socket.IO only handles live propagation. The failure path and the offline flow are in [`messaging-flow.md`](docs/architecture/messaging-flow.md).
 
-## 6. Messaging Architecture
+### 3. Secure media upload and delivery
 
-zeph. employs a hybrid transport system: Express REST for structural transactions (registering user accounts, creating group objects) and Socket.IO for reactive events (instant messaging, typing notifications, statuses).
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant API as Backend
+  participant R2 as Object storage
+  participant W as CDN Worker
 
-```
-Client (Sender)
-      ↓ (HTTP POST /api/message)
-Express Server
-      ↓
-Message Controller (Persists to MongoDB)
-      ↓
-Socket.IO Broadcast (Emits to roomId namespace)
-      ↓
-Client (Receiver)
-```
-
-### Connection Lifecycle
-1.  **Authorization**: Client initiates a Socket.IO connection. The handshake is intercepted by `socketio-jwt` which decodes the Bearer token in the query context.
-2.  **Instantiation**: Upon valid authentication, the connection is bound to a User ID, joined to the user's private namespace, and status is set to `online`.
-3.  **Real-Time Sync**: Events are attached via `events/index.js` (e.g. status changes, loading older messages).
-4.  **Graceful Disconnect**: Disconnect triggers cleanup: removing Socket IDs from lists, changing user status to `offline`/`lastOnline` timestamp.
-
----
-
-## 7. Audio & Video (WebRTC) Architecture
-
-Mediasoup functions as a **Selective Forwarding Unit (SFU)**. Instead of peer-to-peer mesh links, all media is forwarded through the server.
-
-```
-[Peer A (Producer)]                           [Mediasoup Router (SFU)]                   [Peer B (Consumer)]
-        │                                                │                                        │
-        │─── 1. socket: getRouterRtpCapabilities ──────>│                                        │
-        │<── 2. router capabilities returns ─────────────│                                        │
-        │                                                │                                        │
-        │─── 3. socket: createProducerTransport ────────>│                                        │
-        │<── 4. transport parameters returned ───────────│                                        │
-        │                                                │                                        │
-        │─── 5. socket: produce (audio/video track) ────>│                                        │
-        │<── 6. producer ID returned ────────────────────│                                        │
-        │                                                │                                        │
-        │                                                │─── 7. socket: newProducer broadcast ──>│
-        │                                                │                                        │
-        │                                                │<── 8. socket: createConsumerTransport ─│
-        │                                                │─── 9. transport parameters returned ──>│
-        │                                                │                                        │
-        │                                                │<── 10. socket: consume (producer ID) ──│
-        │                                                │─── 11. consumer media stream tracks ──>│
+  B->>API: request upload (name, size)
+  API->>API: check policy, choose key and content type
+  API-->>B: signed upload URL + exact headers
+  B->>R2: upload directly
+  B->>API: finalize
+  API->>R2: verify real size and stored type
+  API->>API: sniff content, reject executables, inspect archives
+  alt checks pass
+    API-->>B: media ready
+  else any check fails
+    API->>R2: delete object
+    API-->>B: rejected
+  end
+  B->>API: request media link
+  API->>API: user belongs to the conversation?
+  API-->>B: short-lived signed URL
+  B->>W: fetch (Range supported)
+  W->>W: verify signature
+  W->>R2: read via private binding
+  W-->>B: 200, 206 or 416
 ```
 
----
+**Why this design?** The browser is never trusted: type, size and key are decided or re-verified by the server, and storage is never exposed directly. Deletion lifecycle and CDN details: [`media-pipeline.md`](docs/architecture/media-pipeline.md). Edge caching is not yet active.
 
-## 8. Authentication Flow
+### 4. AI architecture
 
-Authentication uses JWT tokens signed with SHA-256 via `jsonwebtoken` and validated on endpoints using `passport-jwt`.
-
-```
-User (Login UI) ──> POST /api/login ──> Password compared via Argon2
-                                                   │
-    ┌───────────────── Auth Successful ────────────┴────────── Auth Failed ────┐
-    ↓                                                                          ↓
-JWT generated (Payload: id, email, level)                               401 Error response
-Returned in Response Object
-Stored in localStorage
-Mounted as Bearer Token on future Axios calls
-```
-
-### Route Authorization Levels
-*   **Standard Users**: Can read rooms, upload files, join video conferences, edit their own profile.
-*   **Root Users**: Assigned to user accounts possessing `level: "root"`. Root status allows user deletion via `/api/user/delete`, system configuration, and visibility of the admin management dashboard.
-
----
-
-## 9. Admin Panel
-
-The Admin Panel (`frontend/src/features/Admin`) is a dedicated view accessible only to users marked as `root`.
-*   **User Management Table**: Integrates `react-data-table-component` displaying email, username, permissions level, and last online activity status.
-*   **User Lifecycle Administration**: Provisioning new profiles, modifying roles (`standard` ↔ `root`), and processing account deletions.
-*   **Moderation Controls**: Real-time deletion of rooms and messages.
-
----
-
-## 10. Database Design
-
-MongoDB houses the persistent storage schemas, while NeDB manages active media transports in-memory.
-
-### Mongoose Schemas (Persistent MongoDB)
-
-```
-User
- ├── email (String)
- ├── username (String)
- ├── password (Hash, Argon2)
- ├── level (String: "standard" | "root")
- ├── favorites (Array → Room Refs)
- └── picture (Image Ref)
-
-Room (Channel/Direct Message)
- ├── people (Array → User Refs)
- ├── title (String)
- ├── isGroup (Boolean)
- ├── lastUpdate (Date)
- └── lastMessage (Message Ref)
-
-Message
- ├── author (User Ref)
- ├── content (String)
- ├── file (File Ref)
- └── room (Room Ref)
-
-Meeting (Video Call)
- ├── caller (User Ref)
- ├── callee (User Ref)
- ├── peers (Array of Socket IDs)
- └── users (Array → User Refs)
+```mermaid
+flowchart TD
+  Req["User asks for summary,<br/>translation or draft"] --> Off{"AI configured?"}
+  Off -- "no" --> NA["Feature unavailable<br/>chat unaffected"]
+  Off -- "yes" --> Elig{"Eligible and<br/>no fresh stored result?"}
+  Elig -- "stored result" --> Serve["Serve stored result"]
+  Elig -- "ineligible" --> Rej["Rejected"]
+  Elig -- "needs generation" --> Quota{"Per-user, per-IP,<br/>global limits"}
+  Quota -- "over" --> Rej
+  Quota -- "ok" --> Dedup["Dedup lock:<br/>identical requests share one call"]
+  Dedup --> Ctx["Bounded context<br/>token budget"]
+  Ctx --> Prov["Provider router<br/>timeout + circuit breaker"]
+  Prov --> Cloud["Cloud: Gemini / Groq"]
+  Prov --> Local["Self-hosted: Ollama"]
+  Cloud --> Val["Validate output"]
+  Local --> Val
+  Val --> Store["Store result"] --> Done["Return to user"]
 ```
 
----
+**Why this design?** Every cost and abuse control sits in front of the provider call, so no feature can bypass quotas or timeouts, and AI stays optional. Gemini can fall back to Groq when both are configured. Details, cost controls and the meeting pipeline: [`ai-architecture.md`](docs/architecture/ai-architecture.md).
 
-## 11. API Reference
+### 5. Production infrastructure
 
-| Method | Route | Description | Auth Required |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/login` | Compares email/password, returns JWT token. | No |
-| `POST` | `/api/register` | Registers a new standard user account. | No |
-| `POST` | `/api/check-user` | Validates User ID token validity. | No |
-| `POST` | `/api/upload` | Uploads an image. Returns image metadata object. | Yes (JWT) |
-| `POST` | `/api/upload/file` | Uploads raw documents/attachments. | Yes (JWT) |
-| `POST` | `/api/picture/change` | Updates the authenticated user's profile image. | Yes (JWT) |
-| `POST` | `/api/room/create` | Spawns a direct messaging channel. | Yes (JWT) |
-| `POST` | `/api/group/create` | Spawns a multi-peer chat room. | Yes (JWT) |
-| `POST` | `/api/meeting/call` | Starts an active audio/video meeting context. | Yes (JWT) |
-| `POST` | `/api/meeting/close` | Terminates a conference session. | Yes (JWT) |
-| `POST` | `/api/user/delete` | Deletes a user profile (Requires root access level). | Yes (JWT) |
+```mermaid
+flowchart TB
+  User["User"] --> FE["Frontend<br/>Vercel"]
+  User --> BE["Backend + workers<br/>Render"]
+  User --> CFE["Cloudflare<br/>R2, CDN Worker, Realtime"]
 
----
+  subgraph Data["Data stores"]
+    Mongo[("MongoDB Atlas")]
+    Redis[("Upstash Redis")]
+  end
 
-## 12. Socket Events
+  subgraph Ext["External providers"]
+    AIP["AI providers (optional)"]
+    Mail["Mail provider"]
+  end
 
-| Client-Side Event | Server Handling | Result / DB Operations | Broadcast |
-| :--- | :--- | :--- | :--- |
-| `status` | Updates online status | Set status in memory, updates last online | Broadcasts `onlineUsers` |
-| `getRouterRtpCapabilities` | Returns Mediasoup codecs | No database action | None |
-| `createProducerTransport` | Spawns WebRtcTransport | Inserts transport ID into `producerTransports` | None |
-| `produce` | Starts sending track | Inserts peer document into `store.peers` NeDB | Broadcasts `newProducer` |
-| `consume` | Starts receiving track | Retrieves target transport, builds consumer | None |
-| `join` | Joins a media room | Updates active peer socket arrays in MongoDB | Emits `newPeer` |
-| `leave` | Leaves a media room | Clears socket references from MongoDB & NeDB | Emits `leave` |
-
----
-
-## 13. Environment Variables
-
-### Backend Configuration (`backend/.env`)
-*   `PORT` (Default: `4000`): Port Express server binds to.
-*   `PUBLIC_IP_ADDRESS`: External public IP address of host. Essential for WebRTC routing.
-*   `MAPPED_IP` (Default: `false`): If using NAT mapping (AWS, Google Cloud), set to `true`.
-*   `AUTH_SECRET`: Secret key for signing JWT authorization headers.
-*   `ROOT_USER_EMAIL` / `ROOT_USER_PASSWORD`: Default credentials created on startup.
-*   `MONGO_URI`: Complete MongoDB connection URI (e.g. `mongodb://localhost:27017/chitcx`).
-*   `MAILER_ENABLED` (Default: `false`): Enables email delivery cron tasks.
-
-### Frontend Configuration (`frontend/.env`)
-*   `VITE_SITE_TITLE`: Website browser title.
-*   `VITE_SITE_BRAND`: Layout branding text label.
-*   `VITE_BACKEND_URL`: Absolute URL of the running backend server.
-*   `VITE_DEMO` (Default: `false`): Limits certain profile edit endpoints when true.
-
----
-
-## 14. Scripts & Automation
-
-### Workspace Root Scripts (`package.json`)
-*   No workspace tasks. Individual workspaces run independent scripts.
-
-### Backend Scripts (`backend/package.json`)
-*   `npm start`: Runs server using `node index.js`.
-*   `npm run format:check`: Validates Prettier rules compliance.
-*   `npm run format:write`: Formats the entire backend repository.
-
-### Frontend Scripts (`frontend/package.json`)
-*   `npm run dev` / `npm start`: Runs local Vite hot-reload server.
-*   `npm run build`: Compiles application into optimized static assets under `/dist`.
-*   `npm run lint:check` / `npm run lint:fix`: Code quality validations.
-
----
-
-## 15. Documentation Summaries
-
-*   **`documentation/README.md`**: Summarizes resource links where updates, changelogs, and official deployment announcements are posted.
-*   **`documentation/online.url`**: URL redirect asset from the original template, pointing to the Honeyside/Clover publishing channel (kept for attribution).
-*   **`documentation.pdf`**: User handbook covering administrative features and setup tips.
-
----
-
-## 16. Deployment Guide
-
-### Local Development
-1.  **Configure environment files** by creating `.env` files in both folders using the respective `.env.example` templates.
-2.  **Start Services**:
-    ```bash
-    # Terminal 1: Backend
-    cd backend
-    npm install
-    npm start
-
-    # Terminal 2: Frontend
-    cd frontend
-    npm install
-    npm run dev
-    ```
-
-### Production Setup (Ubuntu Server Setup via Launcher)
-For Ubuntu VPS deployments, zeph. includes a automated launcher script:
-1.  Run the launcher command to trigger the build flow:
-    ```bash
-    ./launcher setup
-    ```
-2.  The launcher script will install standard packages: `build-essential`, `python3`, `python3-pip`, `nvm` (Node.js 18), `yarn`, `pm2`, and `nginx`.
-3.  It will install MongoDB 6.0 and start the service daemon.
-4.  It prompts for domain, SSL email, public IP parameters, and auto-builds the React frontend.
-5.  It configures Nginx, obtains Let's Encrypt certificates automatically, and registers backend execution under PM2 process supervisor.
-
----
-
-## 17. Performance Optimizations
-
-*   **Selective Forwarding Unit (SFU)**: Media is forwarded only to active users in a meeting, avoiding high CPU overhead.
-*   **Lazy Loading**: Pages and tabs (such as administrative tables) are loaded on-demand.
-*   **Database Partitioning**: NeDB handles high-frequency in-memory WebRTC state transactions (saving MongoDB write overhead).
-*   **Asset Processing**: The Express controller imports `sharp` to resize and compress uploaded avatars.
-
----
-
-## 18. Security Features
-
-*   **Argon2 Hashing**: Cryptographic password hashing protection.
-*   **XSS Protection**: Inputs are scrubbed using the `xss` library to prevent script injection.
-*   **JWT Handshakes**: Both HTTP API requests and Socket.IO handshakes are secured using encrypted JSON Web Tokens.
-*   **Upload Shields**: File upload paths map files to randomly generated UUIDs, masking original extensions and physical locations.
-
----
-
-## 19. Complete Architecture Visualizations
-
-### High-Level Architecture
-```
-[User Browser] ──(WebRTC Peer Connections)──> [Mediasoup Media Server]
-      │                                                ▲
- (HTTP & WebSockets)                                   │
-      │                                                │
-      ▼                                                │
-[React Frontend (Vite)] ───────────────────────────────┘
-      │
-      ▼
-[Express Server] ──(Authentication / JWT)──> [Argon2 Password Hashing]
-      │
-      ▼
-[Mongoose ODM]
-      ├─► MongoDB (User profiles, chats, meeting history)
-      └─► AsyncNeDB (In-memory WebRTC active connections list)
+  BE --> Mongo
+  BE --> Redis
+  BE --> CFE
+  BE --> AIP
+  BE --> Mail
 ```
 
+CI is a verification pipeline (secret scan, tests, lint, audit, Docker smoke builds); it does not deploy. See [`infrastructure.md`](docs/architecture/infrastructure.md).
+
+### More diagrams
+
+| Topic | Document |
+|---|---|
+| System overview and data responsibilities | [`system-overview.md`](docs/architecture/system-overview.md) |
+| Messaging and unreliable-network flows | [`messaging-flow.md`](docs/architecture/messaging-flow.md) |
+| Socket.IO across instances | [`realtime-architecture.md`](docs/architecture/realtime-architecture.md) |
+| Upload, CDN delivery, deletion lifecycle | [`media-pipeline.md`](docs/architecture/media-pipeline.md) |
+| AI flow, cost governance, meeting AI | [`ai-architecture.md`](docs/architecture/ai-architecture.md) |
+| Calls | [`calls-architecture.md`](docs/architecture/calls-architecture.md) |
+| Auth, rate limiting, trust boundaries | [`security-architecture.md`](docs/architecture/security-architecture.md) |
+| Background jobs, failure behaviour, performance mapping | [`resilience.md`](docs/architecture/resilience.md) |
+| Infrastructure and CI | [`infrastructure.md`](docs/architecture/infrastructure.md) |
+
 ---
 
-## 20. Codebase Findings & Recommendations
+## Core Systems
 
-1.  **Hardcoded Mailer State**: `config.js` sets `nodemailerEnabled = false` directly. The environment variable `MAILER_ENABLED` is ignored, preventing email features from running unless modified in code.
-    *   *Fix*: Update line 32 in `backend/config.js` to read: `nodemailerEnabled: process.env.MAILER_ENABLED === 'true'`.
-2.  **Old Socket.io Protocol Version**: The project uses Socket.IO `2.5.0`, which uses an older protocol than modern versions (v4.x).
-    *   *Fix*: Upgrade `socket.io` and `socket.io-client` dependencies.
-3.  **NeDB Active State Isolation**: NeDB works well for single-node setups but limits horizontal scaling (since state is kept in local memory).
-    *   *Fix*: For clustered environments, migrate transport tracking to Redis.
+### Realtime Messaging
+- Socket.IO 4 with an authenticated handshake: a socket must present a valid token shortly after connecting or it is dropped, and sessions revoked on the server stop working on sockets as well as HTTP.
+- Each user has a private socket room; conversation fan-out is computed from server-side membership, so clients cannot subscribe themselves to someone else's conversation.
+- The Redis adapter lets multiple backend instances share events, with a single-process fallback when Redis is not configured.
+- Delivery and read receipts, typing indicators and presence; message ordering relies on database IDs.
+- Resync after reconnect and jump-to-message / search-around-message support.
+
+### AI System
+- Features: conversation summarization, translation, draft replies, message rewriting, titles and topics, and meeting summaries/transcription.
+- Requests pass through a governed pipeline: eligibility checks (a summary is not run on a three-message chat), per-user and global quotas, a de-duplication lock so identical concurrent requests collapse into one job, and a hard input-token budget.
+- A provider router supports Gemini and Groq in the cloud and Ollama as a self-hosted option, with a circuit breaker so a failing provider does not stall users. With no provider configured, AI endpoints are simply off.
+- Summaries are stored and reused until the conversation has changed enough to justify a refresh.
+- See [`docs/ZEPH-AI-ARCHITECTURE.md`](docs/ZEPH-AI-ARCHITECTURE.md) and [`docs/AI-STRATEGY.md`](docs/AI-STRATEGY.md).
+
+### Authentication & Security
+- Argon2 password hashing, server-tracked sessions that can be revoked per device, passkey (WebAuthn) sign-in, and a Private Vault that gates hidden conversations behind a PIN or passkey.
+- Sensitive actions (changing a password, managing sessions, moderation) pass through a risk engine that can allow, require step-up, or deny.
+- Authorization is enforced server-side per resource: DM membership, group roles with capability checks, and an admin privacy boundary.
+- Details in [Security](#security).
+
+### Database & Caching
+- MongoDB (Mongoose) with indexes designed around the access patterns: conversation lookup, message history by cursor, per-room de-duplication, TTL indexes for short-lived tokens and invites.
+- A uniqueness constraint prevents duplicate direct-message rooms.
+- Redis is used for the Socket.IO adapter, rate limiting, AI quota and de-duplication state, caching, and job queues.
+
+### File/Media System
+- Seven media categories (image, video, audio, PDF, document, archive, text) governed by a single policy: extension, MIME type, size limit and security level are defined in one place and mirrored (with a test that fails if the mirror drifts) in the frontend.
+- Flow: the client requests an upload slot, uploads directly to object storage using headers the server signed, then asks the server to finalize. Finalization re-checks the real stored size and content type, sniffs the file's actual bytes, inspects archives, generates image thumbnails, and deletes anything that fails.
+- Videos can be trimmed and muted client-side before sending, with a fast path that uploads untouched clips as-is.
+- Downloads and previews are served through a Cloudflare Worker using short-lived signed links with range-request support. Document, archive and text types are always served as downloads rather than rendered.
+- Deleting a message for everyone detaches its media, then a background job removes the stored objects.
+- See [`docs/CDN-ARCHITECTURE.md`](docs/CDN-ARCHITECTURE.md).
+
+### Notifications
+- In-app toasts and previews driven by socket events, unread/receipt state per message, and transactional email (verification, password reset, invites) sent through a mail provider's HTTP API from a queued outbox.
+
+### Network & Performance
+- Cursor pagination for message history, route-level code splitting (admin, media viewers, editors, meetings load on demand), direct-to-storage uploads that bypass the application server, small payloads, and compression.
+- Optimistic UI for sending and deleting, debounced typing/search requests, and retry with backoff.
+- Call video is capped by resolution and bitrate to protect both user data plans and platform cost.
+
+---
+
+## Performance
+
+Numbers below come from the project's own measurements and are labelled by how they were taken. None are production capacity claims.
+
+**Live measurement (real Cloudflare Realtime, headless Chromium with a synthetic camera, one machine, single-digit runs)**
+
+| Change | Before | After |
+|---|---|---|
+| Delivered call video | 640x360 at ~190 kbps | 1280x720 at ~20 fps, ~640-660 kbps |
+| Camera / mic / screen off-on cycles | - | 9 of 9 delivered |
+| 4 participants x 3 tracks | - | all tracks received |
+| Re-enabling a track | 0.7-1.1 s | 0.6-0.8 s |
+
+Source: [`docs/CALL-QUALITY-METRICS.md`](docs/CALL-QUALITY-METRICS.md), [`docs/CALL-FIXES-LOG.md`](docs/CALL-FIXES-LOG.md). Caveats: synthetic video, not a two-real-device test.
+
+**Local benchmarks (developer laptop, local MongoDB/Redis, single Node process, single run, not production)**
+
+| Measurement | Result |
+|---|---|
+| Room list, 10 / 50 / 100 concurrent requests | p50 55 / 267 / 506 ms |
+| Socket.IO, 500 concurrent clients | 500 of 500 connected, no errors; connect+auth p50 596 ms |
+| Backend memory under a burst | ~105 MB rising to ~226 MB peak |
+| User-level query | full scan of 3,005 documents became an index lookup examining 1 |
+| History pagination over 5,000 messages | 50 documents examined per page |
+
+These were taken before the current distributed rate limiter replaced the original in-process one, so they describe raw throughput, not current limiting behaviour. Source: [`docs/PHASE8-CAPACITY-REPORT.md`](docs/PHASE8-CAPACITY-REPORT.md) (kept as a historical record).
+
+**AI pipeline (local, against a mock model server with a fixed 300 ms delay)**
+
+| Scenario | Result |
+|---|---|
+| 10 identical concurrent summary requests | collapsed into 1 model call |
+| Cached summary read | p50 ~60 ms |
+| Per-user burst of 15 requests | 5 accepted, the rest rejected in a few milliseconds |
+
+Real model latency was not measured. Source: [`docs/ZEPH-AI-ARCHITECTURE.md`](docs/ZEPH-AI-ARCHITECTURE.md).
+
+---
+
+## Security
+
+Security mechanisms are described here by purpose. Detailed findings and operational notes are kept in internal documentation.
+
+| Area | Mechanism |
+|---|---|
+| Authentication | Argon2 password hashing; passkey sign-in; per-device sessions that can be revoked server-side and are re-checked on sockets |
+| Sensitive actions | Risk-based decision (allow / step-up / deny) that fails closed; AI contributes only an advisory, bounded signal |
+| Authorization | Server-side checks on every read and write: conversation membership, group role capabilities, admin privacy boundary, media access tied to the referencing conversation |
+| Abuse prevention | Distributed Redis token-bucket rate limiting across all route groups; it denies requests rather than allowing them when its backing store is unavailable |
+| Input handling | Server-side validation and sanitization; payload and file size limits |
+| Uploads | Server-chosen storage keys, signed upload headers, content sniffing, executable rejection, archive inspection, real-size verification, ownership checks, and poster/thumbnail validation |
+| Media delivery | Short-lived signed links, no direct storage exposure, safe download behaviour for risky types |
+| Transport & headers | HTTPS/WSS, hardened HTTP headers, origin allow-list |
+| Secrets & logging | Structured logs with credential redaction; secret scanning and dependency audit in CI |
+| Audit | Security events are recorded for authentication, authorization denials and rate-limit triggers |
+
+**Encryption.** Traffic is encrypted in transit (HTTPS/WSS). Zeph is **not** end-to-end encrypted: message content is readable by the server. A design for end-to-end encryption exists in [`docs/E2EE-THREAT-MODEL.md`](docs/E2EE-THREAT-MODEL.md) but is not implemented, and the product does not claim it.
+
+For security policy and reporting, see [`SECURITY.md`](SECURITY.md).
+
+---
+
+## AI & Business Logic
+
+AI exists to reduce reading and writing effort in a messenger, not as a gimmick:
+
+- **Summaries** let someone catch up on a long group thread in seconds.
+- **Translation** removes a language barrier inside a conversation.
+- **Draft replies and rewriting** help compose messages faster.
+- **Meeting summaries** turn recorded audio into notes.
+
+Business and cost controls are part of the design: AI is opt-in per action (never automatic), quota-limited per user, de-duplicated, bounded in context size, and cached. A self-hosted model option exists so conversations do not have to leave the deployment. Because conversation text is sent to the configured provider, cloud providers should only be enabled where that is acceptable.
+
+---
+
+## Scalability & Reliability
+
+**Implemented today**
+- Stateless API behind a Redis-backed socket adapter, so more instances can be added for realtime fan-out.
+- Background work (cleanup, AI, analysis) runs in BullMQ workers with retries.
+- Graceful shutdown that drains HTTP, sockets, workers and database connections; liveness and readiness health checks.
+- Idempotent writes and resync, so network failures degrade to retries rather than data loss.
+- Provider circuit breakers, request timeouts, usage guards on paid services, and graceful behaviour when optional services (AI, mail, storage backend) are not configured.
+- Heavy assets bypass the application server (direct uploads, CDN delivery).
+
+**Not yet implemented (honest roadmap)**
+- Cross-instance presence and call state, automated database backups, metrics and distributed tracing, a content-security policy, and load testing beyond a single node. Zeph has been measured at the scale of hundreds of concurrent local connections, not millions of users.
+
+---
+
+## Tech Stack
+
+| Responsibility | Technology |
+|---|---|
+| Frontend | React 18, Vite, Redux, Tailwind CSS v4, shadcn/ui (Radix), Lucide icons, React Query (mutations) |
+| Backend | Node.js 20+, Express 4, Socket.IO 4, Mongoose |
+| Data | MongoDB, Redis |
+| Queues & jobs | BullMQ |
+| Auth | Argon2, JWT sessions, WebAuthn passkeys (SimpleWebAuthn) |
+| Media | Cloudflare R2 (S3-compatible), Cloudflare Worker CDN, sharp |
+| Calls | Cloudflare Realtime SFU (default), mediasoup (self-hosted option), WebRTC |
+| AI | Groq, Gemini, Ollama behind a provider router |
+| Testing | Jest, Supertest, mongodb-memory-server, Vitest, Testing Library, Node test runner |
+| CI/CD & hosting | GitHub Actions, Vercel (frontend), Render (backend), MongoDB Atlas, Upstash Redis, Docker |
+
+---
+
+## Engineering Decisions & Trade-offs
+
+Every significant decision is recorded in [`DECISIONS.md`](DECISIONS.md). A few that shaped the project:
+
+- **Idempotency over exactly-once transport.** HTTP + a unique constraint is simpler and more robust than building acknowledgement protocols on sockets. Trade-off: sends are request/response, not a socket push.
+- **Cloudflare Realtime instead of self-hosting an SFU.** The host used for the API cannot expose the wide UDP port range an SFU needs. A managed SFU removed that constraint at the cost of a usage cap, which is guarded. The self-hosted engine remains behind a switch.
+- **Direct-to-storage uploads.** Saves server bandwidth and memory, at the cost of a two-step flow that needs careful server-side re-verification at finalization.
+- **Sniff the bytes, don't trust the browser.** Slightly more work per upload; removes a whole class of disguised-file problems.
+- **Fail closed on rate limiting.** Protects the platform when Redis is down; the trade-off is reduced availability in that failure mode.
+- **Optional AI with a provider abstraction.** Costs some abstraction code, but keeps vendor lock-in, cost and privacy under control.
+- **Tailwind + shadcn/ui as the only styling system.** One consistent design language across chat, auth, settings, meetings and admin. See [`docs/CHITCX-DESIGN-SYSTEM-MIGRATION.md`](docs/CHITCX-DESIGN-SYSTEM-MIGRATION.md).
+- **Honest scope.** E2EE, backups and tracing are documented as gaps rather than hidden.
+
+---
+
+## Testing
+
+- **Backend:** approximately 1,450 test cases across ~146 files (Jest, Supertest, an in-memory MongoDB per test file). Coverage includes authentication and sessions, authorization, rate limiting, socket auth and the Redis adapter, uploads, the CDN signing, AI governance, and the calls engine.
+- **Media matrix:** a table-driven suite exercises every supported file extension through presign, upload, finalization, serving metadata and rejection paths, plus tests that the frontend and backend media policies cannot drift apart.
+- **Frontend:** approximately 650 test cases across ~78 files (Vitest + Testing Library), including the upload client, video editor, optimistic delete with rollback, the offline outbox and the calls engine.
+- **CDN Worker:** a dedicated suite for signature verification, range handling and header behaviour.
+- **CI:** every push runs secret scanning, formatting, linting, dependency audit, the backend and frontend suites, and Docker build smoke tests.
+- **Live checks:** scripts exist to verify storage, CDN and call connectivity against real services.
+
+Counts are static counts of test cases, not a run report. A small number of frontend tests in the meeting recorder component are known to fail on label wording. See [`docs/TESTING-STRATEGY.md`](docs/TESTING-STRATEGY.md) for the original strategy (parts predate the current suite).
+
+---
+
+## Deployment & Infrastructure
+
+| Layer | Where |
+|---|---|
+| Frontend | Vercel (static SPA with long-lived caching for hashed assets) |
+| Backend API + sockets | Render |
+| Database | MongoDB Atlas |
+| Redis / queues | Upstash Redis |
+| Media storage | Cloudflare R2 |
+| Media delivery | Cloudflare Worker (signed URLs, range requests) |
+| Calls | Cloudflare Realtime |
+| Mail | Transactional email provider over HTTP |
+| CI | GitHub Actions (gitleaks, tests, lint, audit, Docker smoke builds) |
+
+Notes: edge caching of media requires the domain to sit on Cloudflare DNS and is a planned step. Cost is deliberately kept modest and bounded (see [`docs/COST-MODEL.md`](docs/COST-MODEL.md) for the original cost reasoning, partly superseded by [`DECISIONS.md`](DECISIONS.md)).
+
+---
+
+## Project Structure
+
+```
+zeph/
+├── backend/            Express + Socket.IO API, models, routes, queues, AI, calls
+│   ├── src/routes/       HTTP endpoints
+│   ├── src/models/       Mongoose schemas
+│   ├── src/queues/       BullMQ queues and workers
+│   ├── src/ai/           AI gateway, providers, quota, dedup
+│   ├── src/calls/        Call engines (Cloudflare Realtime / shared lifecycle)
+│   ├── src/mediasoup/    Self-hosted SFU option
+│   ├── loadtest/         Load and call-quality harnesses
+│   └── test/             Jest suites
+├── frontend/           React SPA (Vite)
+│   ├── src/features/     Conversation, meetings, settings, admin
+│   ├── src/components/ui shadcn/ui primitives
+│   ├── src/actions/      API and socket actions
+│   └── src/lib/          Outbox, media policy, call engine, hooks
+├── cdn-worker/         Cloudflare Worker for signed media delivery
+├── ebpf-sensor/        Optional Linux network telemetry sensor
+├── docs/               Design notes, audits, measurements
+├── docker-compose.yml  Local development stack
+└── DECISIONS.md        Engineering decision log
+```
+
+`documentation/`, `scripts/` and `launcher` are leftovers from the original template and are not part of the Zeph workflow.
+
+---
+
+## Challenges & Solutions
+
+1. **Browser uploads to object storage failing with a bad-request error.** The browser showed a CORS-style failure, but the real cause was the HTTP client library attaching the user's login credential to a cross-origin storage request, which the storage service rejects. Fix: upload with a plain request that sends only the headers the server signed, and bind the content type, cache and disposition headers into the signature. Proven with a real-browser reproduction and covered by regression tests. See [`docs/PROBLEMS-AND-SOLUTIONS.md`](docs/PROBLEMS-AND-SOLUTIONS.md).
+2. **Video and screen share not reaching other participants.** A single WebRTC session could not both publish and receive reliably. Fix: separate send and receive sessions per participant with a fresh session on each toggle, verified live with 4 participants x 3 tracks. See [`docs/CALL-FIXES-LOG.md`](docs/CALL-FIXES-LOG.md).
+3. **Messages on unstable networks.** Retries created duplicates and reconnects created gaps. Fix: client IDs with a database uniqueness guarantee, a durable local outbox, and a server resync call.
+4. **Trusting client-supplied upload metadata.** Type, size and thumbnail references from the browser were treated too generously. Fix: derive the type from the validated extension, re-verify the stored size and bytes at finalization, and validate any companion thumbnail against the uploader's own object.
+5. **Deleting media for real.** Deleting a message left its file in storage. Fix: detach the reference first (which immediately stops serving it), skip the purge if another message still uses it, then remove the objects in a retried background job, with an optimistic UI that rolls back if the request fails.
+
+---
+
+## Future Improvements
+
+- End-to-end encryption for direct messages, following the documented threat model.
+- Automated database backups and a tested restore procedure.
+- Metrics, distributed tracing and alerting.
+- A content-security policy and continued hardening of token lifecycle and AI prompt handling.
+- Cross-instance presence and call state.
+- Edge caching for media after moving DNS to Cloudflare.
+- A real two-device call test and broader multi-node load tests.
+- Upload cancel/retry controls and richer previews for non-image files.
+
+---
+
+## Getting Started
+
+**Prerequisites:** Node.js 20+ (22 for the frontend), MongoDB, Redis. Docker is optional but simplest.
+
+**Option A: Docker**
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+# edit backend/.env: set AUTH_SECRET and the ROOT_USER_* admin account
+docker compose up --build
+```
+
+The app is served on `http://localhost:5173`, the API on port 4002.
+
+**Option B: Manual**
+
+```bash
+# terminal 1
+cd backend && npm install && npm start
+
+# terminal 2
+cd frontend && npm install && npm run dev
+```
+
+**Tests**
+
+```bash
+cd backend && npm test
+cd frontend && npm test
+cd cdn-worker && npm test
+```
+
+The admin account is created from the `ROOT_USER_*` settings on first start.
+
+---
+
+## Environment Variables
+
+Copy `backend/.env.example` and `frontend/.env.example`; the examples list every option. Never commit real values.
+
+| Group | Purpose | Required? |
+|---|---|---|
+| Core | `AUTH_SECRET`, MongoDB connection, `ROOT_USER_*` admin account, `PORT`, `CORS_ORIGIN` | Yes |
+| Redis | `REDIS_URL` for the socket adapter, rate limiting, queues, caching | Effectively yes (rate limiting needs it) |
+| Object storage / CDN | Storage endpoint and credentials, CDN base URL and signing key | Optional (falls back to local disk) |
+| Calls | `CALL_BACKEND` and the provider credentials for the chosen engine, usage caps | Optional |
+| AI | `AI_PROVIDER`, provider keys or local model URL, token/quota limits | Optional (AI is off by default) |
+| Mail | Mail provider credentials | Optional |
+| Rate limits | Per-policy capacity and refill overrides | Optional |
+| Security extras | Threat-intelligence and sensor settings | Optional |
+
+---
+
+## API / Architecture Documentation
+
+| Topic | Document |
+|---|---|
+| Engineering decisions | [`DECISIONS.md`](DECISIONS.md) |
+| New features (calls, meetings, storage, CDN) | [`docs/NEW-FEATURES.md`](docs/NEW-FEATURES.md) |
+| AI architecture and strategy | [`docs/ZEPH-AI-ARCHITECTURE.md`](docs/ZEPH-AI-ARCHITECTURE.md), [`docs/AI-STRATEGY.md`](docs/AI-STRATEGY.md) |
+| AI security risk engine | [`docs/PHASE6-AI-SECURITY-RISK-ENGINE.md`](docs/PHASE6-AI-SECURITY-RISK-ENGINE.md) |
+| CDN and media delivery | [`docs/CDN-ARCHITECTURE.md`](docs/CDN-ARCHITECTURE.md) |
+| Rate limiting design | [`docs/RATE-LIMITING.md`](docs/RATE-LIMITING.md) |
+| Call quality and fixes | [`docs/CALL-QUALITY-METRICS.md`](docs/CALL-QUALITY-METRICS.md), [`docs/CALL-FIXES-LOG.md`](docs/CALL-FIXES-LOG.md) |
+| Problems and solutions | [`docs/PROBLEMS-AND-SOLUTIONS.md`](docs/PROBLEMS-AND-SOLUTIONS.md) |
+| Capacity measurements (historical) | [`docs/PHASE8-CAPACITY-REPORT.md`](docs/PHASE8-CAPACITY-REPORT.md) |
+| E2EE design (not implemented) | [`docs/E2EE-THREAT-MODEL.md`](docs/E2EE-THREAT-MODEL.md) |
+| Security policy | [`SECURITY.md`](SECURITY.md) |
+| Developer notes | [`README.dev.md`](README.dev.md) |
+
+---
+
+## Screenshots / Demo
+
+> Screenshots and a demo video are coming soon. Place images in `docs/screenshots/` and reference them here.
+
+| Chat | Video call | AI summary | Private vault |
+|---|---|---|---|
+| _coming soon_ | _coming soon_ | _coming soon_ | _coming soon_ |
+
+Try it live: **[zephchat.tech](https://www.zephchat.tech/)**
+
+---
+
+## Author
+
+**Adarsh Arya** ([@GEARdHAX](https://github.com/GEARdHAX))
+
+- GitHub: [github.com/GEARdHAX](https://github.com/GEARdHAX)
+- LinkedIn: _add link_
+- Email: _add address_
