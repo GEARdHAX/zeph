@@ -30,7 +30,7 @@ I wanted a project where the interesting problems were real ones: delivering a m
 
 1. **Idempotent, resilient message delivery.** Every outgoing message carries a client-generated ID enforced by a database uniqueness guarantee, so retries after a timeout can never create duplicates. A durable IndexedDB outbox holds unsent messages across reloads and flushes them on reconnect with backoff, and a resync call fills any gap after a disconnect.
 2. **Layered security model.** Server-side session revocation, passkeys, a PIN/WebAuthn "private vault", risk-based step-up for sensitive actions, role-based group authorization, ownership checks on every media read, and a Redis-backed rate limiter that fails closed.
-3. **Hardened upload pipeline.** Direct-to-object-storage uploads with server-signed headers, one source of truth for type/extension/size policy, content sniffing instead of trusting the browser, archive inspection, and server-generated storage keys. Verified with a test matrix covering all 56 supported file extensions.
+3. **Hardened upload pipeline.** Direct-to-object-storage uploads with server-signed headers, one source of truth for type/extension/size policy, content sniffing instead of trusting the browser, archive inspection, and server-generated storage keys. Verified with a test matrix covering all 52 supported file extensions.
 4. **Signed-URL CDN on a Cloudflare Worker.** Private media is served through short-lived signed links with range-request support, correct download behaviour for risky types, and no direct storage exposure.
 5. **Calls on Cloudflare Realtime.** An SFU-based calling engine selectable at runtime (Cloudflare Realtime by default, self-hosted mediasoup as an alternative), with a monthly usage guard to keep cost bounded. Measured live: a 4x increase in delivered pixels at the same stability.
 6. **Governed, optional AI.** A provider-agnostic gateway (cloud or self-hosted model) with eligibility rules, per-user quotas, request de-duplication, bounded context, cached summaries and background jobs. The product works fully with AI switched off.
@@ -302,7 +302,7 @@ These were taken before the current distributed rate limiter replaced the origin
 | Message send, 100 simultaneous | p50 0.54 s |
 | Login, 200 simultaneous | ~32 logins/s (Argon2 is CPU-bound); p50 3.1 s |
 | Image upload via the server, 100 simultaneous | ~9 uploads/s (thumbnail work); PDFs ~60/s |
-| Sockets | 500 of 500 connected and authenticated, p50 456 ms |
+| Sockets (Node client) | 500 of 500 connected and authenticated, p50 456 ms (a simultaneous k6 burst of 500 authenticated only 304; see the load-test doc) |
 
 With default rate limits, 500 and 1,000 simultaneous sends from one IP had 40% and 70% rejected, which is the limiter working. Calls were not load tested, and sockets above 500 are untested. Re-tested with Grafana k6 at a steady arrival rate: 150 message sends/s with p95 13 ms and 0 failures on one local process (it queues beyond roughly 200/s). Full method and caveats: [`docs/LOAD-TEST-RESULTS.md`](docs/LOAD-TEST-RESULTS.md).
 
