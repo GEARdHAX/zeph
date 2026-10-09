@@ -294,6 +294,18 @@ Source: [`docs/CALL-QUALITY-METRICS.md`](docs/CALL-QUALITY-METRICS.md), [`docs/C
 
 These were taken before the current distributed rate limiter replaced the original in-process one, so they describe raw throughput, not current limiting behaviour. Source: [`docs/PHASE8-CAPACITY-REPORT.md`](docs/PHASE8-CAPACITY-REPORT.md) (kept as a historical record).
 
+**Load tests (2026-10-09; one local Node process, laptop shared with the load generator, burst of simultaneous requests, not production)**
+
+| Area | Result (0 errors) |
+|---|---|
+| Message send, 2,000 simultaneous | p50 7.7 s; saturated at ~240 messages/s |
+| Message send, 100 simultaneous | p50 0.54 s |
+| Login, 200 simultaneous | ~32 logins/s (Argon2 is CPU-bound); p50 3.1 s |
+| Image upload via the server, 100 simultaneous | ~9 uploads/s (thumbnail work); PDFs ~60/s |
+| Sockets | 500 of 500 connected and authenticated, p50 456 ms |
+
+With default rate limits, 500 and 1,000 simultaneous sends from one IP had 40% and 70% rejected, which is the limiter working. Calls were not load tested, and sockets above 500 are untested. Re-tested with Grafana k6 at a steady arrival rate: 150 message sends/s with p95 13 ms and 0 failures on one local process (it queues beyond roughly 200/s). Full method and caveats: [`docs/LOAD-TEST-RESULTS.md`](docs/LOAD-TEST-RESULTS.md).
+
 **AI pipeline (local, against a mock model server with a fixed 300 ms delay)**
 
 | Scenario | Result |
@@ -538,6 +550,7 @@ Copy `backend/.env.example` and `frontend/.env.example`; the examples list every
 | Rate limiting design | [`docs/RATE-LIMITING.md`](docs/RATE-LIMITING.md) |
 | Call quality and fixes | [`docs/CALL-QUALITY-METRICS.md`](docs/CALL-QUALITY-METRICS.md), [`docs/CALL-FIXES-LOG.md`](docs/CALL-FIXES-LOG.md) |
 | Problems and solutions | [`docs/PROBLEMS-AND-SOLUTIONS.md`](docs/PROBLEMS-AND-SOLUTIONS.md) |
+| Load test results (current) | [`docs/LOAD-TEST-RESULTS.md`](docs/LOAD-TEST-RESULTS.md) |
 | Capacity measurements (historical) | [`docs/PHASE8-CAPACITY-REPORT.md`](docs/PHASE8-CAPACITY-REPORT.md) |
 | E2EE design (not implemented) | [`docs/E2EE-THREAT-MODEL.md`](docs/E2EE-THREAT-MODEL.md) |
 | Security policy | [`SECURITY.md`](SECURITY.md) |

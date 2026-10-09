@@ -94,3 +94,12 @@ node loadtest/message-only-load.js 1000
 
 Real results from these exact scripts are recorded in
 `docs/PHASE8-CAPACITY-REPORT.md`.
+
+## Additional scripts (2026-10-09)
+
+- **`auth-load.js [concurrency] [baseUrl]`** - registers N users (setup), then logs them all in at once. Argon2 makes
+  this CPU-bound; raise `RATE_LIMIT_AUTH_CAPACITY` on the target or the auth limiter rejects most of it.
+- **`upload-load.js [concurrency] [baseUrl] [png|pdf]`** - concurrent uploads through the server's proxy upload route
+  (local-disk storage). Does not cover the direct-to-R2 path.
+
+Current results: `docs/LOAD-TEST-RESULTS.md`.
